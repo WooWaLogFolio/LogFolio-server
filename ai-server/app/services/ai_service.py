@@ -7,6 +7,11 @@ from app.schemas.models import (
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
 )
+from app.schemas.project import (
+    StructureProjectRequest,
+    StructureProjectResponse,
+    StructuredProject,
+)
 
 
 class AIService:
@@ -15,6 +20,29 @@ class AIService:
     Spring Boot와 요청·응답 규격을 합의한 후 이 메서드 내부를
     OpenAI Structured Output 호출로 교체합니다.
     """
+
+    async def structure_project(
+        self, request: StructureProjectRequest
+    ) -> StructureProjectResponse:
+        evidence = [document.file_name for document in request.documents]
+        return StructureProjectResponse(
+            structured_project=StructuredProject(
+                summary=request.project.description,
+                evidence=evidence,
+            ),
+            missing_contexts=[
+                "role",
+                "problem",
+                "action",
+                "collaboration",
+                "result",
+                "learning",
+            ],
+            warnings=[
+                "현재 응답은 API 연동 확인용 임시 결과입니다.",
+                "입력 자료에서 확인되지 않은 성과는 생성하지 않았습니다.",
+            ],
+        )
 
     async def generate_questions(
         self, request: GenerateQuestionsRequest

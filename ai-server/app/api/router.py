@@ -8,6 +8,7 @@ from app.schemas.models import (
     GenerateQuestionsResponse,
     HealthResponse,
 )
+from app.schemas.project import StructureProjectRequest, StructureProjectResponse
 from app.services.ai_service import ai_service
 
 api_router = APIRouter()
@@ -24,6 +25,13 @@ async def generate_questions(
     request: GenerateQuestionsRequest,
 ) -> GenerateQuestionsResponse:
     return await ai_service.generate_questions(request)
+
+
+@ai_router.post("/structure-project", response_model=StructureProjectResponse)
+async def structure_project(
+    request: StructureProjectRequest,
+) -> StructureProjectResponse:
+    return await ai_service.structure_project(request)
 
 
 @ai_router.post("/generate-card", response_model=GenerateCardResponse)

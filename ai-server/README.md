@@ -35,6 +35,7 @@ Copy-Item .env.example .env
 ## API
 
 - `GET /health`: 서버 상태 확인
+- `POST /api/v1/ai/structure-project`: 프로젝트 설명과 문서 텍스트 구조화
 - `POST /api/v1/ai/generate-questions`: 선택 기록 기반 보완 질문 생성
 - `POST /api/v1/ai/generate-card`: 기록과 문답 기반 경험 카드 구조화
 
