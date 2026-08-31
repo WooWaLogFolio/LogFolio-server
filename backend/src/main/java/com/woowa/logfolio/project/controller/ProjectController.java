@@ -4,6 +4,7 @@ import com.woowa.logfolio.project.dto.ProjectCreateRequest;
 import com.woowa.logfolio.project.dto.ProjectResponse;
 import com.woowa.logfolio.project.dto.ProjectUpdateRequest;
 import com.woowa.logfolio.project.service.ProjectService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
+@Tag(name = "Project", description = "프로젝트 관리 API")
 public class ProjectController {
 
     private final ProjectService projectService;

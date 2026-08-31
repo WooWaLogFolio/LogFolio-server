@@ -4,6 +4,7 @@ import com.woowa.logfolio.user.dto.UserCreateRequest;
 import com.woowa.logfolio.user.dto.UserResponse;
 import com.woowa.logfolio.user.dto.UserUpdateRequest;
 import com.woowa.logfolio.user.service.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Tag(name = "User", description = "사용자 관리 API")
 public class UserController {
 
     private final UserService userService;
