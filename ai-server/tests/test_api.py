@@ -63,3 +63,14 @@ def test_validation_error_uses_shared_error_shape() -> None:
     assert body["code"] == "VALIDATION_ERROR"
     assert body["message"] == "요청 값이 API 계약과 일치하지 않습니다."
     assert body["details"][0]["field"] == "analysisRunId"
+
+
+def test_not_found_uses_shared_error_shape() -> None:
+    response = client.get("/not-found")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "NOT_FOUND",
+        "message": "요청한 API를 찾을 수 없습니다.",
+        "details": [],
+    }
