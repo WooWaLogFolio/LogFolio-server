@@ -1,2 +1,1 @@
 """LogFolio AI server package."""
-

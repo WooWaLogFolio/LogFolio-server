@@ -99,4 +99,3 @@ class AnalysisResponse(ContractModel):
     summary: str = Field(min_length=1)
     candidates: List[ExperienceCandidate] = Field(default_factory=list, max_length=3)
     questions: List[GapQuestion] = Field(default_factory=list, max_length=2)
-

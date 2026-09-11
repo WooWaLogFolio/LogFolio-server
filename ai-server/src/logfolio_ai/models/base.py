@@ -11,4 +11,3 @@ class ContractModel(BaseModel):
         extra="forbid",
         str_strip_whitespace=True,
     )
-
