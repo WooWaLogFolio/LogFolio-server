@@ -211,7 +211,7 @@ MVP는 정확한 근거 추적과 사용자 검토 흐름을 우선합니다.
 
 ## Development status
 
-현재 AI 서버는 설계 및 계약 정리 단계입니다. 구현은 다음 순서로 진행합니다.
+현재 AI 서버는 계약 모델과 기본 실행 구조를 구현하는 단계입니다. 구현은 다음 순서로 진행합니다.
 
 1. Spring–FastAPI 요청·응답 모델
 2. FastAPI 기본 서버와 공통 오류 응답
@@ -223,3 +223,27 @@ MVP는 정확한 근거 추적과 사용자 검토 흐름을 우선합니다.
 8. Spring 통합 테스트
 
 구현이 진행되면 이 문서에 실행 방법, 환경변수, API 예시와 테스트 방법을 추가합니다.
+
+## Local development
+
+Python 3.9 이상이 필요합니다.
+
+```bash
+cd ai-server
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[dev]'
+uvicorn logfolio_ai.main:app --app-dir src --reload
+```
+
+서버 실행 후 다음 주소에서 상태와 API 문서를 확인할 수 있습니다.
+
+- Health: `http://localhost:8000/health`
+- Swagger UI: `http://localhost:8000/docs`
+
+테스트는 다음 명령으로 실행합니다.
+
+```bash
+pytest
+```
