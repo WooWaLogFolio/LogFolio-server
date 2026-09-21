@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     database_url: Optional[SecretStr] = None
     vector_dimension: int = Field(default=768, ge=1, le=2000)
     retrieval_top_k: int = Field(default=5, ge=1, le=20)
+    max_grounded_chunks: int = Field(default=15, ge=1, le=25)
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":

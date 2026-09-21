@@ -117,6 +117,8 @@ MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터�
 
 외부 LLM은 Provider 인터페이스 뒤에 분리하여 공급자나 모델이 변경되더라도 분석 흐름 전체를 다시 작성하지 않도록 설계합니다.
 
+분석 Orchestrator는 여러 검색 목적에서 같은 Chunk가 발견되면 한 번만 전달하고, 해당 Chunk가 어떤 목적으로 검색됐는지 함께 기록합니다. 기본적으로 거리순 최대 15개 Chunk만 LLM에 전달하며 원본 문서 전체는 전달하지 않습니다.
+
 ### LLM Provider and environments
 
 분석 코드는 특정 LLM 공급자에 직접 의존하지 않습니다. 동일한 `LLMProvider` 계약 뒤에서 실행 환경에 따라 구현체만 선택합니다.
@@ -131,6 +133,8 @@ MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터�
 - 운영: 운영 전용 Google 프로젝트와 유료 한도 및 API 키를 분리합니다.
 
 무료·유료 Tier에 따라 애플리케이션 코드를 나누지 않습니다. 요금제와 한도는 Google 프로젝트에서 관리하고, 서버는 Provider·모델·키를 환경변수로 주입받습니다. API 키는 Git에 커밋하지 않습니다.
+
+DB 주소가 없는 로컬 환경에서는 프로세스 메모리 Vector Store를 사용해 전체 RAG 흐름을 테스트합니다. `LOGFOLIO_AI_DATABASE_URL`이 설정된 환경에서만 PostgreSQL과 pgvector에 연결합니다.
 
 ### 6. Validate claims and evidence
 
@@ -300,6 +304,7 @@ LOGFOLIO_AI_EMBEDDING_BATCH_SIZE=16
 LOGFOLIO_AI_DATABASE_URL=postgresql://postgres:password@localhost:5432/logfolio
 LOGFOLIO_AI_VECTOR_DIMENSION=768
 LOGFOLIO_AI_RETRIEVAL_TOP_K=5
+LOGFOLIO_AI_MAX_GROUNDED_CHUNKS=15
 ```
 
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.

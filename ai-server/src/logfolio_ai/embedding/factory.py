@@ -8,7 +8,7 @@ from logfolio_ai.embedding.protocol import EmbeddingProvider
 
 def build_embedding_provider(settings: Settings) -> EmbeddingProvider:
     if settings.embedding_provider == "fake":
-        return FakeEmbeddingProvider()
+        return FakeEmbeddingProvider(dimension=settings.vector_dimension)
     return E5EmbeddingProvider(
         model_name=settings.embedding_model,
         batch_size=settings.embedding_batch_size,

@@ -4,8 +4,9 @@ from typing import Any, Optional
 from pydantic import ValidationError
 
 from logfolio_ai.core.errors import AppError
-from logfolio_ai.llm.prompt import build_analysis_prompt
-from logfolio_ai.models import AnalysisRequest, AnalysisResponse
+from logfolio_ai.llm.models import GroundedAnalysisInput
+from logfolio_ai.llm.prompt import build_grounded_analysis_prompt
+from logfolio_ai.models import AnalysisResponse
 
 
 class GeminiLLMProvider:
@@ -24,14 +25,28 @@ class GeminiLLMProvider:
         self._model = model
         self._timeout_seconds = timeout_seconds
 
-    async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
+    async def analyze_grounded(
+        self, request: GroundedAnalysisInput
+    ) -> AnalysisResponse:
+        return await self._generate(
+            build_grounded_analysis_prompt(request),
+            request.analysis_run_id,
+            request.project_id,
+        )
+
+    async def _generate(
+        self,
+        prompt: str,
+        analysis_run_id: Any,
+        project_id: Any,
+    ) -> AnalysisResponse:
         from google.genai import types
 
         try:
             response = await asyncio.wait_for(
                 self._client.aio.models.generate_content(
                     model=self._model,
-                    contents=build_analysis_prompt(request),
+                    contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
                         response_schema=AnalysisResponse,
@@ -65,7 +80,7 @@ class GeminiLLMProvider:
         # Tracking identifiers are server-owned and must never be trusted to the model.
         return result.model_copy(
             update={
-                "analysis_run_id": request.analysis_run_id,
-                "project_id": request.project_id,
+                "analysis_run_id": analysis_run_id,
+                "project_id": project_id,
             }
         )

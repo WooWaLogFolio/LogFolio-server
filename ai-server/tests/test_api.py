@@ -48,7 +48,7 @@ def test_fake_analysis_preserves_tracking_ids() -> None:
     body = response.json()
     assert body["analysisRunId"] == payload["analysisRunId"]
     assert body["projectId"] == payload["projectId"]
-    assert body["summary"] == "Fake LLM 분석 결과입니다."
+    assert body["summary"] == "Fake LLM 근거 기반 분석 결과입니다."
     assert body["candidates"] == []
     assert body["questions"] == []
 

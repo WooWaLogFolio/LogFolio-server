@@ -11,30 +11,33 @@ from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm.factory import build_llm_provider
 from logfolio_ai.llm.fake import FakeLLMProvider
 from logfolio_ai.llm.gemini import GeminiLLMProvider
-from logfolio_ai.models import AnalysisRequest
+from logfolio_ai.llm.models import GroundedAnalysisInput, GroundedChunk
+from logfolio_ai.rag import AnalysisPurpose
 
 
-def analysis_request() -> AnalysisRequest:
-    return AnalysisRequest.model_validate(
-        {
-            "analysisRunId": str(uuid4()),
-            "projectId": str(uuid4()),
-            "documents": [
-                {
-                    "sourceId": str(uuid4()),
-                    "fileName": "project.pdf",
-                    "pages": [{"pageNumber": 1, "text": "팀은 인터뷰를 진행했다."}],
-                }
-            ],
-        }
+def grounded_request() -> GroundedAnalysisInput:
+    return GroundedAnalysisInput(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        chunks=[
+            GroundedChunk(
+                chunk_id=uuid4(),
+                source_id=uuid4(),
+                file_name="project.pdf",
+                page_number=1,
+                text="팀은 인터뷰를 진행했다.",
+                distance=0.1,
+                purposes=[AnalysisPurpose.PROJECT_OVERVIEW],
+            )
+        ],
     )
 
 
 @pytest.mark.asyncio
 async def test_fake_provider_is_deterministic() -> None:
-    request = analysis_request()
+    request = grounded_request()
 
-    result = await FakeLLMProvider().analyze(request)
+    result = await FakeLLMProvider().analyze_grounded(request)
 
     assert result.analysis_run_id == request.analysis_run_id
     assert result.project_id == request.project_id
@@ -57,7 +60,7 @@ def test_factory_rejects_gemini_without_api_key() -> None:
 
 @pytest.mark.asyncio
 async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
-    request = analysis_request()
+    request = grounded_request()
     generated_run_id = uuid4()
     generated_project_id = uuid4()
     response_text = json.dumps(
@@ -80,7 +83,7 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
         client=client,
     )
 
-    result = await provider.analyze(request)
+    result = await provider.analyze_grounded(request)
 
     assert result.analysis_run_id == request.analysis_run_id
     assert result.project_id == request.project_id
@@ -88,6 +91,7 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     call = generate_content.await_args.kwargs
     assert call["model"] == "test-model"
     assert "팀은 인터뷰를 진행했다." in call["contents"]
+    assert "Analyze only the retrieved chunks" in call["contents"]
 
 
 @pytest.mark.asyncio
@@ -99,7 +103,7 @@ async def test_gemini_provider_maps_timeout_to_app_error() -> None:
     provider = GeminiLLMProvider("test-key", "test-model", 30, client=client)
 
     with pytest.raises(AppError) as error:
-        await provider.analyze(analysis_request())
+        await provider.analyze_grounded(grounded_request())
 
     assert error.value.code == "LLM_TIMEOUT"
     assert error.value.status_code == 504
@@ -114,6 +118,6 @@ async def test_gemini_provider_rejects_invalid_structured_output() -> None:
     provider = GeminiLLMProvider("test-key", "test-model", 30, client=client)
 
     with pytest.raises(AppError) as error:
-        await provider.analyze(analysis_request())
+        await provider.analyze_grounded(grounded_request())
 
     assert error.value.code == "LLM_INVALID_RESPONSE"
