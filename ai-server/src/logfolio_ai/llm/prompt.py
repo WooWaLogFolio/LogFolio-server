@@ -11,6 +11,8 @@ not supported, mark them as requiring confirmation or ask a concise question.
 Return only data that satisfies the supplied JSON schema. Return at most three experience
 candidates and at most two questions. Quotes must be exact excerpts from the source text.
 The result is an AI draft and must never be described as user-confirmed.
+Never return USER_INPUT, USER_CONFIRMED, or USER_EDITED provenance. Those states can
+only be created by the application after an actual user action.
 """
 
 

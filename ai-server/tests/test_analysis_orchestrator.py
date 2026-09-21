@@ -156,7 +156,7 @@ async def test_orchestrator_accepts_exact_quote_from_retrieved_chunk() -> None:
                     Claim(
                         section_type="ACTION",
                         content="JWT 인증 API를 구현했다.",
-                        subject_type=SubjectType.UNKNOWN,
+                        subject_type=SubjectType.TEAM,
                         provenance_type=ProvenanceType.SOURCE_EXTRACTED,
                         verification_status=VerificationStatus.VERIFIED,
                         evidence_type=EvidenceType.DIRECT,
