@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     gemini_api_key: Optional[SecretStr] = None
     gemini_model: str = "gemini-3.8-flash"
     llm_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
+    analysis_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
+    internal_auth_required: bool = False
+    internal_api_key: Optional[SecretStr] = None
     chunk_size_tokens: int = Field(default=700, ge=100, le=2000)
     chunk_overlap_tokens: int = Field(default=100, ge=0, le=500)
     embedding_provider: Literal["fake", "e5"] = "fake"

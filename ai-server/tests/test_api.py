@@ -1,7 +1,10 @@
+import asyncio
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+from logfolio_ai.analysis.dependencies import get_analysis_orchestrator
+from logfolio_ai.core.config import Settings, get_settings
 from logfolio_ai.main import app
 
 client = TestClient(app)
@@ -73,5 +76,82 @@ def test_not_found_uses_shared_error_shape() -> None:
     assert response.json() == {
         "code": "NOT_FOUND",
         "message": "요청한 API를 찾을 수 없습니다.",
+        "details": [],
+    }
+
+
+def test_analysis_requires_matching_internal_api_key_when_configured() -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_auth_required=True,
+        internal_api_key="spring-secret",
+    )
+    try:
+        missing = client.post("/api/v1/analyses", json=valid_analysis_payload())
+        invalid = client.post(
+            "/api/v1/analyses",
+            json=valid_analysis_payload(),
+            headers={"X-Internal-API-Key": "wrong-secret"},
+        )
+        valid = client.post(
+            "/api/v1/analyses",
+            json=valid_analysis_payload(),
+            headers={"X-Internal-API-Key": "spring-secret"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert missing.status_code == 401
+    assert missing.json()["code"] == "INTERNAL_AUTH_FAILED"
+    assert invalid.status_code == 401
+    assert "spring-secret" not in invalid.text
+    assert valid.status_code == 200
+
+
+def test_required_internal_auth_fails_closed_without_server_key() -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_auth_required=True,
+    )
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_AUTH_NOT_CONFIGURED"
+
+
+def test_non_local_environment_fails_closed_without_server_key() -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        environment="production",
+        internal_auth_required=False,
+    )
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_AUTH_NOT_CONFIGURED"
+
+
+def test_analysis_timeout_uses_shared_error_shape() -> None:
+    class SlowOrchestrator:
+        async def analyze(self, request):
+            del request
+            await asyncio.sleep(0.05)
+
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        analysis_timeout_seconds=0.001,
+    )
+    app.dependency_overrides[get_analysis_orchestrator] = lambda: SlowOrchestrator()
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 504
+    assert response.json() == {
+        "code": "ANALYSIS_TIMEOUT",
+        "message": "AI 분석 제한 시간을 초과했습니다.",
         "details": [],
     }
