@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
     chunk_size_tokens: int = Field(default=700, ge=100, le=2000)
     chunk_overlap_tokens: int = Field(default=100, ge=0, le=500)
+    embedding_provider: Literal["fake", "e5"] = "fake"
+    embedding_model: str = "intfloat/multilingual-e5-base"
+    embedding_batch_size: int = Field(default=16, ge=1, le=128)
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":

@@ -83,6 +83,8 @@ FastAPI는 긴 문서를 섹션, 문단, 문장 경계를 고려해 작은 Chunk
 
 Embedding 모델은 답변을 작성하지 않습니다. 서로 다른 표현을 사용하더라도 의미가 비슷한 문서 조각을 찾는 데 사용됩니다.
 
+Embedding도 교체 가능한 Provider로 분리합니다. 로컬·계약 테스트에서는 작은 결정적 Fake 벡터를 사용하고, 실제 검색 품질 검증에서는 E5를 사용합니다. E5에는 저장 문서에 `passage:`를, 검색 문장에 `query:`를 붙이고 Cosine 검색에 맞게 벡터를 정규화합니다.
+
 ### 4. Retrieve evidence with RAG
 
 벡터와 원문 Chunk는 PostgreSQL의 pgvector 확장에 저장됩니다. 분석할 때는 목적에 맞는 Query를 만들고, 현재 프로젝트 안에서 의미가 가까운 Chunk를 검색합니다.
@@ -254,6 +256,12 @@ python -m pip install -e '.[dev]'
 uvicorn logfolio_ai.main:app --app-dir src --reload
 ```
 
+실제 로컬 E5 모델을 실행할 환경에서는 Embedding 추가 의존성을 설치합니다. 첫 실행 시 모델 파일을 내려받으므로 네트워크와 디스크 공간이 필요합니다.
+
+```bash
+python -m pip install -e '.[dev,embedding]'
+```
+
 서버 실행 후 다음 주소에서 상태와 API 문서를 확인할 수 있습니다.
 
 - Health: `http://localhost:8000/health`
@@ -280,4 +288,9 @@ LOGFOLIO_AI_GEMINI_MODEL=gemini-3.8-flash
 LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=30
 LOGFOLIO_AI_CHUNK_SIZE_TOKENS=700
 LOGFOLIO_AI_CHUNK_OVERLAP_TOKENS=100
+LOGFOLIO_AI_EMBEDDING_PROVIDER=fake
+LOGFOLIO_AI_EMBEDDING_MODEL=intfloat/multilingual-e5-base
+LOGFOLIO_AI_EMBEDDING_BATCH_SIZE=16
 ```
+
+실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.
