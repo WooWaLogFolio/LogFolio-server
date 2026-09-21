@@ -14,8 +14,14 @@ class FakeEmbeddingProvider:
         return self._dimension
 
     def _embed(self, text: str) -> List[float]:
-        digest = hashlib.sha256(text.encode("utf-8")).digest()
-        raw = [digest[index] / 127.5 - 1.0 for index in range(self._dimension)]
+        values = bytearray()
+        counter = 0
+        while len(values) < self._dimension:
+            values.extend(
+                hashlib.sha256(f"{counter}:{text}".encode("utf-8")).digest()
+            )
+            counter += 1
+        raw = [value / 127.5 - 1.0 for value in values[: self._dimension]]
         norm = math.sqrt(sum(value * value for value in raw)) or 1.0
         return [value / norm for value in raw]
 

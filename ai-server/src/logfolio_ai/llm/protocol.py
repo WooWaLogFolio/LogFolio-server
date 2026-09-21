@@ -1,9 +1,11 @@
 from typing import Protocol
 
-from logfolio_ai.models import AnalysisRequest, AnalysisResponse
+from logfolio_ai.llm.models import GroundedAnalysisInput
+from logfolio_ai.models import AnalysisResponse
 
 
 class LLMProvider(Protocol):
-    async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
-        """Return a response that satisfies the shared Spring contract."""
-
+    async def analyze_grounded(
+        self, request: GroundedAnalysisInput
+    ) -> AnalysisResponse:
+        """Analyze only evidence chunks selected by the RAG pipeline."""
