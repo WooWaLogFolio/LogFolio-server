@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     embedding_provider: Literal["fake", "e5"] = "fake"
     embedding_model: str = "intfloat/multilingual-e5-base"
     embedding_batch_size: int = Field(default=16, ge=1, le=128)
+    database_url: Optional[SecretStr] = None
+    vector_dimension: int = Field(default=768, ge=1, le=2000)
+    retrieval_top_k: int = Field(default=5, ge=1, le=20)
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":

@@ -89,6 +89,8 @@ Embedding도 교체 가능한 Provider로 분리합니다. 로컬·계약 테스
 
 벡터와 원문 Chunk는 PostgreSQL의 pgvector 확장에 저장됩니다. 분석할 때는 목적에 맞는 Query를 만들고, 현재 프로젝트 안에서 의미가 가까운 Chunk를 검색합니다.
 
+AI 전용 원문 조각과 벡터는 `ai_document_chunks` 테이블에서 관리합니다. Spring 소유 테이블은 FastAPI 마이그레이션이 변경하지 않습니다. Spring이 프로젝트 접근 권한을 먼저 확인하고, FastAPI 검색은 다시 `projectId`를 필수 조건으로 사용합니다. 파일 또는 프로젝트가 삭제될 때는 해당 범위의 Chunk도 함께 제거할 수 있습니다.
+
 검색 목적의 예시는 다음과 같습니다.
 
 - 프로젝트가 해결하려던 문제
@@ -98,6 +100,8 @@ Embedding도 교체 가능한 Provider로 분리합니다. 로컬·계약 테스
 - 프로젝트를 통해 얻은 배움
 
 모든 검색은 요청받은 `projectId` 범위로 제한합니다. 다른 사용자나 다른 프로젝트의 자료가 검색 결과에 포함되지 않도록 Spring의 권한 검사와 FastAPI의 검색 범위 검사를 함께 적용합니다.
+
+MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터가 충분히 쌓여 검색 속도와 재현율을 측정한 뒤 추가합니다.
 
 ### 5. Generate a structured draft
 
@@ -291,6 +295,11 @@ LOGFOLIO_AI_CHUNK_OVERLAP_TOKENS=100
 LOGFOLIO_AI_EMBEDDING_PROVIDER=fake
 LOGFOLIO_AI_EMBEDDING_MODEL=intfloat/multilingual-e5-base
 LOGFOLIO_AI_EMBEDDING_BATCH_SIZE=16
+LOGFOLIO_AI_DATABASE_URL=postgresql://postgres:password@localhost:5432/logfolio
+LOGFOLIO_AI_VECTOR_DIMENSION=768
+LOGFOLIO_AI_RETRIEVAL_TOP_K=5
 ```
 
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.
+
+Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`에 있습니다. 이 SQL은 pgvector 확장을 활성화하므로 개발·운영 DB에 적용하기 전에 Spring 담당자와 실행 주체 및 백업 정책을 확인해야 합니다. 저장소에 추가된 것만으로 실제 DB에는 자동 적용되지 않습니다.
