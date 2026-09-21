@@ -1,11 +1,12 @@
 import asyncio
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from logfolio_ai.analysis.dependencies import get_analysis_orchestrator
 from logfolio_ai.core.config import Settings, get_settings
-from logfolio_ai.main import app
+from logfolio_ai.main import app, prepare_runtime
 
 client = TestClient(app)
 
@@ -40,6 +41,43 @@ def test_health_check() -> None:
         "version": "0.1.0",
         "environment": "local",
     }
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_skips_fake_embedding(monkeypatch) -> None:
+    def fail_if_called():
+        raise AssertionError("fake embedding should not be preloaded")
+
+    monkeypatch.setattr("logfolio_ai.main.get_embedding_provider", fail_if_called)
+
+    await prepare_runtime(Settings(embedding_provider="fake"))
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_validates_e5_dimension(monkeypatch) -> None:
+    class Provider:
+        dimension = 768
+
+    monkeypatch.setattr(
+        "logfolio_ai.main.get_embedding_provider",
+        lambda: Provider(),
+    )
+
+    await prepare_runtime(Settings(embedding_provider="e5", vector_dimension=768))
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_rejects_e5_dimension_mismatch(monkeypatch) -> None:
+    class Provider:
+        dimension = 384
+
+    monkeypatch.setattr(
+        "logfolio_ai.main.get_embedding_provider",
+        lambda: Provider(),
+    )
+
+    with pytest.raises(RuntimeError, match="dimension"):
+        await prepare_runtime(Settings(embedding_provider="e5", vector_dimension=768))
 
 
 def test_fake_analysis_preserves_tracking_ids() -> None:
