@@ -1,0 +1,123 @@
+import asyncio
+from typing import Dict, Iterable, List, Optional
+from uuid import UUID
+
+from logfolio_ai.chunking import chunk_documents
+from logfolio_ai.core.errors import AppError
+from logfolio_ai.embedding import EmbeddingProvider
+from logfolio_ai.models import DocumentSource
+from logfolio_ai.rag.models import AnalysisPurpose, IndexingResult, RetrievalContext
+from logfolio_ai.vector_store import VectorSearchResult, VectorStore
+
+DEFAULT_ANALYSIS_QUERIES: Dict[AnalysisPurpose, str] = {
+    AnalysisPurpose.PROJECT_OVERVIEW: "프로젝트가 해결하려던 문제, 목적, 주요 기능과 진행 기간",
+    AnalysisPurpose.USER_CONTRIBUTION: "사용자가 직접 담당하거나 수행한 역할, 행동과 개인 기여",
+    AnalysisPurpose.DECISION_REASON: "핵심 의사결정, 선택한 방법과 그렇게 판단한 이유",
+    AnalysisPurpose.OUTCOME: "프로젝트 결과, 성과, 변화와 이를 확인할 수 있는 수치",
+    AnalysisPurpose.LEARNING: "프로젝트에서 배운 점, 회고, 어려움과 개선한 내용",
+}
+
+
+class RagService:
+    def __init__(
+        self,
+        embedding_provider: EmbeddingProvider,
+        vector_store: VectorStore,
+        *,
+        embedding_model: str,
+        chunk_size_tokens: int = 700,
+        chunk_overlap_tokens: int = 100,
+        top_k: int = 5,
+    ) -> None:
+        self._embedding_provider = embedding_provider
+        self._vector_store = vector_store
+        self._embedding_model = embedding_model
+        self._chunk_size_tokens = chunk_size_tokens
+        self._chunk_overlap_tokens = chunk_overlap_tokens
+        self._top_k = top_k
+
+    async def index_documents(
+        self,
+        project_id: UUID,
+        documents: Iterable[DocumentSource],
+    ) -> IndexingResult:
+        document_list = list(documents)
+        chunk_count = 0
+
+        for document in document_list:
+            chunks = chunk_documents(
+                [document],
+                chunk_size_tokens=self._chunk_size_tokens,
+                overlap_tokens=self._chunk_overlap_tokens,
+            )
+            embeddings = await self._embedding_provider.embed_documents(
+                [chunk.text for chunk in chunks]
+            )
+            await self._vector_store.replace_source_chunks(
+                project_id,
+                document.source_id,
+                chunks,
+                embeddings,
+                embedding_model=self._embedding_model,
+            )
+            chunk_count += len(chunks)
+
+        return IndexingResult(
+            document_count=len(document_list),
+            chunk_count=chunk_count,
+            embedding_model=self._embedding_model,
+        )
+
+    async def retrieve(
+        self,
+        project_id: UUID,
+        query: str,
+        *,
+        top_k: Optional[int] = None,
+    ) -> List[VectorSearchResult]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            raise ValueError("query must not be blank")
+        query_embedding = await self._embedding_provider.embed_query(normalized_query)
+        return await self._vector_store.search(
+            project_id,
+            query_embedding,
+            top_k=top_k or self._top_k,
+        )
+
+    async def retrieve_analysis_context(
+        self,
+        project_id: UUID,
+    ) -> List[RetrievalContext]:
+        purposes = list(DEFAULT_ANALYSIS_QUERIES)
+        queries = [DEFAULT_ANALYSIS_QUERIES[purpose] for purpose in purposes]
+        query_embeddings = await self._embedding_provider.embed_queries(queries)
+        if len(query_embeddings) != len(queries):
+            raise AppError(
+                code="EMBEDDING_COUNT_MISMATCH",
+                message="검색 Query와 Embedding 개수가 일치하지 않습니다.",
+                status_code=500,
+            )
+
+        async def retrieve_purpose(
+            purpose: AnalysisPurpose,
+            query: str,
+            query_embedding: List[float],
+        ) -> RetrievalContext:
+            chunks = await self._vector_store.search(
+                project_id,
+                query_embedding,
+                top_k=self._top_k,
+            )
+            return RetrievalContext(purpose=purpose, query=query, chunks=chunks)
+
+        return list(
+            await asyncio.gather(
+                *(
+                    retrieve_purpose(purpose, query, query_embedding)
+                    for purpose, query, query_embedding in zip(
+                        purposes, queries, query_embeddings
+                    )
+                )
+            )
+        )

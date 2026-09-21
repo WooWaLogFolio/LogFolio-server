@@ -12,3 +12,5 @@ class EmbeddingProvider(Protocol):
     async def embed_query(self, text: str) -> List[float]:
         """Embed a retrieval query using the provider's query convention."""
 
+    async def embed_queries(self, texts: Sequence[str]) -> List[List[float]]:
+        """Embed multiple retrieval queries in one model batch."""

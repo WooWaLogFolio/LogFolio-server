@@ -24,3 +24,6 @@ class FakeEmbeddingProvider:
 
     async def embed_query(self, text: str) -> List[float]:
         return self._embed(f"query: {text}")
+
+    async def embed_queries(self, texts: Sequence[str]) -> List[List[float]]:
+        return [self._embed(f"query: {text}") for text in texts]

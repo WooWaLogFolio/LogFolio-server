@@ -12,6 +12,7 @@ from logfolio_ai.vector_store.pgvector_store import PgVectorStore
 class FakeConnection:
     def __init__(self) -> None:
         self.executemany_calls: List[Any] = []
+        self.execute_calls: List[Any] = []
 
     @asynccontextmanager
     async def transaction(self):
@@ -19,6 +20,9 @@ class FakeConnection:
 
     async def executemany(self, sql: str, rows: List[Any]) -> None:
         self.executemany_calls.append((sql, rows))
+
+    async def execute(self, sql: str, *args: Any) -> None:
+        self.execute_calls.append((sql, args))
 
 
 class FakePool:
@@ -173,3 +177,24 @@ async def test_upsert_rejects_mismatched_chunk_and_embedding_counts() -> None:
             [],
             embedding_model="test-model",
         )
+
+
+@pytest.mark.asyncio
+async def test_replace_source_deletes_and_inserts_in_one_transaction() -> None:
+    pool = FakePool()
+    store = PgVectorStore(pool, vector_dimension=3)
+    project_id = uuid4()
+    source_chunk = chunk()
+
+    await store.replace_source_chunks(
+        project_id,
+        source_chunk.source_id,
+        [source_chunk],
+        [[1.0, 0.0, 0.0]],
+        embedding_model="test-model",
+    )
+
+    delete_sql, delete_args = pool.connection.execute_calls[0]
+    assert "WHERE project_id = $1 AND source_id = $2" in delete_sql
+    assert delete_args == (project_id, source_chunk.source_id)
+    assert len(pool.connection.executemany_calls) == 1

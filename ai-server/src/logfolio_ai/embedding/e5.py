@@ -55,9 +55,16 @@ class E5EmbeddingProvider:
             ) from exc
 
     async def embed_query(self, text: str) -> List[float]:
+        return (await self.embed_queries([text]))[0]
+
+    async def embed_queries(self, texts: Sequence[str]) -> List[List[float]]:
+        if not texts:
+            return []
         try:
-            vectors = await asyncio.to_thread(self._encode, [f"query: {text}"])
-            return vectors[0]
+            return await asyncio.to_thread(
+                self._encode,
+                [f"query: {text}" for text in texts],
+            )
         except Exception as exc:
             raise AppError(
                 code="EMBEDDING_ERROR",

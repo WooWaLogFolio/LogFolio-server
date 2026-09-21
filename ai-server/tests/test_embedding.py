@@ -39,14 +39,17 @@ async def test_e5_uses_passage_and_query_prefixes() -> None:
     provider = E5EmbeddingProvider("test-model", batch_size=4, model=model)
 
     document_vectors = await provider.embed_documents(["JWT 인증을 구현했다."])
-    query_vector = await provider.embed_query("사용자의 기여")
+    query_vectors = await provider.embed_queries(["사용자의 기여", "프로젝트 결과"])
 
     assert model.calls[0]["texts"] == ["passage: JWT 인증을 구현했다."]
-    assert model.calls[1]["texts"] == ["query: 사용자의 기여"]
+    assert model.calls[1]["texts"] == [
+        "query: 사용자의 기여",
+        "query: 프로젝트 결과",
+    ]
     assert model.calls[0]["normalize_embeddings"] is True
     assert model.calls[0]["batch_size"] == 4
     assert document_vectors == [[1.0, 0.0, 0.0]]
-    assert query_vector == [1.0, 0.0, 0.0]
+    assert query_vectors == [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]]
     assert provider.dimension == 3
 
 
