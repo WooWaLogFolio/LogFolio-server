@@ -142,6 +142,54 @@ class PgVectorStore:
                 status_code=503,
             ) from exc
 
+    async def replace_source_chunks(
+        self,
+        project_id: UUID,
+        source_id: UUID,
+        chunks: Sequence[DocumentChunk],
+        embeddings: Sequence[Sequence[float]],
+        *,
+        embedding_model: str,
+    ) -> None:
+        if len(chunks) != len(embeddings):
+            raise ValueError("chunks and embeddings must have the same length")
+        if any(chunk.source_id != source_id for chunk in chunks):
+            raise ValueError("every chunk must belong to source_id")
+
+        rows = [
+            (
+                chunk.chunk_id,
+                project_id,
+                chunk.source_id,
+                chunk.file_name,
+                chunk.sequence,
+                chunk.page_number,
+                chunk.section_title,
+                chunk.char_start,
+                chunk.char_end,
+                chunk.token_count,
+                chunk.text,
+                self._validate_vector(embedding),
+                embedding_model,
+            )
+            for chunk, embedding in zip(chunks, embeddings)
+        ]
+
+        try:
+            async with self._pool.acquire() as connection:
+                async with connection.transaction():
+                    await connection.execute(_DELETE_SOURCE_SQL, project_id, source_id)
+                    if rows:
+                        await connection.executemany(_UPSERT_SQL, rows)
+        except AppError:
+            raise
+        except Exception as exc:
+            raise AppError(
+                code="VECTOR_STORE_WRITE_ERROR",
+                message="파일 Chunk 교체에 실패했습니다.",
+                status_code=503,
+            ) from exc
+
     async def search(
         self,
         project_id: UUID,
