@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - logfolio-postgres:/var/lib/postgresql/data
+      - ../migrations/001_create_ai_document_chunks.sql:/docker-entrypoint-initdb.d/001_create_ai_document_chunks.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ai-server:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    environment:
+      LOGFOLIO_AI_ENVIRONMENT: local
+      LOGFOLIO_AI_LLM_PROVIDER: fake
+      LOGFOLIO_AI_EMBEDDING_PROVIDER: fake
+      LOGFOLIO_AI_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_AI_INTERNAL_AUTH_REQUIRED: "true"
+      LOGFOLIO_AI_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  smoke:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    profiles: ["smoke"]
+    environment:
+      LOGFOLIO_SMOKE_BASE_URL: http://ai-server:8000
+      LOGFOLIO_SMOKE_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+    command: ["python", "/app/scripts/smoke_test.py"]
+    depends_on:
+      ai-server:
+        condition: service_healthy
+
+volumes:
+  logfolio-postgres:
