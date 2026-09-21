@@ -362,3 +362,14 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5 
 ```
 
 첫 실행은 모델과 PyTorch 의존성을 내려받으므로 시간이 오래 걸리고 디스크를 많이 사용할 수 있습니다. Docker 이미지는 GPU가 없는 현재 배포 방향에 맞춰 PyTorch CPU 전용 Wheel을 사용하므로 CUDA 런타임을 포함하지 않습니다. Hugging Face 모델 캐시는 `logfolio-huggingface` Docker 볼륨에 보존되어 이후 실행에서 재사용됩니다. 모델 공식 사용법에 따라 문서는 `passage:`, 검색문은 `query:` 접두어를 사용하며 벡터를 정규화합니다.
+
+### E5 and pgvector end-to-end validation
+
+실제 E5 모델과 PostgreSQL/pgvector를 사용하되 LLM만 Fake Provider로 유지하여 전체 RAG API를 검증합니다. 서버는 E5 모델을 시작 단계에서 미리 로딩하므로 Health Check 성공 이후의 첫 분석 요청도 모델 로딩 시간을 포함하지 않습니다.
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-rag up --build --abort-on-container-exit --exit-code-from e5-rag-smoke e5-rag-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-rag down
+```
+
+검증 항목은 내부 API 키 인증, 30초 이내 응답, 추적 ID 보존, pgvector Chunk 저장, 768차원 벡터, E5 모델명과 프로젝트 범위 격리입니다. Fake LLM을 사용하므로 외부 생성형 AI 비용은 발생하지 않습니다.
