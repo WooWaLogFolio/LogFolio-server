@@ -294,6 +294,14 @@ python -m pip install -e '.[dev,embedding]'
 pytest
 ```
 
+AI Policy 회귀 평가는 실제 사용자 자료를 모사한 고정 데이터셋으로 실행합니다. 외부 LLM을 호출하지 않으므로 API 비용이 발생하지 않습니다.
+
+```bash
+python -m logfolio_ai.evaluation.runner
+```
+
+현재 평가 데이터는 팀 활동의 개인 귀속, 근거 없는 성과, 명시된 개인 기여, 사용자 확인 상태 위조와 불필요한 질문을 포함합니다. 실제 Gemini 품질과 RAG 검색 정확도 평가는 운영 데이터가 아닌 별도의 비식별 검증 자료로 확장해야 합니다.
+
 기본 설정은 외부 호출이 없는 Fake Provider입니다.
 
 ```bash
