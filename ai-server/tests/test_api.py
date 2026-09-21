@@ -39,7 +39,7 @@ def test_health_check() -> None:
     }
 
 
-def test_analysis_stub_preserves_tracking_ids() -> None:
+def test_fake_analysis_preserves_tracking_ids() -> None:
     payload = valid_analysis_payload()
 
     response = client.post("/api/v1/analyses", json=payload)
@@ -48,6 +48,7 @@ def test_analysis_stub_preserves_tracking_ids() -> None:
     body = response.json()
     assert body["analysisRunId"] == payload["analysisRunId"]
     assert body["projectId"] == payload["projectId"]
+    assert body["summary"] == "Fake LLM 분석 결과입니다."
     assert body["candidates"] == []
     assert body["questions"] == []
 
