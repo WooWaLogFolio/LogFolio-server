@@ -75,6 +75,8 @@ FastAPI는 긴 문서를 섹션, 문단, 문장 경계를 고려해 작은 Chunk
 - 문서 및 섹션 제목
 - 원문 텍스트
 
+초기 구현은 페이지 경계를 넘어서 Chunk를 합치지 않으며, 기본 크기 700단위와 Overlap 100단위로 시작합니다. 현재 단위 계산은 모델별 토크나이저가 아닌 가벼운 결정적 추정 방식이므로 실제 검색 품질 평가에 따라 조정합니다. 같은 파일 ID와 같은 원문에는 동일한 Chunk ID를 생성하여 재시도 시 중복을 줄입니다.
+
 ### 3. Create embeddings
 
 각 Chunk는 로컬 Embedding 모델을 통해 의미를 나타내는 벡터로 변환됩니다. 초기 후보 모델은 한국어를 포함한 다국어 검색을 지원하는 `intfloat/multilingual-e5-base`입니다.
@@ -276,4 +278,6 @@ LOGFOLIO_AI_LLM_PROVIDER=gemini
 LOGFOLIO_AI_GEMINI_API_KEY=your-api-key
 LOGFOLIO_AI_GEMINI_MODEL=gemini-3.8-flash
 LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=30
+LOGFOLIO_AI_CHUNK_SIZE_TOKENS=700
+LOGFOLIO_AI_CHUNK_OVERLAP_TOKENS=100
 ```

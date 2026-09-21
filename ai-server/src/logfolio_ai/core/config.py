@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal, Optional
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     gemini_api_key: Optional[SecretStr] = None
     gemini_model: str = "gemini-3.8-flash"
     llm_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
+    chunk_size_tokens: int = Field(default=700, ge=100, le=2000)
+    chunk_overlap_tokens: int = Field(default=100, ge=0, le=500)
+
+    @model_validator(mode="after")
+    def validate_chunk_window(self) -> "Settings":
+        if self.chunk_overlap_tokens >= self.chunk_size_tokens:
+            raise ValueError("chunk overlap must be smaller than chunk size")
+        return self
 
 
 @lru_cache
