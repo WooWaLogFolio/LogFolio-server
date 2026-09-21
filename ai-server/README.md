@@ -288,6 +288,8 @@ python -m pip install -e '.[dev,embedding]'
 - Health: `http://localhost:8000/health`
 - Swagger UI: `http://localhost:8000/docs`
 
+Spring 연동 요청·응답과 재시도 규칙은 [`docs/spring-fastapi-contract.md`](docs/spring-fastapi-contract.md)에 정리되어 있습니다.
+
 테스트는 다음 명령으로 실행합니다.
 
 ```bash
