@@ -80,6 +80,21 @@ async def test_prepare_runtime_rejects_e5_dimension_mismatch(monkeypatch) -> Non
         await prepare_runtime(Settings(embedding_provider="e5", vector_dimension=768))
 
 
+@pytest.mark.asyncio
+async def test_prepare_runtime_preloads_gemini_provider(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(
+        "logfolio_ai.main.get_llm_provider",
+        lambda: calls.append("gemini"),
+    )
+
+    await prepare_runtime(
+        Settings(llm_provider="gemini", gemini_api_key="test-key")
+    )
+
+    assert calls == ["gemini"]
+
+
 def test_fake_analysis_preserves_tracking_ids() -> None:
     payload = valid_analysis_payload()
 

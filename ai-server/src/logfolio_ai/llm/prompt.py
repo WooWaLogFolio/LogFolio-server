@@ -20,7 +20,6 @@ def build_grounded_analysis_prompt(request: GroundedAnalysisInput) -> str:
     source_payload = request.model_dump(mode="json", by_alias=True)
     return "\n\n".join(
         [
-            SYSTEM_POLICY.strip(),
             "Analyze only the retrieved chunks in the following JSON.",
             "Do not use outside knowledge. If the chunks do not support a claim, omit it or ask for confirmation.",
             "Every evidence sourceId, chunkId, pageNumber, and quote must match a supplied chunk exactly.",
