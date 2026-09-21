@@ -29,6 +29,9 @@ class E5EmbeddingProvider:
 
     @property
     def dimension(self) -> int:
+        get_dimension = getattr(self._model, "get_embedding_dimension", None)
+        if get_dimension is not None:
+            return int(get_dimension())
         return int(self._model.get_sentence_embedding_dimension())
 
     def _encode(self, texts: Sequence[str]) -> List[List[float]]:

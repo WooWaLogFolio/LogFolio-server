@@ -59,5 +59,20 @@ services:
       ai-server:
         condition: service_healthy
 
+  e5-eval:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "true"
+    profiles: ["e5"]
+    environment:
+      HF_HOME: /home/logfolio/.cache/huggingface
+      LOGFOLIO_AI_EMBEDDING_MODEL: intfloat/multilingual-e5-base
+      LOGFOLIO_AI_VECTOR_DIMENSION: "768"
+    command: ["python", "-m", "logfolio_ai.evaluation.embedding_runner"]
+    volumes:
+      - logfolio-huggingface:/home/logfolio/.cache/huggingface
+
 volumes:
   logfolio-postgres:
+  logfolio-huggingface:
