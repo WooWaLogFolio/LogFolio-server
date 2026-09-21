@@ -12,6 +12,8 @@ from logfolio_ai.llm.factory import build_llm_provider
 from logfolio_ai.llm.fake import FakeLLMProvider
 from logfolio_ai.llm.gemini import GeminiLLMProvider
 from logfolio_ai.llm.models import GroundedAnalysisInput, GroundedChunk
+from logfolio_ai.llm.prompt import SYSTEM_POLICY
+from logfolio_ai.models import AnalysisResponse
 from logfolio_ai.rag import AnalysisPurpose
 
 
@@ -92,6 +94,11 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert call["model"] == "test-model"
     assert "팀은 인터뷰를 진행했다." in call["contents"]
     assert "Analyze only the retrieved chunks" in call["contents"]
+    assert SYSTEM_POLICY.strip() not in call["contents"]
+    assert call["config"].system_instruction == SYSTEM_POLICY.strip()
+    assert call["config"].response_json_schema == AnalysisResponse.model_json_schema(
+        by_alias=True
+    )
 
 
 @pytest.mark.asyncio

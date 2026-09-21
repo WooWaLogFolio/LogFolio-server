@@ -306,7 +306,7 @@ Gemini를 사용할 때만 로컬 `.env` 또는 배포 환경의 Secret에 다�
 ```bash
 LOGFOLIO_AI_LLM_PROVIDER=gemini
 LOGFOLIO_AI_GEMINI_API_KEY=your-api-key
-LOGFOLIO_AI_GEMINI_MODEL=gemini-3.8-flash
+LOGFOLIO_AI_GEMINI_MODEL=gemini-3.5-flash
 LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=30
 LOGFOLIO_AI_CHUNK_SIZE_TOKENS=700
 LOGFOLIO_AI_CHUNK_OVERLAP_TOKENS=100
@@ -373,3 +373,24 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-
 ```
 
 검증 항목은 내부 API 키 인증, 30초 이내 응답, 추적 ID 보존, pgvector Chunk 저장, 768차원 벡터, E5 모델명과 프로젝트 범위 격리입니다. Fake LLM을 사용하므로 외부 생성형 AI 비용은 발생하지 않습니다.
+
+### Gemini free-tier validation
+
+개발 단계에서는 `gemini-3.5-flash` 무료 티어와 비식별 합성 자료만 사용합니다. 무료 티어로 전송한 콘텐츠는 Google 제품 개선에 사용될 수 있으므로 실제 사용자 파일, 개인정보와 회사 비공개 자료를 보내지 않습니다. 운영 환경은 별도의 유료 프로젝트와 Secret으로 분리해야 합니다.
+
+모델은 `GEMINI_MODEL` 환경변수로 교체할 수 있습니다. 예를 들어 `gemini-3.8-flash`가 안정화되면 코드 변경 없이 해당 모델로 전환할 수 있습니다.
+
+`deploy/.env`에 Google AI Studio에서 발급한 개발용 키를 직접 입력합니다. 실제 키는 Git, 문서, 메신저 또는 실행 로그에 남기지 않습니다.
+
+```dotenv
+GEMINI_API_KEY=your-local-development-key
+```
+
+합성 자료로 실제 Structured Output과 AI Policy 흐름을 한 번 검증합니다.
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gemini up --build --abort-on-container-exit --exit-code-from gemini-smoke gemini-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gemini down
+```
+
+Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다. Smoke Test는 30초 이내 응답, 요청 추적 ID, 후보·질문 개수 제한과 사용자 전용 출처 상태 위조 여부를 확인합니다.

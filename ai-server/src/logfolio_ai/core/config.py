@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, ge=1, le=65535)
     llm_provider: Literal["fake", "gemini"] = "fake"
     gemini_api_key: Optional[SecretStr] = None
-    gemini_model: str = "gemini-3.8-flash"
+    gemini_model: str = "gemini-3.5-flash"
     llm_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
     analysis_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
     internal_auth_required: bool = False

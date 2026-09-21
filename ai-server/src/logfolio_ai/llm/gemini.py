@@ -1,12 +1,16 @@
 import asyncio
+import logging
 from typing import Any, Optional
 
 from pydantic import ValidationError
 
 from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm.models import GroundedAnalysisInput
-from logfolio_ai.llm.prompt import build_grounded_analysis_prompt
+from logfolio_ai.llm.prompt import SYSTEM_POLICY, build_grounded_analysis_prompt
 from logfolio_ai.models import AnalysisResponse
+
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiLLMProvider:
@@ -48,8 +52,11 @@ class GeminiLLMProvider:
                     model=self._model,
                     contents=prompt,
                     config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_POLICY.strip(),
                         response_mime_type="application/json",
-                        response_schema=AnalysisResponse,
+                        response_json_schema=AnalysisResponse.model_json_schema(
+                            by_alias=True
+                        ),
                         temperature=0.1,
                     ),
                 ),
@@ -62,6 +69,14 @@ class GeminiLLMProvider:
                 status_code=504,
             ) from exc
         except Exception as exc:
+            status_code = getattr(exc, "status_code", None)
+            provider_message = str(exc).replace("\n", " ")[:500]
+            logger.warning(
+                "Gemini request failed: error_type=%s status_code=%s message=%s",
+                type(exc).__name__,
+                status_code,
+                provider_message,
+            )
             raise AppError(
                 code="LLM_PROVIDER_ERROR",
                 message="LLM 공급자 호출에 실패했습니다.",

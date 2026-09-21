@@ -9,18 +9,20 @@ from logfolio_ai.api.router import api_router
 from logfolio_ai.core.config import Settings, get_settings
 from logfolio_ai.core.errors import register_exception_handlers
 from logfolio_ai.embedding import get_embedding_provider
+from logfolio_ai.llm import get_llm_provider
 
 
 async def prepare_runtime(settings: Settings) -> None:
     """Load heavyweight local models before the server becomes ready."""
 
-    if settings.embedding_provider != "e5":
-        return
-    provider = await asyncio.to_thread(get_embedding_provider)
-    if provider.dimension != settings.vector_dimension:
-        raise RuntimeError(
-            "Embedding model dimension does not match LOGFOLIO_AI_VECTOR_DIMENSION"
-        )
+    if settings.embedding_provider == "e5":
+        provider = await asyncio.to_thread(get_embedding_provider)
+        if provider.dimension != settings.vector_dimension:
+            raise RuntimeError(
+                "Embedding model dimension does not match LOGFOLIO_AI_VECTOR_DIMENSION"
+            )
+    if settings.llm_provider == "gemini":
+        await asyncio.to_thread(get_llm_provider)
 
 
 @asynccontextmanager
