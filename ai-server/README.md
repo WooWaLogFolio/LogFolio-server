@@ -4,7 +4,7 @@ LogFolio AI Server는 사용자가 업로드한 프로젝트 자료에서 경험
 
 단순히 자연스러운 포트폴리오 문장을 생성하는 것이 아니라, 문서에 실제로 존재하는 내용과 사용자가 직접 기여한 내용을 구분합니다. AI가 만든 결과는 초안으로 제공되며 사용자의 검토를 거친 뒤에만 최종 경험카드로 저장됩니다.
 
-> 현재 이 디렉터리는 AI 서버의 설계를 정리한 단계이며, 기능은 순차적으로 구현될 예정입니다.
+> 현재 이 디렉터리는 AI 서버의 기본 API 계약과 교체 가능한 LLM Provider를 구현했으며, RAG 기능은 순차적으로 구현될 예정입니다.
 
 ## Why this server exists
 
@@ -106,6 +106,21 @@ Embedding 모델은 답변을 작성하지 않습니다. 서로 다른 표현을
 - 최대 2개의 보완 질문
 
 외부 LLM은 Provider 인터페이스 뒤에 분리하여 공급자나 모델이 변경되더라도 분석 흐름 전체를 다시 작성하지 않도록 설계합니다.
+
+### LLM Provider and environments
+
+분석 코드는 특정 LLM 공급자에 직접 의존하지 않습니다. 동일한 `LLMProvider` 계약 뒤에서 실행 환경에 따라 구현체만 선택합니다.
+
+- `fake`: API 키와 비용 없이 고정된 응답을 반환합니다. 로컬 개발과 Spring 연동 테스트의 기본값입니다.
+- `gemini`: Google Gemini API에서 JSON Schema 기반 Structured Output을 생성합니다. 실제 AI 품질 검증과 배포 환경에서 사용합니다.
+
+환경별 운영 원칙은 다음과 같습니다.
+
+- 로컬 및 자동 테스트: `fake`를 사용합니다.
+- 개발 검증: 개발 전용 Google 프로젝트와 API 키를 사용하고, 공개 자료 또는 비식별 테스트 자료만 전송합니다.
+- 운영: 운영 전용 Google 프로젝트와 유료 한도 및 API 키를 분리합니다.
+
+무료·유료 Tier에 따라 애플리케이션 코드를 나누지 않습니다. 요금제와 한도는 Google 프로젝트에서 관리하고, 서버는 Provider·모델·키를 환경변수로 주입받습니다. API 키는 Git에 커밋하지 않습니다.
 
 ### 6. Validate claims and evidence
 
@@ -246,4 +261,19 @@ uvicorn logfolio_ai.main:app --app-dir src --reload
 
 ```bash
 pytest
+```
+
+기본 설정은 외부 호출이 없는 Fake Provider입니다.
+
+```bash
+LOGFOLIO_AI_LLM_PROVIDER=fake
+```
+
+Gemini를 사용할 때만 로컬 `.env` 또는 배포 환경의 Secret에 다음 값을 설정합니다.
+
+```bash
+LOGFOLIO_AI_LLM_PROVIDER=gemini
+LOGFOLIO_AI_GEMINI_API_KEY=your-api-key
+LOGFOLIO_AI_GEMINI_MODEL=gemini-3.8-flash
+LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=30
 ```
