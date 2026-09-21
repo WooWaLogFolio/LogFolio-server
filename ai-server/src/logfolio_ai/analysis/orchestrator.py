@@ -1,9 +1,10 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm import GroundedAnalysisInput, GroundedChunk, LLMProvider
 from logfolio_ai.models import AnalysisRequest, AnalysisResponse
+from logfolio_ai.policy import AIPolicyValidator
 from logfolio_ai.rag import AnalysisPurpose, RagService, RetrievalContext
 
 
@@ -14,10 +15,12 @@ class AnalysisOrchestrator:
         llm_provider: LLMProvider,
         *,
         max_grounded_chunks: int = 15,
+        policy_validator: Optional[AIPolicyValidator] = None,
     ) -> None:
         self._rag_service = rag_service
         self._llm_provider = llm_provider
         self._max_grounded_chunks = max_grounded_chunks
+        self._policy_validator = policy_validator or AIPolicyValidator()
 
     def _build_grounded_chunks(
         self,
@@ -99,4 +102,4 @@ class AnalysisOrchestrator:
         )
         response = await self._llm_provider.analyze_grounded(grounded_input)
         self._validate_evidence(response, grounded_chunks)
-        return response
+        return self._policy_validator.validate(response)
