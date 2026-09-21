@@ -21,6 +21,14 @@ class RecordingModel:
         return [[1.0, 0.0, 0.0] for _ in texts]
 
 
+class CurrentApiRecordingModel(RecordingModel):
+    def get_embedding_dimension(self) -> int:
+        return 3
+
+    def get_sentence_embedding_dimension(self) -> int:
+        raise AssertionError("deprecated dimension API should not be used")
+
+
 @pytest.mark.asyncio
 async def test_fake_embedding_is_deterministic_and_normalized() -> None:
     provider = FakeEmbeddingProvider(dimension=8)
@@ -60,6 +68,12 @@ async def test_empty_document_batch_does_not_call_model() -> None:
 
     assert await provider.embed_documents([]) == []
     assert model.calls == []
+
+
+def test_e5_prefers_current_dimension_api() -> None:
+    provider = E5EmbeddingProvider("test-model", model=CurrentApiRecordingModel())
+
+    assert provider.dimension == 3
 
 
 def test_factory_defaults_to_fake_embedding() -> None:

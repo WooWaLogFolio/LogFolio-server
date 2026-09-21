@@ -352,3 +352,13 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile smo
 Compose의 마이그레이션 파일은 새 DB 볼륨을 처음 생성할 때만 자동 실행됩니다. 이미 생성된 개발·운영 DB에는 Spring 담당자와 실행 시점 및 백업 정책을 합의한 뒤 별도의 마이그레이션 절차로 적용해야 합니다.
 
 실제 E5를 포함한 이미지는 `INSTALL_EMBEDDING=true`로 빌드할 수 있지만 모델 의존성 때문에 이미지 크기와 빌드 시간이 크게 늘어납니다. 운영에서는 Gemini API 키, DB 비밀번호와 내부 API 키를 이미지나 저장소에 넣지 않고 배포 플랫폼의 Secret으로 주입해야 합니다.
+
+### E5 retrieval validation
+
+실제 `intfloat/multilingual-e5-base` 모델이 768차원 벡터를 생성하고 한국어 Query에 관련 문서를 가장 먼저 반환하는지 고정된 소규모 데이터로 확인합니다. 이것은 모델 연결을 확인하는 Smoke Evaluation이며, 서비스 품질 기준을 대신하지 않습니다.
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5 run --rm e5-eval
+```
+
+첫 실행은 모델과 PyTorch 의존성을 내려받으므로 시간이 오래 걸리고 디스크를 많이 사용할 수 있습니다. Docker 이미지는 GPU가 없는 현재 배포 방향에 맞춰 PyTorch CPU 전용 Wheel을 사용하므로 CUDA 런타임을 포함하지 않습니다. Hugging Face 모델 캐시는 `logfolio-huggingface` Docker 볼륨에 보존되어 이후 실행에서 재사용됩니다. 모델 공식 사용법에 따라 문서는 `passage:`, 검색문은 `query:` 접두어를 사용하며 벡터를 정규화합니다.
