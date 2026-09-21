@@ -4,7 +4,7 @@ LogFolio AI Server는 사용자가 업로드한 프로젝트 자료에서 경험
 
 단순히 자연스러운 포트폴리오 문장을 생성하는 것이 아니라, 문서에 실제로 존재하는 내용과 사용자가 직접 기여한 내용을 구분합니다. AI가 만든 결과는 초안으로 제공되며 사용자의 검토를 거친 뒤에만 최종 경험카드로 저장됩니다.
 
-> 현재 이 디렉터리는 AI 서버의 기본 API 계약과 교체 가능한 LLM Provider를 구현했으며, RAG 기능은 순차적으로 구현될 예정입니다.
+> 현재 이 디렉터리는 Spring 연동 계약, 교체 가능한 LLM·Embedding Provider, RAG, AI Policy 검증과 Docker 기반 통합 검증 환경을 포함합니다.
 
 ## Why this server exists
 
@@ -251,22 +251,13 @@ MVP는 정확한 근거 추적과 사용자 검토 흐름을 우선합니다.
 
 ## Development status
 
-현재 AI 서버는 계약 모델과 기본 실행 구조를 구현하는 단계입니다. 구현은 다음 순서로 진행합니다.
+현재 Spring–FastAPI 요청·응답 모델, 공통 오류 응답, LLM Provider, Chunking, Embedding, pgvector 저장·검색, RAG 분석, AI Policy 검증과 고정 평가 데이터셋이 구현되어 있습니다. Docker Compose 환경에서는 PostgreSQL 17과 pgvector를 포함한 분석 API의 Smoke Test를 실행할 수 있습니다.
 
-1. Spring–FastAPI 요청·응답 모델
-2. FastAPI 기본 서버와 공통 오류 응답
-3. 외부 LLM Provider 및 Structured Output
-4. Chunking과 Embedding
-5. pgvector 저장 및 프로젝트 범위 검색
-6. Claim, Evidence, 경험 후보 및 질문 생성
-7. AI Policy 검증과 평가
-8. Spring 통합 테스트
-
-구현이 진행되면 이 문서에 실행 방법, 환경변수, API 예시와 테스트 방법을 추가합니다.
+Fake Provider 검증은 외부 API 비용 없이 서버 간 계약과 처리 흐름을 확인하기 위한 것입니다. 실제 검색·생성 품질은 E5와 Gemini를 켠 별도의 비식별 평가 환경에서 검증해야 합니다.
 
 ## Local development
 
-Python 3.9 이상이 필요합니다.
+Python 3.11 이상이 필요합니다.
 
 ```bash
 cd ai-server
@@ -331,3 +322,33 @@ LOGFOLIO_AI_MAX_GROUNDED_CHUNKS=15
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.
 
 Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`에 있습니다. 이 SQL은 pgvector 확장을 활성화하므로 개발·운영 DB에 적용하기 전에 Spring 담당자와 실행 주체 및 백업 정책을 확인해야 합니다. 저장소에 추가된 것만으로 실제 DB에는 자동 적용되지 않습니다.
+
+## Docker integration environment
+
+이 환경은 로컬에서 Spring 연동 전에 FastAPI, PostgreSQL 17, pgvector와 내부 인증을 함께 검증하기 위한 것입니다. 기본 Provider는 `fake`이므로 Gemini API 키와 외부 API 비용이 필요하지 않습니다.
+
+먼저 로컬 전용 환경변수 파일을 만들고 예시 비밀번호와 API 키를 변경합니다. `deploy/.env`는 Git에 커밋하지 않습니다.
+
+```bash
+cd ai-server
+cp deploy/.env.example deploy/.env
+```
+
+Compose 설정을 확인한 뒤 통합 Smoke Test를 실행합니다.
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml config
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile smoke up --build --abort-on-container-exit --exit-code-from smoke
+```
+
+성공하면 `LogFolio AI smoke test passed`가 출력됩니다. 테스트 후 컨테이너와 네트워크만 정리하고 DB 볼륨은 보존합니다.
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile smoke down
+```
+
+`down -v`는 로컬 PostgreSQL 데이터를 함께 삭제하므로 DB를 의도적으로 초기화할 때만 사용합니다.
+
+Compose의 마이그레이션 파일은 새 DB 볼륨을 처음 생성할 때만 자동 실행됩니다. 이미 생성된 개발·운영 DB에는 Spring 담당자와 실행 시점 및 백업 정책을 합의한 뒤 별도의 마이그레이션 절차로 적용해야 합니다.
+
+실제 E5를 포함한 이미지는 `INSTALL_EMBEDDING=true`로 빌드할 수 있지만 모델 의존성 때문에 이미지 크기와 빌드 시간이 크게 늘어납니다. 운영에서는 Gemini API 키, DB 비밀번호와 내부 API 키를 이미지나 저장소에 넣지 않고 배포 플랫폼의 Secret으로 주입해야 합니다.
