@@ -1,0 +1,263 @@
+[
+  {
+    "caseId": "team-activity-is-not-user-contribution",
+    "category": "source-grounding",
+    "description": "팀 활동을 사용자 개인 기여로 귀속하지 않는다.",
+    "sourceText": "프로젝트 팀은 사용자 인터뷰를 5회 진행했다.",
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000001",
+      "projectId": "20000000-0000-0000-0000-000000000001",
+      "summary": "사용자 인터뷰 프로젝트",
+      "candidates": [
+        {
+          "candidateId": "30000000-0000-0000-0000-000000000001",
+          "title": "사용자 인터뷰",
+          "summary": "인터뷰 수행 경험",
+          "claims": [
+            {
+              "sectionType": "CONTRIBUTION",
+              "content": "사용자가 인터뷰 5회를 주도했다.",
+              "subjectType": "USER",
+              "provenanceType": "SOURCE_EXTRACTED",
+              "verificationStatus": "VERIFIED",
+              "evidenceType": "DIRECT",
+              "evidences": [
+                {
+                  "sourceId": "40000000-0000-0000-0000-000000000001",
+                  "chunkId": "50000000-0000-0000-0000-000000000001",
+                  "pageNumber": 1,
+                  "quote": "프로젝트 팀은 사용자 인터뷰를 5회 진행했다."
+                }
+              ],
+              "policyViolations": [],
+              "requiresUserConfirmation": false
+            }
+          ]
+        }
+      ],
+      "questions": []
+    },
+    "expected": {
+      "claims": [
+        {
+          "candidateIndex": 0,
+          "claimIndex": 0,
+          "subjectType": "UNKNOWN",
+          "provenanceType": "AI_INFERRED",
+          "verificationStatus": "NEEDS_CONFIRMATION",
+          "requiresUserConfirmation": true,
+          "violationsContain": [
+            "UNSUPPORTED_USER_CONTRIBUTION",
+            "TEAM_TO_USER_ATTRIBUTION"
+          ]
+        }
+      ],
+      "questionTargets": []
+    }
+  },
+  {
+    "caseId": "unsupported-achievement-needs-confirmation",
+    "category": "inference",
+    "description": "자료에 없는 성과 수치를 확정하지 않는다.",
+    "sourceText": "로그인 기능을 구현했다.",
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000002",
+      "projectId": "20000000-0000-0000-0000-000000000002",
+      "summary": "로그인 기능 프로젝트",
+      "candidates": [
+        {
+          "candidateId": "30000000-0000-0000-0000-000000000002",
+          "title": "로그인 개선",
+          "summary": "로그인 기능 구현 경험",
+          "claims": [
+            {
+              "sectionType": "RESULT",
+              "content": "로그인 성공률을 30% 높였다.",
+              "subjectType": "UNKNOWN",
+              "provenanceType": "AI_INFERRED",
+              "verificationStatus": "NEEDS_CONFIRMATION",
+              "evidenceType": "NONE",
+              "evidences": [],
+              "policyViolations": [],
+              "requiresUserConfirmation": true
+            }
+          ]
+        }
+      ],
+      "questions": []
+    },
+    "expected": {
+      "claims": [
+        {
+          "candidateIndex": 0,
+          "claimIndex": 0,
+          "verificationStatus": "NEEDS_CONFIRMATION",
+          "requiresUserConfirmation": true,
+          "violationsContain": ["MISSING_EVIDENCE", "UNSUPPORTED_ACHIEVEMENT"]
+        }
+      ],
+      "questionTargets": []
+    }
+  },
+  {
+    "caseId": "explicit-first-person-contribution",
+    "category": "source-grounding",
+    "description": "1인칭으로 명시된 개인 기여는 유지한다.",
+    "sourceText": "저는 JWT 인증 API 구현을 담당했습니다.",
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000003",
+      "projectId": "20000000-0000-0000-0000-000000000003",
+      "summary": "인증 기능 프로젝트",
+      "candidates": [
+        {
+          "candidateId": "30000000-0000-0000-0000-000000000003",
+          "title": "JWT 인증 구현",
+          "summary": "인증 API 구현 경험",
+          "claims": [
+            {
+              "sectionType": "CONTRIBUTION",
+              "content": "JWT 인증 API 구현을 담당했다.",
+              "subjectType": "USER",
+              "provenanceType": "SOURCE_EXTRACTED",
+              "verificationStatus": "VERIFIED",
+              "evidenceType": "DIRECT",
+              "evidences": [
+                {
+                  "sourceId": "40000000-0000-0000-0000-000000000003",
+                  "chunkId": "50000000-0000-0000-0000-000000000003",
+                  "pageNumber": 2,
+                  "quote": "저는 JWT 인증 API 구현을 담당했습니다."
+                }
+              ],
+              "policyViolations": [],
+              "requiresUserConfirmation": false
+            }
+          ]
+        }
+      ],
+      "questions": []
+    },
+    "expected": {
+      "claims": [
+        {
+          "candidateIndex": 0,
+          "claimIndex": 0,
+          "subjectType": "USER",
+          "provenanceType": "SOURCE_EXTRACTED",
+          "verificationStatus": "VERIFIED",
+          "requiresUserConfirmation": false,
+          "violationsContain": []
+        }
+      ],
+      "questionTargets": []
+    }
+  },
+  {
+    "caseId": "ai-cannot-confirm-user-state",
+    "category": "review-integrity",
+    "description": "AI는 사용자 확인 상태를 직접 생성할 수 없다.",
+    "sourceText": "프로젝트 팀은 기능 우선순위를 정했다.",
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000004",
+      "projectId": "20000000-0000-0000-0000-000000000004",
+      "summary": "기능 우선순위 프로젝트",
+      "candidates": [
+        {
+          "candidateId": "30000000-0000-0000-0000-000000000004",
+          "title": "기능 우선순위",
+          "summary": "우선순위 결정 경험",
+          "claims": [
+            {
+              "sectionType": "DECISION",
+              "content": "팀이 기능 우선순위를 정했다.",
+              "subjectType": "TEAM",
+              "provenanceType": "USER_CONFIRMED",
+              "verificationStatus": "VERIFIED",
+              "evidenceType": "DIRECT",
+              "evidences": [
+                {
+                  "sourceId": "40000000-0000-0000-0000-000000000004",
+                  "chunkId": "50000000-0000-0000-0000-000000000004",
+                  "pageNumber": 1,
+                  "quote": "프로젝트 팀은 기능 우선순위를 정했다."
+                }
+              ],
+              "policyViolations": [],
+              "requiresUserConfirmation": false
+            }
+          ]
+        }
+      ],
+      "questions": []
+    },
+    "expected": {
+      "claims": [
+        {
+          "candidateIndex": 0,
+          "claimIndex": 0,
+          "provenanceType": "AI_INFERRED",
+          "verificationStatus": "NEEDS_CONFIRMATION",
+          "requiresUserConfirmation": true,
+          "violationsContain": ["INVALID_PROVENANCE"]
+        }
+      ],
+      "questionTargets": []
+    }
+  },
+  {
+    "caseId": "do-not-ask-answered-question",
+    "category": "question-generation",
+    "description": "자료에 결과가 있으면 결과 질문을 제거하고 필요한 질문만 유지한다.",
+    "sourceText": "프로젝트는 아이디어톤 본선에 진출했다.",
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000005",
+      "projectId": "20000000-0000-0000-0000-000000000005",
+      "summary": "아이디어톤 프로젝트",
+      "candidates": [
+        {
+          "candidateId": "30000000-0000-0000-0000-000000000005",
+          "title": "아이디어톤",
+          "summary": "본선 진출 경험",
+          "claims": [
+            {
+              "sectionType": "RESULT",
+              "content": "프로젝트가 아이디어톤 본선에 진출했다.",
+              "subjectType": "TEAM",
+              "provenanceType": "SOURCE_EXTRACTED",
+              "verificationStatus": "VERIFIED",
+              "evidenceType": "DIRECT",
+              "evidences": [
+                {
+                  "sourceId": "40000000-0000-0000-0000-000000000005",
+                  "chunkId": "50000000-0000-0000-0000-000000000005",
+                  "pageNumber": 1,
+                  "quote": "프로젝트는 아이디어톤 본선에 진출했다."
+                }
+              ],
+              "policyViolations": [],
+              "requiresUserConfirmation": false
+            }
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "questionId": "60000000-0000-0000-0000-000000000005",
+          "targetSection": "RESULT",
+          "question": "프로젝트 결과는 무엇인가요?",
+          "suggestedAnswers": []
+        },
+        {
+          "questionId": "60000000-0000-0000-0000-000000000006",
+          "targetSection": "CONTRIBUTION",
+          "question": "직접 담당한 부분은 무엇인가요?",
+          "suggestedAnswers": []
+        }
+      ]
+    },
+    "expected": {
+      "claims": [],
+      "questionTargets": ["CONTRIBUTION"]
+    }
+  }
+]
