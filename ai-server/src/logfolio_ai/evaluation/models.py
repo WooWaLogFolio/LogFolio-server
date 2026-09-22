@@ -4,6 +4,7 @@ from pydantic import Field
 
 from logfolio_ai.models import (
     AnalysisResponse,
+    EvidenceType,
     PolicyViolationType,
     ProvenanceType,
     SubjectType,
@@ -18,6 +19,7 @@ class ClaimExpectation(ContractModel):
     subject_type: Optional[SubjectType] = None
     provenance_type: Optional[ProvenanceType] = None
     verification_status: Optional[VerificationStatus] = None
+    evidence_type: Optional[EvidenceType] = None
     requires_user_confirmation: Optional[bool] = None
     violations_contain: List[PolicyViolationType] = Field(default_factory=list)
 
