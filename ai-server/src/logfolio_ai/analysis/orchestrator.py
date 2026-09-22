@@ -1,3 +1,5 @@
+import logging
+import time
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -6,6 +8,9 @@ from logfolio_ai.llm import GroundedAnalysisInput, GroundedChunk, LLMProvider
 from logfolio_ai.models import AnalysisRequest, AnalysisResponse
 from logfolio_ai.policy import AIPolicyValidator
 from logfolio_ai.rag import AnalysisPurpose, RagService, RetrievalContext
+
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class AnalysisOrchestrator:
@@ -92,14 +97,36 @@ class AnalysisOrchestrator:
                         )
 
     async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
+        started_at = time.perf_counter()
         await self._rag_service.index_documents(request.project_id, request.documents)
+        indexed_at = time.perf_counter()
         contexts = await self._rag_service.retrieve_analysis_context(request.project_id)
+        retrieved_at = time.perf_counter()
         grounded_chunks = self._build_grounded_chunks(contexts)
         grounded_input = GroundedAnalysisInput(
             analysis_run_id=request.analysis_run_id,
             project_id=request.project_id,
             chunks=grounded_chunks,
         )
+        logger.info(
+            "Analysis grounding prepared: index=%.3fs retrieve=%.3fs chunks=%d",
+            indexed_at - started_at,
+            retrieved_at - indexed_at,
+            len(grounded_chunks),
+        )
         response = await self._llm_provider.analyze_grounded(grounded_input)
+        generated_at = time.perf_counter()
         self._validate_evidence(response, grounded_chunks)
-        return self._policy_validator.validate(response)
+        validated = self._policy_validator.validate(response)
+        completed_at = time.perf_counter()
+        logger.info(
+            "Analysis stages completed: index=%.3fs retrieve=%.3fs "
+            "generate=%.3fs validate=%.3fs total=%.3fs chunks=%d",
+            indexed_at - started_at,
+            retrieved_at - indexed_at,
+            generated_at - retrieved_at,
+            completed_at - generated_at,
+            completed_at - started_at,
+            len(grounded_chunks),
+        )
+        return validated

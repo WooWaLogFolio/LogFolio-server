@@ -394,3 +394,14 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gem
 ```
 
 Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다. Smoke Test는 30초 이내 응답, 요청 추적 ID, 후보·질문 개수 제한과 사용자 전용 출처 상태 위조 여부를 확인합니다.
+
+### Full E5, pgvector, Gemini pipeline validation
+
+실제 E5 Embedding, pgvector 검색, Gemini Structured Output과 AI Policy를 한 요청으로 검증합니다. 테스트는 다른 `projectId`에 격리 확인용 자료를 먼저 넣고, 해당 자료가 분석 근거나 요약에 섞이지 않는지도 확인합니다. 외부 Gemini에는 비식별 합성 자료만 전송합니다.
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline up --build --abort-on-container-exit --exit-code-from full-pipeline-smoke full-pipeline-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline down
+```
+
+검증 항목은 30초 이내 응답, 추적 ID 보존, 경험 후보 1~3개, 질문 최대 2개, 원문과 일치하는 근거, 다른 프로젝트 자료 격리, 768차원 E5 벡터와 모델명입니다. 외부 LLM 응답 시간은 변동될 수 있으므로 첫 실패에는 동일 `analysisRunId`로 최대 1회만 재시도합니다.

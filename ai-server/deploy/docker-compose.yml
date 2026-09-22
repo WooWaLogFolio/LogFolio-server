@@ -169,6 +169,61 @@ services:
       ai-server-gemini:
         condition: service_healthy
 
+  ai-server-full-pipeline:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "true"
+    profiles: ["full-pipeline"]
+    environment:
+      HF_HOME: /home/logfolio/.cache/huggingface
+      LOGFOLIO_AI_ENVIRONMENT: local
+      LOGFOLIO_AI_LLM_PROVIDER: gemini
+      LOGFOLIO_AI_GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      LOGFOLIO_AI_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LOGFOLIO_AI_LLM_TIMEOUT_SECONDS: "30"
+      LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS: "30"
+      LOGFOLIO_AI_EMBEDDING_PROVIDER: e5
+      LOGFOLIO_AI_EMBEDDING_MODEL: intfloat/multilingual-e5-base
+      LOGFOLIO_AI_VECTOR_DIMENSION: "768"
+      LOGFOLIO_AI_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_AI_INTERNAL_AUTH_REQUIRED: "true"
+      LOGFOLIO_AI_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - logfolio-huggingface:/home/logfolio/.cache/huggingface
+
+  full-pipeline-smoke:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    profiles: ["full-pipeline"]
+    environment:
+      LOGFOLIO_SMOKE_BASE_URL: http://ai-server-full-pipeline:8000
+      LOGFOLIO_SMOKE_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_SMOKE_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_SMOKE_MAX_SECONDS: "30"
+    command: ["python", "/app/scripts/full_pipeline_smoke_test.py"]
+    depends_on:
+      ai-server-full-pipeline:
+        condition: service_healthy
+
 volumes:
   logfolio-postgres:
   logfolio-huggingface:
