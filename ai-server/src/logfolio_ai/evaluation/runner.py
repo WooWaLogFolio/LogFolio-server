@@ -36,6 +36,7 @@ def _check_claim(case: EvaluationCase, expected: ClaimExpectation, output) -> Li
         "subject_type",
         "provenance_type",
         "verification_status",
+        "evidence_type",
         "requires_user_confirmation",
     )
     for field in fields:
