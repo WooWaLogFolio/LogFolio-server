@@ -1,6 +1,5 @@
 package com.woowa.logfolio.user.service;
 
-import com.woowa.logfolio.user.dto.UserCreateRequest;
 import com.woowa.logfolio.user.dto.UserResponse;
 import com.woowa.logfolio.user.dto.UserUpdateRequest;
 import com.woowa.logfolio.user.entity.User;
@@ -20,15 +19,6 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    @Transactional
-    public UserResponse create(UserCreateRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
-        }
-        User user = new User(request.email(), request.name(), request.passwordHash());
-        return UserResponse.from(userRepository.save(user));
-    }
-
     public UserResponse get(UUID id) {
         return UserResponse.from(findActiveUser(id));
     }
@@ -36,7 +26,21 @@ public class UserService {
     @Transactional
     public UserResponse update(UUID id, UserUpdateRequest request) {
         User user = findActiveUser(id);
-        user.update(request.name(), request.status(), request.onboardingCompletedAt());
+        user.update(request.name(), request.onboardingCompletedAt());
+        return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse updateName(UUID id, String name) {
+        User user = findActiveUser(id);
+        user.updateName(name.trim());
+        return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse completeOnboarding(UUID id) {
+        User user = findActiveUser(id);
+        user.completeOnboarding();
         return UserResponse.from(user);
     }
 
