@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:logfolio;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  security:
+    oauth2:
+      client:
+        registration:
+          naver:
+            client-id: test-naver-client
+            client-secret: test-naver-secret
+          kakao:
+            client-id: test-kakao-client
+            client-secret: test-kakao-secret
