@@ -71,6 +71,7 @@ def test_response_accepts_at_most_three_candidates_and_two_questions() -> None:
     questions = [
         GapQuestion(
             question_id=uuid4(),
+            candidate_id=candidates[0].candidate_id,
             target_section="RESULT",
             question=f"결과를 알려주세요. {index}",
         )
@@ -87,6 +88,34 @@ def test_response_accepts_at_most_three_candidates_and_two_questions() -> None:
 
     assert len(response.candidates) == 3
     assert len(response.questions) == 2
+
+
+def test_question_candidate_must_reference_returned_candidate() -> None:
+    candidate = ExperienceCandidate(
+        candidate_id=uuid4(),
+        title="인증 기능 구현 경험",
+        summary="인증 기능 구현 경험",
+        claims=[make_claim()],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="question candidateId must reference a returned candidate",
+    ):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="프로젝트 분석 초안",
+            candidates=[candidate],
+            questions=[
+                GapQuestion(
+                    question_id=uuid4(),
+                    candidate_id=uuid4(),
+                    target_section="RESULT",
+                    question="결과를 알려주세요.",
+                )
+            ],
+        )
 
 
 def test_source_extracted_claim_requires_evidence() -> None:

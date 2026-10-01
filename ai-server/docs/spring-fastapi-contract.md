@@ -50,15 +50,55 @@ X-Internal-API-Key: <shared-secret>
   "analysisRunId": "10000000-0000-0000-0000-000000000001",
   "projectId": "20000000-0000-0000-0000-000000000001",
   "summary": "프로젝트 자료를 분석한 AI 초안입니다.",
-  "candidates": [],
-  "questions": []
+  "candidates": [
+    {
+      "candidateId": "40000000-0000-0000-0000-000000000001",
+      "title": "인증 기능 구현 경험",
+      "summary": "JWT 인증 기능을 구현한 경험입니다.",
+      "claims": []
+    }
+  ],
+  "questions": [
+    {
+      "questionId": "50000000-0000-0000-0000-000000000001",
+      "candidateId": "40000000-0000-0000-0000-000000000001",
+      "targetSection": "RESULT",
+      "question": "인증 기능을 적용한 후 어떤 변화가 있었나요?",
+      "suggestedAnswers": []
+    }
+  ]
 }
 ```
 
 - 경험 후보는 최대 3개
 - 보완 질문은 최대 2개
+- `questions[].candidateId`는 응답에 포함된 경험 후보를 가리킴
+- 근거가 부족해 경험 후보 자체를 만들 수 없는 질문은 `candidateId`가 `null`일 수 있음
 - 결과는 AI 초안이며 바로 경험 DB에 확정 저장하지 않음
 - Spring은 사용자 승인·수정·거절 이후에만 확정 상태로 저장
+
+## Spring persistence mapping
+
+새로운 Claim 테이블을 만들지 않고 기존 ERD를 다음과 같이 사용합니다.
+
+| AI response | Spring ERD |
+| --- | --- |
+| 경험 후보와 전체 AI 원본 | `experience_candidates`, `draft_content` |
+| 검토할 Claim의 `content` | `review_items.proposed_content` |
+| Claim의 `sectionType` | `review_items.item_type` |
+| 사용자가 승인·수정한 내용 | `review_items.confirmed_content` |
+| 승인·수정·거절 상태 | `review_items.decision` |
+| Evidence의 `excerpt` | `evidence_items.excerpt` |
+| Evidence와 검토 항목 연결 | `review_item_evidence` |
+
+Spring ERD에는 연동 구현 전에 다음 변경이 필요합니다.
+
+- `gap_questions.candidate_id` nullable 컬럼 추가
+- `gap_questions.experience_id` nullable 변경
+- 경험 확정 전 질문은 `candidate_id`, 확정 후에는 `experience_id`로 연결
+- `evidence_items.chunk_id` nullable 컬럼 추가
+- `evidence_items.page_number` nullable 컬럼 추가
+- `location`은 `3페이지`처럼 사용자에게 보여줄 표현으로 유지
 
 ## Error response
 
