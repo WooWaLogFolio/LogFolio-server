@@ -8,7 +8,7 @@ from logfolio_ai.vector_store.models import VectorSearchResult
 
 _UPSERT_SQL = """
 INSERT INTO ai_document_chunks (
-    chunk_id, project_id, source_id, file_name, sequence, page_number,
+    chunk_id, project_id, project_file_id, original_name, sequence, page_number,
     section_title, char_start, char_end, token_count, content, embedding,
     embedding_model
 ) VALUES (
@@ -16,8 +16,8 @@ INSERT INTO ai_document_chunks (
 )
 ON CONFLICT (chunk_id) DO UPDATE SET
     project_id = EXCLUDED.project_id,
-    source_id = EXCLUDED.source_id,
-    file_name = EXCLUDED.file_name,
+    project_file_id = EXCLUDED.project_file_id,
+    original_name = EXCLUDED.original_name,
     sequence = EXCLUDED.sequence,
     page_number = EXCLUDED.page_number,
     section_title = EXCLUDED.section_title,
@@ -32,7 +32,7 @@ ON CONFLICT (chunk_id) DO UPDATE SET
 
 _SEARCH_SQL = """
 SELECT
-    chunk_id, source_id, file_name, sequence, page_number, section_title,
+    chunk_id, project_file_id, original_name, sequence, page_number, section_title,
     char_start, char_end, content, embedding <=> $2 AS distance
 FROM ai_document_chunks
 WHERE project_id = $1
@@ -47,7 +47,7 @@ WHERE project_id = $1
 
 _DELETE_SOURCE_SQL = """
 DELETE FROM ai_document_chunks
-WHERE project_id = $1 AND source_id = $2
+WHERE project_id = $1 AND project_file_id = $2
 """
 
 
@@ -115,8 +115,8 @@ class PgVectorStore:
             (
                 chunk.chunk_id,
                 project_id,
-                chunk.source_id,
-                chunk.file_name,
+                chunk.project_file_id,
+                chunk.original_name,
                 chunk.sequence,
                 chunk.page_number,
                 chunk.section_title,
@@ -145,7 +145,7 @@ class PgVectorStore:
     async def replace_source_chunks(
         self,
         project_id: UUID,
-        source_id: UUID,
+        project_file_id: UUID,
         chunks: Sequence[DocumentChunk],
         embeddings: Sequence[Sequence[float]],
         *,
@@ -153,15 +153,15 @@ class PgVectorStore:
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
-        if any(chunk.source_id != source_id for chunk in chunks):
-            raise ValueError("every chunk must belong to source_id")
+        if any(chunk.project_file_id != project_file_id for chunk in chunks):
+            raise ValueError("every chunk must belong to project_file_id")
 
         rows = [
             (
                 chunk.chunk_id,
                 project_id,
-                chunk.source_id,
-                chunk.file_name,
+                chunk.project_file_id,
+                chunk.original_name,
                 chunk.sequence,
                 chunk.page_number,
                 chunk.section_title,
@@ -178,7 +178,7 @@ class PgVectorStore:
         try:
             async with self._pool.acquire() as connection:
                 async with connection.transaction():
-                    await connection.execute(_DELETE_SOURCE_SQL, project_id, source_id)
+                    await connection.execute(_DELETE_SOURCE_SQL, project_id, project_file_id)
                     if rows:
                         await connection.executemany(_UPSERT_SQL, rows)
         except AppError:
@@ -214,8 +214,8 @@ class PgVectorStore:
         return [
             VectorSearchResult(
                 chunk_id=row["chunk_id"],
-                source_id=row["source_id"],
-                file_name=row["file_name"],
+                project_file_id=row["project_file_id"],
+                original_name=row["original_name"],
                 sequence=row["sequence"],
                 page_number=row["page_number"],
                 section_title=row["section_title"],
@@ -237,9 +237,9 @@ class PgVectorStore:
                 status_code=503,
             ) from exc
 
-    async def delete_source(self, project_id: UUID, source_id: UUID) -> None:
+    async def delete_source(self, project_id: UUID, project_file_id: UUID) -> None:
         try:
-            await self._pool.execute(_DELETE_SOURCE_SQL, project_id, source_id)
+            await self._pool.execute(_DELETE_SOURCE_SQL, project_id, project_file_id)
         except Exception as exc:
             raise AppError(
                 code="VECTOR_STORE_DELETE_ERROR",

@@ -68,8 +68,8 @@ def request() -> AnalysisRequest:
         project_id=uuid4(),
         documents=[
             DocumentSource(
-                source_id=uuid4(),
-                file_name="project.pdf",
+                project_file_id=uuid4(),
+                original_name="project.pdf",
                 pages=[
                     DocumentPage(
                         page_number=1,
@@ -84,8 +84,8 @@ def request() -> AnalysisRequest:
 def search_result(*, distance: float = 0.2) -> VectorSearchResult:
     return VectorSearchResult(
         chunk_id=uuid4(),
-        source_id=uuid4(),
-        file_name="project.pdf",
+        project_file_id=uuid4(),
+        original_name="project.pdf",
         sequence=0,
         page_number=1,
         char_start=0,
@@ -140,7 +140,7 @@ async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_accepts_exact_quote_from_retrieved_chunk() -> None:
+async def test_orchestrator_accepts_exact_excerpt_from_retrieved_chunk() -> None:
     analysis_request = request()
     result = search_result()
     response = AnalysisResponse(
@@ -162,10 +162,10 @@ async def test_orchestrator_accepts_exact_quote_from_retrieved_chunk() -> None:
                         evidence_type=EvidenceType.DIRECT,
                         evidences=[
                             Evidence(
-                                source_id=result.source_id,
+                                project_file_id=result.project_file_id,
                                 chunk_id=result.chunk_id,
                                 page_number=1,
-                                quote="JWT 인증 API를 구현했다.",
+                                excerpt="JWT 인증 API를 구현했다.",
                             )
                         ],
                         requires_user_confirmation=False,
@@ -212,9 +212,9 @@ async def test_orchestrator_rejects_evidence_not_in_retrieved_chunks() -> None:
                         evidence_type=EvidenceType.DIRECT,
                         evidences=[
                             Evidence(
-                                source_id=uuid4(),
+                                project_file_id=uuid4(),
                                 chunk_id=uuid4(),
-                                quote="존재하지 않는 인용문",
+                                excerpt="존재하지 않는 인용문",
                             )
                         ],
                         requires_user_confirmation=False,

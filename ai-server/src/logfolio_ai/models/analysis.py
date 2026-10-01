@@ -19,8 +19,8 @@ class DocumentPage(ContractModel):
 
 
 class DocumentSource(ContractModel):
-    source_id: UUID
-    file_name: str = Field(min_length=1, max_length=255)
+    project_file_id: UUID
+    original_name: str = Field(min_length=1, max_length=255)
     mime_type: Optional[str] = Field(default=None, max_length=100)
     pages: List[DocumentPage] = Field(min_length=1)
 
@@ -32,10 +32,10 @@ class AnalysisRequest(ContractModel):
 
 
 class Evidence(ContractModel):
-    source_id: UUID
+    project_file_id: UUID
     chunk_id: UUID
     page_number: Optional[int] = Field(default=None, ge=1)
-    quote: str = Field(min_length=1)
+    excerpt: str = Field(min_length=1)
 
 
 class Claim(ContractModel):

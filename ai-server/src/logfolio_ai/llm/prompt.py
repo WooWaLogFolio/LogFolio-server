@@ -22,7 +22,7 @@ def build_grounded_analysis_prompt(request: GroundedAnalysisInput) -> str:
         [
             "Analyze only the retrieved chunks in the following JSON.",
             "Do not use outside knowledge. If the chunks do not support a claim, omit it or ask for confirmation.",
-            "Every evidence sourceId, chunkId, pageNumber, and quote must match a supplied chunk exactly.",
+            "Every evidence projectFileId, chunkId, pageNumber, and excerpt must match a supplied chunk exactly.",
             json.dumps(source_payload, ensure_ascii=False),
         ]
     )

@@ -9,8 +9,8 @@ from logfolio_ai.rag.models import AnalysisPurpose
 
 class GroundedChunk(ContractModel):
     chunk_id: UUID
-    source_id: UUID
-    file_name: str
+    project_file_id: UUID
+    original_name: str
     page_number: Optional[int] = Field(default=None, ge=1)
     section_title: Optional[str] = None
     text: str = Field(min_length=1)

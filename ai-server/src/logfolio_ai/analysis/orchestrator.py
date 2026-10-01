@@ -39,8 +39,8 @@ class AnalysisOrchestrator:
                 if existing is None:
                     chunk = GroundedChunk(
                         chunk_id=result.chunk_id,
-                        source_id=result.source_id,
-                        file_name=result.file_name,
+                        project_file_id=result.project_file_id,
+                        original_name=result.original_name,
                         page_number=result.page_number,
                         section_title=result.section_title,
                         text=result.text,
@@ -74,13 +74,13 @@ class AnalysisOrchestrator:
             for claim in candidate.claims:
                 for evidence in claim.evidences:
                     source = chunks.get(evidence.chunk_id)
-                    if source is None or source.source_id != evidence.source_id:
+                    if source is None or source.project_file_id != evidence.project_file_id:
                         raise AppError(
                             code="UNGROUNDED_EVIDENCE",
                             message="AI가 검색되지 않은 근거를 반환했습니다.",
                             status_code=502,
                         )
-                    if evidence.quote not in source.text:
+                    if evidence.excerpt not in source.text:
                         raise AppError(
                             code="INVALID_EVIDENCE_QUOTE",
                             message="AI 인용문이 검색된 원문과 일치하지 않습니다.",

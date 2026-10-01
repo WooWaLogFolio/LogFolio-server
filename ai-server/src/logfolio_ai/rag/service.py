@@ -55,7 +55,7 @@ class RagService:
             )
             await self._vector_store.replace_source_chunks(
                 project_id,
-                document.source_id,
+                document.project_file_id,
                 chunks,
                 embeddings,
                 embedding_model=self._embedding_model,

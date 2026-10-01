@@ -10,8 +10,8 @@ from logfolio_ai.models import DocumentPage, DocumentSource
 
 def document(text: str, *, page_number: int = 1) -> DocumentSource:
     return DocumentSource(
-        source_id=uuid4(),
-        file_name="project.md",
+        project_file_id=uuid4(),
+        original_name="project.md",
         pages=[DocumentPage(page_number=page_number, text=text)],
     )
 
@@ -23,8 +23,8 @@ def test_short_document_preserves_exact_source_metadata() -> None:
 
     assert len(chunks) == 1
     chunk = chunks[0]
-    assert chunk.source_id == source.source_id
-    assert chunk.file_name == "project.md"
+    assert chunk.project_file_id == source.project_file_id
+    assert chunk.original_name == "project.md"
     assert chunk.page_number == 1
     assert chunk.section_title == "인증 기능"
     assert chunk.text == source.pages[0].text
@@ -54,8 +54,8 @@ def test_chunk_ids_are_stable_for_the_same_source() -> None:
 
 def test_pages_are_not_mixed_into_one_chunk() -> None:
     source = DocumentSource(
-        source_id=uuid4(),
-        file_name="project.pdf",
+        project_file_id=uuid4(),
+        original_name="project.pdf",
         pages=[
             DocumentPage(page_number=1, text="첫 번째 페이지"),
             DocumentPage(page_number=2, text="두 번째 페이지"),

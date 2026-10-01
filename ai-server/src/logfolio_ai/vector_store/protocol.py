@@ -9,7 +9,7 @@ class VectorStore(Protocol):
     async def replace_source_chunks(
         self,
         project_id: UUID,
-        source_id: UUID,
+        project_file_id: UUID,
         chunks: Sequence[DocumentChunk],
         embeddings: Sequence[Sequence[float]],
         *,

@@ -47,7 +47,7 @@ class AIPolicyValidator:
     @staticmethod
     def _has_marker(claim: Claim, markers: Iterable[str]) -> bool:
         return any(
-            marker in evidence.quote
+            marker in evidence.excerpt
             for evidence in claim.evidences
             for marker in markers
         )

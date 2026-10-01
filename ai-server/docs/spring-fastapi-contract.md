@@ -20,8 +20,8 @@ X-Internal-API-Key: <shared-secret>
   "projectId": "20000000-0000-0000-0000-000000000001",
   "documents": [
     {
-      "sourceId": "30000000-0000-0000-0000-000000000001",
-      "fileName": "project-report.pdf",
+      "projectFileId": "30000000-0000-0000-0000-000000000001",
+      "originalName": "project-report.pdf",
       "mimeType": "application/pdf",
       "pages": [
         {

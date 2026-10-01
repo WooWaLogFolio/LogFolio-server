@@ -17,8 +17,8 @@ def main() -> None:
         "projectId": PROJECT_ID,
         "documents": [
             {
-                "sourceId": "90000000-0000-0000-0000-000000000001",
-                "fileName": "synthetic-team-project.txt",
+                "projectFileId": "90000000-0000-0000-0000-000000000001",
+                "originalName": "synthetic-team-project.txt",
                 "mimeType": "text/plain",
                 "pages": [
                     {

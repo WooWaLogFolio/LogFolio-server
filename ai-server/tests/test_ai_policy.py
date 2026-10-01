@@ -15,12 +15,12 @@ from logfolio_ai.models import (
 from logfolio_ai.policy import AIPolicyValidator
 
 
-def evidence(quote: str) -> Evidence:
+def evidence(excerpt: str) -> Evidence:
     return Evidence(
-        source_id=uuid4(),
+        project_file_id=uuid4(),
         chunk_id=uuid4(),
         page_number=1,
-        quote=quote,
+        excerpt=excerpt,
     )
 
 
