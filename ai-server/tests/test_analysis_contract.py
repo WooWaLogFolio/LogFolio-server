@@ -21,18 +21,18 @@ from logfolio_ai.models import (
 
 def make_document() -> DocumentSource:
     return DocumentSource(
-        source_id=uuid4(),
-        file_name="project.pdf",
+        project_file_id=uuid4(),
+        original_name="project.pdf",
         pages=[DocumentPage(page_number=1, text="JWT 인증 API를 구현했다.")],
     )
 
 
 def make_evidence() -> Evidence:
     return Evidence(
-        source_id=uuid4(),
+        project_file_id=uuid4(),
         chunk_id=uuid4(),
         page_number=1,
-        quote="박수빈은 JWT 인증 API 구현을 담당했다.",
+        excerpt="박수빈은 JWT 인증 API 구현을 담당했다.",
     )
 
 
@@ -127,7 +127,7 @@ def test_contract_serializes_with_camel_case_keys() -> None:
 
     assert "analysisRunId" in payload
     assert "projectId" in payload
-    assert "sourceId" in payload["documents"][0]
+    assert "projectFileId" in payload["documents"][0]
     assert "pageNumber" in payload["documents"][0]["pages"][0]
 
 
@@ -139,8 +139,8 @@ def test_contract_rejects_unknown_fields() -> None:
                 "projectId": str(uuid4()),
                 "documents": [
                     {
-                        "sourceId": str(uuid4()),
-                        "fileName": "project.pdf",
+                        "projectFileId": str(uuid4()),
+                        "originalName": "project.pdf",
                         "pages": [{"text": "프로젝트 자료"}],
                     }
                 ],

@@ -39,13 +39,13 @@ def _section_at(headings: List[Tuple[int, str]], position: int) -> Optional[str]
 
 
 def _stable_chunk_id(
-    source_id: UUID,
+    project_file_id: UUID,
     page_number: Optional[int],
     sequence: int,
     text: str,
 ) -> UUID:
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    identity = f"logfolio:{source_id}:{page_number}:{sequence}:{digest}"
+    identity = f"logfolio:{project_file_id}:{page_number}:{sequence}:{digest}"
     return uuid5(NAMESPACE_URL, identity)
 
 
@@ -82,13 +82,13 @@ def chunk_documents(
                 chunks.append(
                     DocumentChunk(
                         chunk_id=_stable_chunk_id(
-                            document.source_id,
+                            document.project_file_id,
                             page.page_number,
                             sequence,
                             chunk_text,
                         ),
-                        source_id=document.source_id,
-                        file_name=document.file_name,
+                        project_file_id=document.project_file_id,
+                        original_name=document.original_name,
                         sequence=sequence,
                         page_number=page.page_number,
                         section_title=_section_at(headings, char_start),

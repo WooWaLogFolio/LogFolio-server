@@ -24,8 +24,8 @@ def grounded_request() -> GroundedAnalysisInput:
         chunks=[
             GroundedChunk(
                 chunk_id=uuid4(),
-                source_id=uuid4(),
-                file_name="project.pdf",
+                project_file_id=uuid4(),
+                original_name="project.pdf",
                 page_number=1,
                 text="팀은 인터뷰를 진행했다.",
                 distance=0.1,

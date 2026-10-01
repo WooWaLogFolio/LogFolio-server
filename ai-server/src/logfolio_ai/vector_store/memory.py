@@ -19,7 +19,7 @@ class MemoryVectorStore:
     async def replace_source_chunks(
         self,
         project_id: UUID,
-        source_id: UUID,
+        project_file_id: UUID,
         chunks: Sequence[DocumentChunk],
         embeddings: Sequence[Sequence[float]],
         *,
@@ -28,14 +28,14 @@ class MemoryVectorStore:
         del embedding_model
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
-        if any(chunk.source_id != source_id for chunk in chunks):
-            raise ValueError("every chunk must belong to source_id")
+        if any(chunk.project_file_id != project_file_id for chunk in chunks):
+            raise ValueError("every chunk must belong to project_file_id")
         values = [
             (chunk, [float(value) for value in embedding])
             for chunk, embedding in zip(chunks, embeddings)
         ]
         async with self._lock:
-            self._sources[(project_id, source_id)] = values
+            self._sources[(project_id, project_file_id)] = values
 
     @staticmethod
     def _cosine_distance(left: Sequence[float], right: Sequence[float]) -> float:
@@ -76,8 +76,8 @@ class MemoryVectorStore:
         return [
             VectorSearchResult(
                 chunk_id=chunk.chunk_id,
-                source_id=chunk.source_id,
-                file_name=chunk.file_name,
+                project_file_id=chunk.project_file_id,
+                original_name=chunk.original_name,
                 sequence=chunk.sequence,
                 page_number=chunk.page_number,
                 section_title=chunk.section_title,
@@ -89,9 +89,9 @@ class MemoryVectorStore:
             for distance, chunk in ranked
         ]
 
-    async def delete_source(self, project_id: UUID, source_id: UUID) -> None:
+    async def delete_source(self, project_id: UUID, project_file_id: UUID) -> None:
         async with self._lock:
-            self._sources.pop((project_id, source_id), None)
+            self._sources.pop((project_id, project_file_id), None)
 
     async def delete_project(self, project_id: UUID) -> None:
         async with self._lock:

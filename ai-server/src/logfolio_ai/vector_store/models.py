@@ -8,8 +8,8 @@ from logfolio_ai.models.base import ContractModel
 
 class VectorSearchResult(ContractModel):
     chunk_id: UUID
-    source_id: UUID
-    file_name: str
+    project_file_id: UUID
+    original_name: str
     sequence: int = Field(ge=0)
     page_number: Optional[int] = Field(default=None, ge=1)
     section_title: Optional[str] = None

@@ -17,8 +17,8 @@ def valid_analysis_payload() -> dict:
         "projectId": str(uuid4()),
         "documents": [
             {
-                "sourceId": str(uuid4()),
-                "fileName": "project.pdf",
+                "projectFileId": str(uuid4()),
+                "originalName": "project.pdf",
                 "mimeType": "application/pdf",
                 "pages": [
                     {

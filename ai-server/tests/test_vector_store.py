@@ -50,8 +50,8 @@ class FakePool:
 def chunk() -> DocumentChunk:
     return DocumentChunk(
         chunk_id=uuid4(),
-        source_id=uuid4(),
-        file_name="project.pdf",
+        project_file_id=uuid4(),
+        original_name="project.pdf",
         sequence=0,
         page_number=1,
         section_title="인증 기능",
@@ -80,7 +80,7 @@ async def test_upsert_keeps_project_scope_and_chunk_metadata() -> None:
     assert "ON CONFLICT (chunk_id)" in sql
     assert rows[0][0] == source_chunk.chunk_id
     assert rows[0][1] == project_id
-    assert rows[0][2] == source_chunk.source_id
+    assert rows[0][2] == source_chunk.project_file_id
     assert rows[0][11] == [1.0, 0.0, 0.0]
 
 
@@ -93,8 +93,8 @@ async def test_search_always_filters_by_project_before_top_k() -> None:
     pool.search_rows = [
         {
             "chunk_id": result_chunk.chunk_id,
-            "source_id": result_chunk.source_id,
-            "file_name": result_chunk.file_name,
+            "project_file_id": result_chunk.project_file_id,
+            "original_name": result_chunk.original_name,
             "sequence": 0,
             "page_number": 1,
             "section_title": "인증 기능",
@@ -145,13 +145,13 @@ async def test_source_delete_requires_both_project_and_source_scope() -> None:
     pool = FakePool()
     store = PgVectorStore(pool, vector_dimension=3)
     project_id = uuid4()
-    source_id = uuid4()
+    project_file_id = uuid4()
 
-    await store.delete_source(project_id, source_id)
+    await store.delete_source(project_id, project_file_id)
 
     sql, args = pool.execute_calls[0]
-    assert "WHERE project_id = $1 AND source_id = $2" in sql
-    assert args == (project_id, source_id)
+    assert "WHERE project_id = $1 AND project_file_id = $2" in sql
+    assert args == (project_id, project_file_id)
 
 
 @pytest.mark.asyncio
@@ -188,13 +188,13 @@ async def test_replace_source_deletes_and_inserts_in_one_transaction() -> None:
 
     await store.replace_source_chunks(
         project_id,
-        source_chunk.source_id,
+        source_chunk.project_file_id,
         [source_chunk],
         [[1.0, 0.0, 0.0]],
         embedding_model="test-model",
     )
 
     delete_sql, delete_args = pool.connection.execute_calls[0]
-    assert "WHERE project_id = $1 AND source_id = $2" in delete_sql
-    assert delete_args == (project_id, source_chunk.source_id)
+    assert "WHERE project_id = $1 AND project_file_id = $2" in delete_sql
+    assert delete_args == (project_id, source_chunk.project_file_id)
     assert len(pool.connection.executemany_calls) == 1

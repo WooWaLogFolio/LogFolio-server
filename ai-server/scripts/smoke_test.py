@@ -11,8 +11,8 @@ def main() -> None:
         "projectId": "20000000-0000-0000-0000-000000000001",
         "documents": [
             {
-                "sourceId": "30000000-0000-0000-0000-000000000001",
-                "fileName": "smoke-test.txt",
+                "projectFileId": "30000000-0000-0000-0000-000000000001",
+                "originalName": "smoke-test.txt",
                 "mimeType": "text/plain",
                 "pages": [
                     {

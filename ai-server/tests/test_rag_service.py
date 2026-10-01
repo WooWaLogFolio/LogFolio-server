@@ -39,7 +39,7 @@ class RecordingVectorStore:
     async def replace_source_chunks(
         self,
         project_id: UUID,
-        source_id: UUID,
+        project_file_id: UUID,
         chunks: Sequence[DocumentChunk],
         embeddings: Sequence[Sequence[float]],
         *,
@@ -48,7 +48,7 @@ class RecordingVectorStore:
         self.replace_calls.append(
             {
                 "project_id": project_id,
-                "source_id": source_id,
+                "project_file_id": project_file_id,
                 "chunks": list(chunks),
                 "embeddings": list(embeddings),
                 "embedding_model": embedding_model,
@@ -74,8 +74,8 @@ class RecordingVectorStore:
 
 def source(text: str = "JWT 인증 API를 구현했다.") -> DocumentSource:
     return DocumentSource(
-        source_id=uuid4(),
-        file_name="project.pdf",
+        project_file_id=uuid4(),
+        original_name="project.pdf",
         pages=[DocumentPage(page_number=1, text=text)],
     )
 
@@ -108,7 +108,7 @@ async def test_index_connects_chunking_embedding_and_atomic_source_replace() -> 
     assert result.chunk_count == 1
     assert embedding.document_calls == [["JWT 인증 API를 구현했다."]]
     assert store.replace_calls[0]["project_id"] == project_id
-    assert store.replace_calls[0]["source_id"] == document.source_id
+    assert store.replace_calls[0]["project_file_id"] == document.project_file_id
     assert store.replace_calls[0]["embedding_model"] == "test-e5"
 
 
