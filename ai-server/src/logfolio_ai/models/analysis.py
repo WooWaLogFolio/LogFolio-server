@@ -85,6 +85,13 @@ class ExperienceCandidate(ContractModel):
 
 class GapQuestion(ContractModel):
     question_id: UUID
+    candidate_id: Optional[UUID] = Field(
+        default=None,
+        description=(
+            "Experience candidate this question supplements. Null when no candidate "
+            "can be created from the available evidence."
+        ),
+    )
     target_section: str = Field(
         min_length=1,
         description="Spring-owned target section value defined by the shared ERD contract.",
@@ -99,3 +106,16 @@ class AnalysisResponse(ContractModel):
     summary: str = Field(min_length=1)
     candidates: List[ExperienceCandidate] = Field(default_factory=list, max_length=3)
     questions: List[GapQuestion] = Field(default_factory=list, max_length=2)
+
+    @model_validator(mode="after")
+    def validate_question_candidate_references(self) -> "AnalysisResponse":
+        candidate_ids = {candidate.candidate_id for candidate in self.candidates}
+        unknown_ids = {
+            question.candidate_id
+            for question in self.questions
+            if question.candidate_id is not None
+            and question.candidate_id not in candidate_ids
+        }
+        if unknown_ids:
+            raise ValueError("question candidateId must reference a returned candidate")
+        return self
