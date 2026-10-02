@@ -5,18 +5,21 @@ import pytest
 
 from logfolio_ai.analysis import AnalysisOrchestrator
 from logfolio_ai.chunking import DocumentChunk
+from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm import GroundedAnalysisInput
 from logfolio_ai.models import (
     AnalysisRequest,
     AnalysisResponse,
     AnalysisResultType,
     Claim,
+    ConflictDetail,
     DocumentPage,
     DocumentSource,
     Evidence,
     EvidenceType,
     ExperienceCandidate,
     ExistingEvidence,
+    ExistingClaim,
     ExistingExperience,
     ProvenanceType,
     ProjectContext,
@@ -492,3 +495,168 @@ async def test_suspected_project_mismatch_waits_for_user_without_llm_call() -> N
     assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
     assert response.source_warnings == [warning]
     assert llm.grounded_input is None
+
+
+@pytest.mark.asyncio
+async def test_valid_conflict_references_existing_confirmed_claim() -> None:
+    analysis_request = request()
+    retrieved = search_result()
+    experience_id = uuid4()
+    analysis_request.existing_experiences = [
+        ExistingExperience(
+            experience_id=experience_id,
+            title="인터뷰 경험",
+            claims=[
+                ExistingClaim(
+                    section_type="ACTION",
+                    content="인터뷰 질문지를 설계했다.",
+                )
+            ],
+            evidences=[
+                ExistingEvidence(
+                    evidence_id=uuid4(),
+                    source_id=uuid4(),
+                    chunk_id=uuid4(),
+                )
+            ],
+        )
+    ]
+    proposed_claim = Claim(
+        section_type="ACTION",
+        content="인터뷰 진행까지 담당했다.",
+        subject_type=SubjectType.TEAM,
+        provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+        verification_status=VerificationStatus.VERIFIED,
+        evidence_type=EvidenceType.DIRECT,
+        evidences=[
+            Evidence(
+                source_id=retrieved.source_id,
+                chunk_id=retrieved.chunk_id,
+                page_number=1,
+                excerpt=retrieved.text,
+            )
+        ],
+        requires_user_confirmation=False,
+    )
+    response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="기존 확정 내용과 새 근거가 충돌합니다.",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                conflict=True,
+                conflicts=[
+                    ConflictDetail(
+                        section_type="ACTION",
+                        existing_content="인터뷰 질문지를 설계했다.",
+                        proposed_content="인터뷰 진행까지 담당했다.",
+                        reason="담당 범위가 다릅니다.",
+                    )
+                ],
+                title="인터뷰 경험 충돌",
+                summary="사용자 확인이 필요합니다.",
+                claims=[proposed_claim],
+            )
+        ],
+    )
+    existing_chunk = DocumentChunk(
+        chunk_id=analysis_request.existing_experiences[0].evidences[0].chunk_id,
+        source_id=analysis_request.existing_experiences[0].evidences[0].source_id,
+        source_name="old.pdf",
+        sequence=0,
+        char_start=0,
+        char_end=10,
+        token_count=3,
+        text="기존 인터뷰 근거",
+    )
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.USER_CONTRIBUTION,
+                query="기여",
+                chunks=[retrieved],
+            )
+        ],
+        [
+            ExistingExperienceContext(
+                experience_id=experience_id,
+                relevance_distance=0.2,
+                chunks=[existing_chunk],
+            )
+        ],
+    )
+
+    result = await AnalysisOrchestrator(
+        rag, RecordingLLMProvider(response)
+    ).analyze(analysis_request)
+
+    assert result.candidates[0].conflict is True
+    assert result.candidates[0].conflicts[0].existing_content == (
+        "인터뷰 질문지를 설계했다."
+    )
+
+
+@pytest.mark.asyncio
+async def test_conflict_rejects_existing_content_not_supplied_by_spring() -> None:
+    analysis_request = request()
+    experience_id = uuid4()
+    analysis_request.existing_experiences = [
+        ExistingExperience(
+            experience_id=experience_id,
+            title="기존 경험",
+            claims=[ExistingClaim(section_type="ACTION", content="확정된 내용")],
+            evidences=[],
+        )
+    ]
+    proposed_claim = Claim(
+        section_type="ACTION",
+        content="새 내용",
+        subject_type=SubjectType.UNKNOWN,
+        provenance_type=ProvenanceType.AI_INFERRED,
+        verification_status=VerificationStatus.NEEDS_CONFIRMATION,
+        evidence_type=EvidenceType.NONE,
+        requires_user_confirmation=True,
+    )
+    response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="충돌",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                conflict=True,
+                conflicts=[
+                    ConflictDetail(
+                        section_type="ACTION",
+                        existing_content="요청에 없던 내용",
+                        proposed_content="새 내용",
+                        reason="다릅니다.",
+                    )
+                ],
+                title="충돌",
+                summary="확인 필요",
+                claims=[proposed_claim],
+            )
+        ],
+    )
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.USER_CONTRIBUTION,
+                query="기여",
+                chunks=[search_result()],
+            )
+        ]
+    )
+
+    with pytest.raises(AppError) as error:
+        await AnalysisOrchestrator(rag, RecordingLLMProvider(response)).analyze(
+            analysis_request
+        )
+
+    assert error.value.code == "INVALID_CONFLICT_REFERENCE"

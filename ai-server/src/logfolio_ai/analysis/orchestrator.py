@@ -71,6 +71,72 @@ class AnalysisOrchestrator:
         return merged[: self._max_grounded_chunks]
 
     @staticmethod
+    def _normalize_content(value: str) -> str:
+        return " ".join(value.split())
+
+    def _validate_conflict_references(
+        self,
+        response: AnalysisResponse,
+        request: AnalysisRequest,
+    ) -> None:
+        experiences = {
+            experience.experience_id: experience
+            for experience in request.existing_experiences
+        }
+        corrections_by_experience = {}
+        for correction in request.corrections:
+            if (
+                correction.experience_id is not None
+                and correction.corrected_content
+                and correction.section_type
+            ):
+                corrections_by_experience.setdefault(
+                    correction.experience_id,
+                    [],
+                ).append(correction)
+
+        for candidate in response.candidates:
+            if not candidate.conflict or candidate.target_experience_id is None:
+                continue
+            experience = experiences.get(candidate.target_experience_id)
+            if experience is None:
+                raise AppError(
+                    code="INVALID_CONFLICT_REFERENCE",
+                    message="충돌 항목이 요청에 없는 기존 경험을 참조했습니다.",
+                    status_code=502,
+                )
+            allowed_existing = {
+                (
+                    claim.section_type.upper(),
+                    self._normalize_content(claim.content),
+                )
+                for claim in experience.claims
+            }
+            allowed_existing.update(
+                (
+                    correction.section_type.upper(),
+                    self._normalize_content(correction.corrected_content),
+                )
+                for correction in corrections_by_experience.get(
+                    candidate.target_experience_id,
+                    [],
+                )
+            )
+            if any(
+                (
+                    conflict.section_type.upper(),
+                    self._normalize_content(conflict.existing_content),
+                )
+                not in allowed_existing
+                for conflict in candidate.conflicts
+            ):
+                raise AppError(
+                    code="INVALID_CONFLICT_REFERENCE",
+                    message="충돌 항목의 기존 내용이 요청의 사용자 확정값과 일치하지 않습니다.",
+                    status_code=502,
+                )
+
+    @staticmethod
     def _is_valid_evidence(
         claim,
         chunks: Dict[UUID, GroundedChunk],
@@ -111,7 +177,31 @@ class AnalysisOrchestrator:
             if candidate.claims and not valid_claims:
                 removed_candidate_ids.add(candidate.candidate_id)
                 continue
-            candidates.append(candidate.model_copy(update={"claims": valid_claims}))
+            valid_claim_pairs = {
+                (
+                    claim.section_type.upper(),
+                    self._normalize_content(claim.content),
+                )
+                for claim in valid_claims
+            }
+            valid_conflicts = [
+                conflict
+                for conflict in candidate.conflicts
+                if (
+                    conflict.section_type.upper(),
+                    self._normalize_content(conflict.proposed_content),
+                )
+                in valid_claim_pairs
+            ]
+            candidates.append(
+                candidate.model_copy(
+                    update={
+                        "claims": valid_claims,
+                        "conflict": bool(valid_conflicts),
+                        "conflicts": valid_conflicts,
+                    }
+                )
+            )
 
         questions = [
             question.model_copy(update={"candidate_id": None})
@@ -275,6 +365,7 @@ class AnalysisOrchestrator:
         )
         response = await self._llm_provider.analyze_grounded(grounded_input)
         generated_at = time.perf_counter()
+        self._validate_conflict_references(response, request)
         existing_ids = {
             experience.experience_id for experience in request.existing_experiences
         }

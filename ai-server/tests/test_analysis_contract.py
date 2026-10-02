@@ -8,6 +8,7 @@ from logfolio_ai.models import (
     AnalysisRequest,
     AnalysisResponse,
     Claim,
+    ConflictDetail,
     DocumentPage,
     DocumentSource,
     Evidence,
@@ -242,6 +243,44 @@ def test_existing_update_requires_target_experience() -> None:
             title="기존 경험 보강",
             summary="새 근거를 추가합니다.",
         )
+
+
+def test_conflict_requires_structured_detail_referencing_candidate_claim() -> None:
+    experience_id = uuid4()
+    proposed_claim = make_claim().model_copy(
+        update={"section_type": "ACTION", "content": "인터뷰 진행까지 담당했다."}
+    )
+
+    with pytest.raises(ValidationError, match="requires conflict details"):
+        ExperienceCandidate(
+            candidate_id=uuid4(),
+            result_type=AnalysisResultType.EXISTING_UPDATE,
+            target_experience_id=experience_id,
+            conflict=True,
+            title="기존 경험 충돌",
+            summary="새 자료와 기존 내용이 다릅니다.",
+            claims=[proposed_claim],
+        )
+
+    candidate = ExperienceCandidate(
+        candidate_id=uuid4(),
+        result_type=AnalysisResultType.EXISTING_UPDATE,
+        target_experience_id=experience_id,
+        conflict=True,
+        conflicts=[
+            ConflictDetail(
+                section_type="ACTION",
+                existing_content="인터뷰 질문지를 설계했다.",
+                proposed_content="인터뷰 진행까지 담당했다.",
+                reason="담당 범위가 서로 다릅니다.",
+            )
+        ],
+        title="기존 경험 충돌",
+        summary="새 자료와 기존 내용이 다릅니다.",
+        claims=[proposed_claim],
+    )
+
+    assert candidate.conflicts[0].proposed_content == proposed_claim.content
 
 
 def test_empty_analysis_is_classified_as_no_update() -> None:

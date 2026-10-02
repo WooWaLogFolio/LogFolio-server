@@ -28,8 +28,12 @@ Use EXISTING_UPDATE only when the target Experience ID appears in relatedExperie
 otherwise do not force the mapping and choose NEW_EXPERIENCE or NEEDS_CONTEXT.
 Use NO_UPDATE only when the material is understandable but has no new value to reflect. Do not use
 NO_UPDATE for insufficient material; use ADDITIONAL_SOURCE instead.
-Never overwrite or ignore user-edited or rejected content. Mark a conflict when new evidence
-contradicts a user-confirmed or corrected value; do not resolve that conflict automatically.
+Never overwrite or ignore user-edited or rejected content. When new evidence contradicts a
+user-confirmed ExistingClaim or corrected value, return an EXISTING_UPDATE with conflict=true and
+at least one conflicts item. Each conflicts item must copy the exact existingContent, copy a
+proposedContent from a returned Claim in the same sectionType, and briefly explain the difference.
+Do not resolve the conflict automatically. Use conflict=false and an empty conflicts list when the
+new material only adds compatible detail.
 Do not force a Source into an existing Experience when the mapping is ambiguous.
 The result is an AI draft and must never be described as user-confirmed.
 Never return USER_INPUT, USER_CONFIRMED, or USER_EDITED provenance. Those states can
