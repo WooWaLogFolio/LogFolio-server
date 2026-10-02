@@ -148,11 +148,19 @@ class Claim(ContractModel):
         return self
 
 
+class ConflictDetail(ContractModel):
+    section_type: str = Field(min_length=1)
+    existing_content: str = Field(min_length=1)
+    proposed_content: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
 class ExperienceCandidate(ContractModel):
     candidate_id: UUID
     result_type: AnalysisResultType = AnalysisResultType.NEW_EXPERIENCE
     target_experience_id: Optional[UUID] = None
     conflict: bool = False
+    conflicts: List[ConflictDetail] = Field(default_factory=list, max_length=10)
     title: str = Field(min_length=1, max_length=255)
     summary: str = Field(min_length=1)
     claims: List[Claim] = Field(default_factory=list)
@@ -171,6 +179,25 @@ class ExperienceCandidate(ContractModel):
             raise ValueError("only EXISTING_UPDATE can reference targetExperienceId")
         if self.conflict and self.result_type != AnalysisResultType.EXISTING_UPDATE:
             raise ValueError("conflict is only valid for EXISTING_UPDATE")
+        if self.conflict and not self.conflicts:
+            raise ValueError("conflict=true requires conflict details")
+        if not self.conflict and self.conflicts:
+            raise ValueError("conflict details require conflict=true")
+        claim_pairs = {
+            (claim.section_type.upper(), " ".join(claim.content.split()))
+            for claim in self.claims
+        }
+        invalid_proposals = [
+            detail
+            for detail in self.conflicts
+            if (
+                detail.section_type.upper(),
+                " ".join(detail.proposed_content.split()),
+            )
+            not in claim_pairs
+        ]
+        if invalid_proposals:
+            raise ValueError("conflict proposedContent must reference a candidate claim")
         return self
 
 

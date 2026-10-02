@@ -196,6 +196,7 @@ Spring 재호출 규칙:
       "resultType": "EXISTING_UPDATE",
       "targetExperienceId": "60000000-0000-0000-0000-000000000001",
       "conflict": false,
+      "conflicts": [],
       "title": "인증 기능 구현 경험",
       "summary": "JWT 인증 기능을 구현한 경험입니다.",
       "claims": []
@@ -223,8 +224,53 @@ Spring 재호출 규칙:
 - `informationNeed`도 없고 후보·질문·경고가 모두 없을 때만 `NO_UPDATE`
 - `EXISTING_UPDATE`는 요청에 포함된 기존 Experience의 `targetExperienceId` 필수
 - 기존 사용자 확정값과 충돌하면 `conflict=true`; FastAPI가 자동 덮어쓰지 않음
+- `conflict=true`이면 `conflicts`에 기존 확정 문장, 새 제안 문장, 충돌 이유를 반드시 포함
+- `conflicts[].existingContent`는 요청의 해당 Existing Experience Claim 또는 사용자 수정값과 정확히 일치해야 함
+- `conflicts[].proposedContent`는 같은 Candidate의 동일 `sectionType` Claim과 정확히 일치해야 함
 - 경험 후보는 최대 3개
 - 보완 질문은 최대 2개
+
+### 기존 Experience 충돌 응답
+
+```json
+{
+  "candidateId": "40000000-0000-0000-0000-000000000002",
+  "resultType": "EXISTING_UPDATE",
+  "targetExperienceId": "60000000-0000-0000-0000-000000000001",
+  "conflict": true,
+  "conflicts": [
+    {
+      "sectionType": "ACTION",
+      "existingContent": "인터뷰 질문지를 설계했다.",
+      "proposedContent": "인터뷰 진행까지 담당했다.",
+      "reason": "기존 확정 내용과 새 자료의 담당 범위가 다릅니다."
+    }
+  ],
+  "title": "사용자 인터뷰 경험",
+  "summary": "기존 확정 내용과 새 근거의 차이를 확인해야 합니다.",
+  "claims": [
+    {
+      "sectionType": "ACTION",
+      "content": "인터뷰 진행까지 담당했다.",
+      "subjectType": "UNKNOWN",
+      "provenanceType": "AI_INFERRED",
+      "verificationStatus": "NEEDS_CONFIRMATION",
+      "evidenceType": "NONE",
+      "evidences": [],
+      "policyViolations": [],
+      "requiresUserConfirmation": true
+    }
+  ]
+}
+```
+
+처리 원칙:
+
+- FastAPI는 기존 Experience를 수정하거나 새 Source를 버리지 않음
+- Spring은 기존 값과 새 제안을 함께 `review_items`에 저장하고 사용자 선택을 받음
+- 사용자가 승인하거나 수정한 뒤에만 최종 Experience 반영
+- 사용자가 기존 값을 유지하면 새 제안을 자동으로 다시 적용하지 않도록 Correction/Review 결과를 다음 분석 요청에 전달
+- AI가 요청에 없는 기존 문장을 충돌 대상으로 반환하면 `INVALID_CONFLICT_REFERENCE`로 분석 결과를 거부
 
 ### 정보 부족 분류
 
