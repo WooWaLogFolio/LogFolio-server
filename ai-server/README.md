@@ -62,6 +62,8 @@ FastAPI는 사용자 파일의 원본 저장이나 로그인 처리를 담당하
 
 Spring이 Project File 또는 Quick Log를 저장하면 텍스트와 Source 식별자를 `/api/v1/sources/index`로 전달합니다. FastAPI는 이때 Chunking과 Embedding을 수행하지만 LLM 분석은 실행하지 않습니다. 일부 Source가 실패해도 성공한 Source는 검색 가능한 상태로 유지합니다.
 
+Spring에서 Source 삭제가 확정되면 `/api/v1/projects/{projectId}/sources/{sourceId}/index`를 `DELETE`로 호출해 해당 Source의 검색 Chunk만 제거합니다. 이 호출은 Spring DB, S3 원본, Evidence 또는 사용자 확정 Experience를 변경하지 않습니다.
+
 사용자가 `AI 분석하기`를 선택하면 Spring이 별도의 `/api/v1/analyses` 요청을 보냅니다. 분석 요청은 `analysisRunId`로 추적하며, 새 Source ID와 현재 프로젝트의 기존 Experience 요약·Claim·Evidence 메타데이터를 함께 전달합니다. 이미 인덱싱한 Source는 다시 전처리하지 않습니다.
 
 FastAPI는 새 Source와 기존 Experience의 제목·요약·Claim을 먼저 의미 비교합니다. 관련성이 확인된 Experience만 기존 Evidence의 정확한 Chunk를 추가 조회하고, 새 Source와 기존 원문을 함께 LLM에 전달합니다. 관련성 기준을 통과하지 못한 Experience는 보강 대상으로 강제 연결하지 않습니다.

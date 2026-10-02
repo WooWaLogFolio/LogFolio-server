@@ -44,6 +44,7 @@ class RecordingVectorStore:
         self.chunks: List[DocumentChunk] = []
         self.get_chunk_calls: List[dict] = []
         self.get_source_chunk_calls: List[dict] = []
+        self.delete_source_calls: List[dict] = []
         self.content_hash_sources = {}
 
     async def replace_source_chunks(
@@ -121,6 +122,11 @@ class RecordingVectorStore:
         )
         requested = set(source_ids)
         return [chunk for chunk in self.chunks if chunk.source_id in requested][:limit]
+
+    async def delete_source(self, project_id: UUID, source_id: UUID) -> None:
+        self.delete_source_calls.append(
+            {"project_id": project_id, "source_id": source_id}
+        )
 
 
 def source(text: str = "JWT 인증 API를 구현했다.") -> DocumentSource:
@@ -214,6 +220,21 @@ async def test_same_source_id_can_be_reindexed() -> None:
     assert result.indexed_count == 1
     assert result.duplicate_count == 0
     assert len(store.replace_calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_source_index_keeps_project_and_source_scope() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    service = rag_service(embedding, store)
+    project_id = uuid4()
+    source_id = uuid4()
+
+    await service.delete_source_index(project_id, source_id)
+
+    assert store.delete_source_calls == [
+        {"project_id": project_id, "source_id": source_id}
+    ]
 
 
 @pytest.mark.asyncio

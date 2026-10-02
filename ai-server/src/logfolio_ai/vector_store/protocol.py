@@ -50,3 +50,6 @@ class VectorStore(Protocol):
         limit: int,
     ) -> List[DocumentChunk]:
         """Load new Source chunks when semantic retrieval returns no results."""
+
+    async def delete_source(self, project_id: UUID, source_id: UUID) -> None:
+        """Delete one Source index only within the authorized project."""
