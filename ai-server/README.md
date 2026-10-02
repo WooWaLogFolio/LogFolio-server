@@ -109,6 +109,8 @@ MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터�
 
 의미 검색 결과가 0건이면 기존 Experience를 추측으로 연결하지 않습니다. 대신 이번 Analysis Run의 `sourceIds`에 해당하는 새 Source Chunk 원문만 다시 불러와 신규 경험 가능성을 분석합니다. 해당 Chunk도 존재하지 않으면 LLM을 호출하지 않고 `NO_UPDATE`와 인덱싱 필요 사유를 반환합니다.
 
+정보가 부족할 때는 두 경우를 구분합니다. 질문 1~2개로 보완할 수 있으면 `informationNeed=USER_ANSWER`와 질문을 반환하고, 자료가 너무 모호해 경험 자체를 특정할 수 없으면 Candidate를 만들지 않고 `informationNeed=ADDITIONAL_SOURCE`와 필요한 자료 설명을 반환합니다. 후자는 `NO_UPDATE`가 아니며, 기존 Source는 `INDEXED` 상태로 유지됩니다.
+
 ### 5. Generate a structured draft
 
 검색된 Chunk만 외부 LLM에 근거로 전달합니다. LLM은 자유 형식의 글이 아니라 약속된 JSON 구조로 다음 결과를 생성합니다.

@@ -15,6 +15,7 @@ from logfolio_ai.models import (
     ExperienceCandidate,
     ExistingExperience,
     GapQuestion,
+    InformationNeedType,
     ProjectContext,
     ProvenanceType,
     SubjectType,
@@ -292,3 +293,73 @@ def test_project_context_and_confirmation_use_camel_case_contract() -> None:
 
     assert payload["projectContext"]["name"] == "LogFolio"
     assert payload["confirmedSourceIds"] == [str(source_id)]
+
+
+def test_questions_are_classified_as_user_answer_information_need() -> None:
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="개인 기여 확인이 필요합니다.",
+        questions=[
+            GapQuestion(
+                question_id=uuid4(),
+                target_section="CONTRIBUTION",
+                question="직접 담당한 부분은 무엇인가요?",
+            )
+        ],
+    )
+
+    assert response.information_need == InformationNeedType.USER_ANSWER
+    assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+
+
+def test_additional_source_is_needs_context_without_candidate_or_question() -> None:
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="경험으로 정리할 자료가 부족합니다.",
+        information_need=InformationNeedType.ADDITIONAL_SOURCE,
+        information_need_reason=(
+            "구체적인 행동이나 의사결정을 확인할 수 있는 기록이 필요합니다."
+        ),
+    )
+
+    assert response.candidates == []
+    assert response.questions == []
+    assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+
+
+def test_additional_source_rejects_candidate_or_missing_reason() -> None:
+    with pytest.raises(ValidationError, match="informationNeedReason"):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="자료가 부족합니다.",
+            information_need=InformationNeedType.ADDITIONAL_SOURCE,
+        )
+
+    with pytest.raises(ValidationError, match="cannot include candidates or questions"):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="자료가 부족합니다.",
+            candidates=[
+                ExperienceCandidate(
+                    candidate_id=uuid4(),
+                    title="불완전한 경험",
+                    summary="생성하면 안 되는 후보",
+                )
+            ],
+            information_need=InformationNeedType.ADDITIONAL_SOURCE,
+            information_need_reason="자료가 부족합니다.",
+        )
+
+
+def test_user_answer_requires_question() -> None:
+    with pytest.raises(ValidationError, match="requires questions"):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="질문이 필요합니다.",
+            information_need=InformationNeedType.USER_ANSWER,
+        )

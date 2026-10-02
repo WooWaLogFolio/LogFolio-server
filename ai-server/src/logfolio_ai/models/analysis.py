@@ -7,6 +7,7 @@ from logfolio_ai.models.base import ContractModel
 from logfolio_ai.models.enums import (
     AnalysisResultType,
     EvidenceType,
+    InformationNeedType,
     PolicyViolationType,
     ProvenanceType,
     SubjectType,
@@ -206,6 +207,8 @@ class AnalysisResponse(ContractModel):
     candidates: List[ExperienceCandidate] = Field(default_factory=list, max_length=3)
     questions: List[GapQuestion] = Field(default_factory=list, max_length=2)
     source_warnings: List[SourceWarning] = Field(default_factory=list, max_length=50)
+    information_need: Optional[InformationNeedType] = None
+    information_need_reason: Optional[str] = Field(default=None, min_length=1)
     result_types: List[AnalysisResultType] = Field(default_factory=list)
     no_update_reason: Optional[str] = None
 
@@ -223,9 +226,30 @@ class AnalysisResponse(ContractModel):
         result_types = {candidate.result_type for candidate in self.candidates}
         if self.questions:
             result_types.add(AnalysisResultType.NEEDS_CONTEXT)
+            if self.information_need is None:
+                self.information_need = InformationNeedType.USER_ANSWER
+        if self.information_need == InformationNeedType.USER_ANSWER and not self.questions:
+            raise ValueError("USER_ANSWER informationNeed requires questions")
+        if self.information_need == InformationNeedType.ADDITIONAL_SOURCE:
+            if self.candidates or self.questions:
+                raise ValueError(
+                    "ADDITIONAL_SOURCE cannot include candidates or questions"
+                )
+            if self.information_need_reason is None:
+                raise ValueError(
+                    "ADDITIONAL_SOURCE requires informationNeedReason"
+                )
+            result_types.add(AnalysisResultType.NEEDS_CONTEXT)
+        if self.information_need_reason is not None and self.information_need is None:
+            raise ValueError("informationNeedReason requires informationNeed")
         if self.source_warnings:
             result_types.add(AnalysisResultType.NEEDS_CONTEXT)
-        if not self.candidates and not self.questions and not self.source_warnings:
+        if (
+            not self.candidates
+            and not self.questions
+            and not self.source_warnings
+            and self.information_need is None
+        ):
             result_types.add(AnalysisResultType.NO_UPDATE)
         if AnalysisResultType.NO_UPDATE in result_types and (
             self.candidates or self.questions or self.source_warnings

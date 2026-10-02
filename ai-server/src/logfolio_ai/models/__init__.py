@@ -20,6 +20,7 @@ from logfolio_ai.models.analysis import (
 from logfolio_ai.models.enums import (
     AnalysisResultType,
     EvidenceType,
+    InformationNeedType,
     PolicyViolationType,
     ProvenanceType,
     SubjectType,
@@ -38,6 +39,7 @@ __all__ = [
     "DocumentSource",
     "Evidence",
     "EvidenceType",
+    "InformationNeedType",
     "ExperienceCandidate",
     "GapQuestion",
     "ProjectContext",

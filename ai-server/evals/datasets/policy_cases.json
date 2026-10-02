@@ -662,5 +662,26 @@
       "claims": [],
       "questionTargets": ["CONTRIBUTION", "RESULT"]
     }
+  },
+  {
+    "caseId": "request-additional-source-for-vague-material",
+    "category": "information-need",
+    "description": "경험을 특정할 수 없는 단편 기록은 억지 질문이나 후보 대신 추가 자료를 요청한다.",
+    "sourceText": "회의함. 자료 정리함. 최종본 제출.",
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000016",
+      "projectId": "20000000-0000-0000-0000-000000000016",
+      "summary": "경험으로 정리하기에는 정보가 부족합니다.",
+      "candidates": [],
+      "questions": [],
+      "informationNeed": "ADDITIONAL_SOURCE",
+      "informationNeedReason": "구체적인 행동이나 중요한 결정을 확인할 수 있는 기록이 필요합니다."
+    },
+    "expected": {
+      "claims": [],
+      "questionTargets": [],
+      "informationNeed": "ADDITIONAL_SOURCE",
+      "resultTypes": ["NEEDS_CONTEXT"]
+    }
   }
 ]

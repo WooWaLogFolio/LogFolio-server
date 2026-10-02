@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from logfolio_ai.models import (
+    AnalysisResultType,
     AnalysisResponse,
     Claim,
     Evidence,
@@ -155,3 +156,23 @@ def test_questions_are_sorted_by_product_priority() -> None:
         "CONTRIBUTION",
         "LEARNING",
     ]
+
+
+def test_removed_answered_question_recomputes_response_state() -> None:
+    answered = claim(section_type="RESULT")
+    result = AIPolicyValidator().validate(
+        response(
+            [answered],
+            [
+                GapQuestion(
+                    question_id=uuid4(),
+                    target_section="RESULT",
+                    question="프로젝트 결과는 무엇인가요?",
+                )
+            ],
+        )
+    )
+
+    assert result.questions == []
+    assert result.information_need is None
+    assert result.result_types == [AnalysisResultType.NEW_EXPERIENCE]

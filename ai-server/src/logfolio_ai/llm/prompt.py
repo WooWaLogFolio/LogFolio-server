@@ -14,14 +14,20 @@ Each question must use the related returned candidateId. Use null only when the 
 too weak to create any candidate for that question.
 Compare new Source chunks with existingExperiences and corrections. Classify each proposed
 candidate as EXISTING_UPDATE or NEW_EXPERIENCE. EXISTING_UPDATE must reference one supplied
-targetExperienceId. If key context is missing, return a question so NEEDS_CONTEXT is present.
+targetExperienceId. Separate two kinds of insufficient information:
+1. If one or two concise user answers can complete meaningful experience context, return those
+questions and set informationNeed=USER_ANSWER.
+2. If the chunks contain only vague fragments and one or two answers cannot identify a meaningful
+experience, return no candidate and no question, set informationNeed=ADDITIONAL_SOURCE, and explain
+what evidence is missing in informationNeedReason. Do not invent a candidate merely to ask questions.
 Chunks with relatedExperienceIds are original Evidence loaded only after semantic matching.
 Chunks with retrievalFallback=true are the new Source originals loaded because semantic
 retrieval returned zero results. Analyze those chunks as new Source evidence, but do not
 force them into an existing Experience or add unsupported facts.
 Use EXISTING_UPDATE only when the target Experience ID appears in relatedExperienceIds;
 otherwise do not force the mapping and choose NEW_EXPERIENCE or NEEDS_CONTEXT.
-If there is no meaningful update, return no candidates or questions and explain noUpdateReason.
+Use NO_UPDATE only when the material is understandable but has no new value to reflect. Do not use
+NO_UPDATE for insufficient material; use ADDITIONAL_SOURCE instead.
 Never overwrite or ignore user-edited or rejected content. Mark a conflict when new evidence
 contradicts a user-confirmed or corrected value; do not resolve that conflict automatically.
 Do not force a Source into an existing Experience when the mapping is ambiguous.

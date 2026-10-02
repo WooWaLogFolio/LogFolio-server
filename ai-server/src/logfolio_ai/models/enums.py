@@ -19,6 +19,11 @@ class AnalysisResultType(str, Enum):
     NO_UPDATE = "NO_UPDATE"
 
 
+class InformationNeedType(str, Enum):
+    USER_ANSWER = "USER_ANSWER"
+    ADDITIONAL_SOURCE = "ADDITIONAL_SOURCE"
+
+
 class SourceWarningType(str, Enum):
     POSSIBLE_PROJECT_MISMATCH = "POSSIBLE_PROJECT_MISMATCH"
 
