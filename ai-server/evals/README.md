@@ -70,4 +70,33 @@ python -m logfolio_ai.evaluation.product_runner \
 - `--pricing`: 버전과 환율을 명시한 가격 설정
 - `--output-json`, `--output-csv`: 비교 결과 저장 경로
 
+결과의 `acceptance`에는 정책 v1의 자동 판정 가능한 합격선이 함께 기록됩니다.
+
+- 신규/기존 보강 및 Merge/Split 정확도 90% 이상
+- 질문 필요 여부 정확도 90% 이상
+- 치명 Policy 오류와 Schema 오류 0건
+- P95 25초 이하
+- 자동 재시도 최대 1회
+
+Spring Review 승인 데이터가 필요한 `승인된 경험당 비용`과 사람이 직접 채점하는
+`Human Quality Score`는 임의로 계산하지 않고 `NOT_EVALUATED`로 표시합니다.
+하나라도 `NOT_EVALUATED`이면 전체 `accepted`는 `false`이며, 측정된 자동 Gate의
+통과 여부는 개별 `status`와 집계 수치로 확인합니다.
+
+## Retrieval Eval
+
+`retrieval_core_v1`은 새 Source, 사용자 기여, 판단 근거, 기존 Experience 근거,
+기존 Index 재사용 검색을 평가하는 버전형 데이터셋입니다. 결과에는 `Recall@K`,
+무관 Chunk 비율, 다른 Project Chunk 혼입 건수가 포함됩니다. Project 필터는 유사도
+순위 계산 전에 적용합니다.
+
+```bash
+python -m logfolio_ai.evaluation.embedding_runner \
+  --dataset evals/datasets/retrieval_core_v1.json \
+  --top-k 3 \
+  --output-json evals/results/retrieval.json
+```
+
+이 명령은 외부 LLM API를 호출하지 않지만 로컬 E5 모델을 사용합니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.

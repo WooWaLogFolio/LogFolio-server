@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import Field
@@ -57,6 +58,7 @@ class CostEstimate(ContractModel):
 
 class ProductEvalRun(ContractModel):
     case_id: str
+    category: str
     run_number: int = Field(ge=1)
     provider: str
     model: str
@@ -66,6 +68,30 @@ class ProductEvalRun(ContractModel):
     automatic_evaluation: Optional[AutomaticEvaluation] = None
     usage: LLMCallMetrics
     cost: CostEstimate = Field(default_factory=CostEstimate)
+
+
+class AcceptanceGateStatus(str, Enum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    NOT_EVALUATED = "NOT_EVALUATED"
+
+
+class AcceptanceGate(ContractModel):
+    name: str
+    status: AcceptanceGateStatus
+    actual: Optional[float] = None
+    threshold: Optional[float] = None
+    unit: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class AcceptanceSummary(ContractModel):
+    accepted: bool
+    evaluated_gate_count: int = Field(ge=0)
+    passed_gate_count: int = Field(ge=0)
+    failed_gate_count: int = Field(ge=0)
+    not_evaluated_gate_count: int = Field(ge=0)
+    gates: List[AcceptanceGate] = Field(default_factory=list)
 
 
 class ProductEvalReport(ContractModel):
@@ -78,6 +104,7 @@ class ProductEvalReport(ContractModel):
     pass_rate: float = Field(ge=0, le=1)
     total_estimated_cost_usd: Optional[float] = Field(default=None, ge=0)
     total_estimated_cost_krw: Optional[float] = Field(default=None, ge=0)
+    acceptance: AcceptanceSummary
     runs: List[ProductEvalRun] = Field(default_factory=list)
 
 
