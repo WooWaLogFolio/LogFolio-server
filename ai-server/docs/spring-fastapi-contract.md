@@ -60,6 +60,13 @@ X-Internal-API-Key: <shared-secret>
     "30000000-0000-0000-0000-000000000001",
     "30000000-0000-0000-0000-000000000002"
   ],
+  "projectContext": {
+    "name": "LogFolio",
+    "description": "프로젝트 경험을 근거 중심으로 정리하는 서비스",
+    "activityType": "TEAM_PROJECT",
+    "userRole": "AI 서버 개발"
+  },
+  "confirmedSourceIds": [],
   "existingExperiences": [
     {
       "experienceId": "60000000-0000-0000-0000-000000000001",
@@ -85,6 +92,8 @@ X-Internal-API-Key: <shared-secret>
 - 모든 ID는 UUID 문자열
 - JSON 필드는 camelCase
 - `sourceIds`는 이번 Analysis Run에 새로 반영할 `INDEXED` Source이며 최대 50개
+- `projectContext`는 다른 프로젝트 자료 의심 판별에 쓰는 최소 프로젝트 설명. 없으면 FastAPI는 임의 판별하지 않음
+- `confirmedSourceIds`는 사용자가 `그래도 포함`을 선택한 Source ID. 반드시 이번 `sourceIds`에 포함되어야 함
 - `existingExperiences`에는 현재 프로젝트의 기존 Experience 요약·Claim·Evidence ID를 전달
 - `evidences`의 `sourceId + chunkId`는 관련 Experience가 선택됐을 때 FastAPI가 기존 Evidence 원문을 정확히 다시 조회하는 키
 - `corrections`에는 사용자가 이전에 수정하거나 거절한 내용을 전달
@@ -105,6 +114,40 @@ X-Internal-API-Key: <shared-secret>
 ```
 
 기본 의미 거리 기준은 `0.4`이며 운영 평가 데이터로 조정합니다. 기준을 통과하지 못한 Experience는 강제로 보강 대상으로 연결하지 않습니다.
+
+### 다른 프로젝트 자료 의심 응답
+
+프로젝트 Context와 Source의 가장 가까운 Chunk 거리가 설정 기준보다 크면 분석·LLM 호출을 잠시 멈추고 다음 형태로 반환합니다.
+
+```json
+{
+  "analysisRunId": "10000000-0000-0000-0000-000000000001",
+  "projectId": "20000000-0000-0000-0000-000000000001",
+  "summary": "현재 프로젝트와 관련성이 낮아 보이는 Source가 있습니다.",
+  "candidates": [],
+  "questions": [],
+  "sourceWarnings": [
+    {
+      "sourceId": "30000000-0000-0000-0000-000000000002",
+      "sourceName": "other-project.pdf",
+      "warningType": "POSSIBLE_PROJECT_MISMATCH",
+      "distance": 0.91,
+      "message": "현재 프로젝트와 관련성이 낮아 보이는 자료입니다. 이번 분석에서 제외할지, 그래도 포함할지 확인해주세요.",
+      "allowedActions": ["EXCLUDE_FROM_ANALYSIS", "INCLUDE_ANYWAY"]
+    }
+  ],
+  "resultTypes": ["NEEDS_CONTEXT"],
+  "noUpdateReason": null
+}
+```
+
+Spring 재호출 규칙:
+
+- `EXCLUDE_FROM_ANALYSIS`: 해당 ID를 다음 요청의 `sourceIds`에서 제외
+- `INCLUDE_ANYWAY`: 해당 ID를 `sourceIds`와 `confirmedSourceIds` 양쪽에 포함
+- Source 자체는 삭제·이동하거나 `INDEXED` 상태를 변경하지 않음
+- `confirmedSourceIds`는 이번 분석 요청에만 적용하며 영구적인 프로젝트 소속 확정값이 아님
+- 검색 결과가 없는 Source는 이 판별에서 확정하지 않고 기존 Retrieval 0건 정책으로 처리
 
 ## Success response
 

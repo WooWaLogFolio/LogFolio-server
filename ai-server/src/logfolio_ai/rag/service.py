@@ -8,6 +8,8 @@ from logfolio_ai.embedding import EmbeddingProvider
 from logfolio_ai.models import (
     DocumentSource,
     ExistingExperience,
+    ProjectContext,
+    SourceWarning,
     SourceIndexItem,
     SourceIndexResponse,
 )
@@ -39,6 +41,7 @@ class RagService:
         chunk_overlap_tokens: int = 100,
         top_k: int = 5,
         existing_experience_match_distance: float = 0.4,
+        project_source_match_distance: float = 0.65,
         max_related_experiences: int = 3,
     ) -> None:
         self._embedding_provider = embedding_provider
@@ -48,6 +51,7 @@ class RagService:
         self._chunk_overlap_tokens = chunk_overlap_tokens
         self._top_k = top_k
         self._existing_experience_match_distance = existing_experience_match_distance
+        self._project_source_match_distance = project_source_match_distance
         self._max_related_experiences = max_related_experiences
 
     @staticmethod
@@ -57,6 +61,67 @@ class RagService:
             parts.append(experience.summary)
         parts.extend(claim.content for claim in experience.claims)
         return "\n".join(parts)
+
+    @staticmethod
+    def _project_query(project_context: ProjectContext) -> str:
+        parts = [project_context.name]
+        parts.extend(
+            value
+            for value in (
+                project_context.description,
+                project_context.activity_type,
+                project_context.user_role,
+            )
+            if value
+        )
+        return "\n".join(parts)
+
+    async def find_suspected_project_mismatches(
+        self,
+        project_id: UUID,
+        source_ids: Sequence[UUID],
+        project_context: ProjectContext,
+        *,
+        confirmed_source_ids: Sequence[UUID] = (),
+    ) -> List[SourceWarning]:
+        """Flag possible mismatches without deleting or excluding any Source."""
+
+        confirmed = set(confirmed_source_ids)
+        unchecked = [source_id for source_id in source_ids if source_id not in confirmed]
+        if not unchecked:
+            return []
+
+        query_embedding = await self._embedding_provider.embed_query(
+            self._project_query(project_context)
+        )
+
+        async def inspect(source_id: UUID) -> Optional[SourceWarning]:
+            results = await self._vector_store.search(
+                project_id,
+                query_embedding,
+                top_k=1,
+                source_ids=[source_id],
+            )
+            if not results:
+                return None
+            closest = results[0]
+            if (
+                closest.source_id != source_id
+                or closest.distance <= self._project_source_match_distance
+            ):
+                return None
+            return SourceWarning(
+                source_id=source_id,
+                source_name=closest.source_name,
+                distance=closest.distance,
+                message=(
+                    "현재 프로젝트와 관련성이 낮아 보이는 자료입니다. "
+                    "이번 분석에서 제외할지, 그래도 포함할지 확인해주세요."
+                ),
+            )
+
+        warnings = await asyncio.gather(*(inspect(source_id) for source_id in unchecked))
+        return [warning for warning in warnings if warning is not None]
 
     async def index_documents(
         self,

@@ -9,6 +9,7 @@ from logfolio_ai.models import (
     DocumentSource,
     ExistingEvidence,
     ExistingExperience,
+    ProjectContext,
 )
 from logfolio_ai.rag import AnalysisPurpose, RagService
 from logfolio_ai.vector_store import VectorSearchResult
@@ -193,6 +194,55 @@ async def test_blank_query_is_rejected_before_embedding() -> None:
     with pytest.raises(ValueError):
         await service.retrieve(uuid4(), "   ")
 
+    assert embedding.query_calls == []
+    assert store.search_calls == []
+
+
+@pytest.mark.asyncio
+async def test_project_mismatch_requires_confirmation_for_distant_source() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    source_id = uuid4()
+    store.results = [
+        VectorSearchResult(
+            chunk_id=uuid4(),
+            source_id=source_id,
+            source_name="other-project.pdf",
+            sequence=0,
+            char_start=0,
+            char_end=10,
+            text="전혀 다른 프로젝트 자료",
+            distance=0.9,
+        )
+    ]
+    service = rag_service(embedding, store)
+
+    warnings = await service.find_suspected_project_mismatches(
+        uuid4(),
+        [source_id],
+        ProjectContext(name="LogFolio", description="경험 정리 서비스"),
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].source_id == source_id
+    assert store.search_calls[0]["source_ids"] == [source_id]
+
+
+@pytest.mark.asyncio
+async def test_confirmed_source_skips_project_mismatch_check() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    source_id = uuid4()
+    service = rag_service(embedding, store)
+
+    warnings = await service.find_suspected_project_mismatches(
+        uuid4(),
+        [source_id],
+        ProjectContext(name="LogFolio"),
+        confirmed_source_ids=[source_id],
+    )
+
+    assert warnings == []
     assert embedding.query_calls == []
     assert store.search_calls == []
 

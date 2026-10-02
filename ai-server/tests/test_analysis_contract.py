@@ -15,9 +15,11 @@ from logfolio_ai.models import (
     ExperienceCandidate,
     ExistingExperience,
     GapQuestion,
+    ProjectContext,
     ProvenanceType,
     SubjectType,
     SourceType,
+    SourceWarning,
     VerificationStatus,
 )
 
@@ -244,3 +246,49 @@ def test_quick_log_is_a_supported_source_type() -> None:
     )
 
     assert source.source_type == SourceType.QUICK_LOG
+
+
+def test_confirmed_source_must_be_part_of_analysis_sources() -> None:
+    with pytest.raises(ValidationError, match="confirmedSourceIds"):
+        AnalysisRequest(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            source_ids=[uuid4()],
+            confirmed_source_ids=[uuid4()],
+        )
+
+
+def test_source_warning_is_classified_as_needs_context() -> None:
+    source_id = uuid4()
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="자료 포함 여부를 확인해주세요.",
+        source_warnings=[
+            SourceWarning(
+                source_id=source_id,
+                source_name="other-project.pdf",
+                distance=0.9,
+                message="현재 프로젝트와 관련성이 낮아 보입니다.",
+            )
+        ],
+    )
+
+    assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+    assert response.source_warnings[0].source_id == source_id
+
+
+def test_project_context_and_confirmation_use_camel_case_contract() -> None:
+    source_id = uuid4()
+    request = AnalysisRequest(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        source_ids=[source_id],
+        project_context=ProjectContext(name="LogFolio", description="경험 정리 서비스"),
+        confirmed_source_ids=[source_id],
+    )
+
+    payload = request.model_dump(mode="json", by_alias=True)
+
+    assert payload["projectContext"]["name"] == "LogFolio"
+    assert payload["confirmedSourceIds"] == [str(source_id)]
