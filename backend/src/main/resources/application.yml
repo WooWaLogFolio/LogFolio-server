@@ -57,6 +57,12 @@ app:
     signup-redirect-uri: ${OAUTH2_SIGNUP_REDIRECT_URI:http://localhost:3000/oauth2/complete-signup}
   storage:
     root: ${FILE_STORAGE_ROOT:./storage/uploads}
+  ai:
+    enabled: ${AI_SERVER_ENABLED:false}
+    base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
+    internal-api-key: ${AI_SERVER_INTERNAL_API_KEY:}
+    connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
+    read-timeout: ${AI_SERVER_READ_TIMEOUT:35s}
 
 springdoc:
   swagger-ui:
