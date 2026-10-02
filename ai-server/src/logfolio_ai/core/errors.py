@@ -23,6 +23,15 @@ class ErrorResponse(ContractModel):
     ai_usage: Optional[AIUsageRecord] = None
 
 
+COMMON_ERROR_RESPONSES = {
+    401: {"model": ErrorResponse, "description": "Internal API authentication failed"},
+    422: {"model": ErrorResponse, "description": "Request contract validation failed"},
+    500: {"model": ErrorResponse, "description": "Server configuration or internal error"},
+    502: {"model": ErrorResponse, "description": "AI provider or generated output error"},
+    504: {"model": ErrorResponse, "description": "Analysis timeout"},
+}
+
+
 class AppError(Exception):
     def __init__(
         self,

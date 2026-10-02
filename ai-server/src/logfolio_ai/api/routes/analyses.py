@@ -6,13 +6,17 @@ from logfolio_ai.analysis import AnalysisOrchestrator
 from logfolio_ai.analysis.dependencies import get_analysis_orchestrator
 from logfolio_ai.api.dependencies import require_internal_api_key
 from logfolio_ai.core.config import Settings, get_settings
-from logfolio_ai.core.errors import AppError
+from logfolio_ai.core.errors import AppError, COMMON_ERROR_RESPONSES
 from logfolio_ai.models import AnalysisRequest, AnalysisResponse
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
 
 
-@router.post("", response_model=AnalysisResponse)
+@router.post(
+    "",
+    response_model=AnalysisResponse,
+    responses=COMMON_ERROR_RESPONSES,
+)
 async def create_analysis(
     request: AnalysisRequest,
     orchestrator: AnalysisOrchestrator = Depends(get_analysis_orchestrator),

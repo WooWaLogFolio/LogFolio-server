@@ -366,7 +366,7 @@ LOGFOLIO_AI_MAX_RELATED_EXPERIENCES=3
 
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.
 
-Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`부터 순서대로 적용합니다. `003_support_unified_sources.sql`은 파일 전용 컬럼을 통합 Source 컬럼으로 바꾸고 Quick Log를 지원하며, `004_add_source_content_hash.sql`은 정확한 Source 중복 판별용 SHA-256을 저장합니다. SQL은 pgvector 확장을 활성화하므로 개발·운영 DB에 적용하기 전에 Spring 담당자와 실행 주체 및 백업 정책을 확인해야 합니다. 저장소에 추가된 것만으로 실제 DB에는 자동 적용되지 않습니다.
+Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`부터 순서대로 적용합니다. `003_support_unified_sources.sql`은 파일 전용 컬럼을 통합 Source 컬럼으로 바꾸고 Quick Log를 지원하며, `004_add_source_content_hash.sql`은 정확한 Source 중복 판별용 SHA-256을 저장합니다. Docker Compose에서는 `migrate` 서비스가 `ai_schema_migrations` 이력을 확인하고 아직 적용되지 않은 SQL만 실행한 후 FastAPI를 시작합니다. 운영 DB 적용 전에는 Spring 담당자와 실행 주체·백업·롤백 정책을 별도로 합의해야 합니다.
 
 ## Docker integration environment
 
@@ -383,7 +383,8 @@ Compose 설정을 확인한 뒤 통합 Smoke Test를 실행합니다.
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml config
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile smoke up --build --abort-on-container-exit --exit-code-from smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build postgres migrate ai-server
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile smoke run --rm smoke
 ```
 
 성공하면 `LogFolio AI smoke test passed`가 출력됩니다. 테스트 후 컨테이너와 네트워크만 정리하고 DB 볼륨은 보존합니다.
@@ -394,7 +395,7 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile smo
 
 `down -v`는 로컬 PostgreSQL 데이터를 함께 삭제하므로 DB를 의도적으로 초기화할 때만 사용합니다.
 
-Compose의 마이그레이션 파일은 새 DB 볼륨을 처음 생성할 때만 자동 실행됩니다. 이미 생성된 개발·운영 DB에는 Spring 담당자와 실행 시점 및 백업 정책을 합의한 뒤 별도의 마이그레이션 절차로 적용해야 합니다.
+Compose는 새 DB뿐 아니라 기존 개발 볼륨에도 미적용 마이그레이션을 순서대로 적용합니다. 기존 001~004 DB는 실제 컬럼을 확인해 초기 이력을 안전하게 구성하며, 같은 마이그레이션은 다시 실행하지 않습니다. 운영 DB에서는 자동 실행 여부를 별도로 결정해야 합니다.
 
 실제 E5를 포함한 이미지는 `INSTALL_EMBEDDING=true`로 빌드할 수 있지만 모델 의존성 때문에 이미지 크기와 빌드 시간이 크게 늘어납니다. 운영에서는 Gemini API 키, DB 비밀번호와 내부 API 키를 이미지나 저장소에 넣지 않고 배포 플랫폼의 Secret으로 주입해야 합니다.
 
@@ -413,7 +414,8 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5 
 실제 E5 모델과 PostgreSQL/pgvector를 사용하되 LLM만 Fake Provider로 유지하여 전체 RAG API를 검증합니다. 서버는 E5 모델을 시작 단계에서 미리 로딩하므로 Health Check 성공 이후의 첫 분석 요청도 모델 로딩 시간을 포함하지 않습니다.
 
 ```bash
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-rag up --build --abort-on-container-exit --exit-code-from e5-rag-smoke e5-rag-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-rag up -d --build postgres migrate ai-server-e5
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-rag run --rm e5-rag-smoke
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-rag down
 ```
 
@@ -445,7 +447,8 @@ Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다.
 실제 E5 Embedding, pgvector 검색, Gemini Structured Output과 AI Policy를 한 요청으로 검증합니다. 테스트는 다른 `projectId`에 격리 확인용 자료를 먼저 넣고, 해당 자료가 분석 근거나 요약에 섞이지 않는지도 확인합니다. 외부 Gemini에는 비식별 합성 자료만 전송합니다.
 
 ```bash
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline up --build --abort-on-container-exit --exit-code-from full-pipeline-smoke full-pipeline-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline up -d --build postgres migrate ai-server-full-pipeline
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm full-pipeline-smoke
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline down
 ```
 

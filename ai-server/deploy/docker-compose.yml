@@ -19,6 +19,21 @@ services:
       timeout: 3s
       retries: 10
 
+  migrate:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    command: ["sh", "/migrations/apply_migrations.sh"]
+    volumes:
+      - ../migrations:/migrations/sql:ro
+      - ../scripts/apply_migrations.sh:/migrations/apply_migrations.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   ai-server:
     build:
       context: ..
@@ -35,8 +50,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -97,8 +112,8 @@ services:
     ports:
       - "8001:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -199,8 +214,8 @@ services:
     ports:
       - "8003:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
