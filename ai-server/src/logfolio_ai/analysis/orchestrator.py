@@ -70,41 +70,70 @@ class AnalysisOrchestrator:
         merged.sort(key=lambda chunk: (chunk.distance, str(chunk.chunk_id)))
         return merged[: self._max_grounded_chunks]
 
-    def _validate_evidence(
+    @staticmethod
+    def _is_valid_evidence(
+        claim,
+        chunks: Dict[UUID, GroundedChunk],
+    ) -> bool:
+        for evidence in claim.evidences:
+            source = chunks.get(evidence.chunk_id)
+            if (
+                source is None
+                or source.source_id != evidence.source_id
+                or source.source_type != evidence.source_type
+            ):
+                return False
+            if evidence.excerpt not in source.text:
+                return False
+            if (
+                evidence.page_number is not None
+                and evidence.page_number != source.page_number
+            ):
+                return False
+        return True
+
+    def _filter_invalid_evidence(
         self,
         response: AnalysisResponse,
         grounded_chunks: List[GroundedChunk],
-    ) -> None:
+    ) -> AnalysisResponse:
         chunks = {chunk.chunk_id: chunk for chunk in grounded_chunks}
+        candidates = []
+        removed_candidate_ids = set()
+        removed_claim_count = 0
         for candidate in response.candidates:
-            for claim in candidate.claims:
-                for evidence in claim.evidences:
-                    source = chunks.get(evidence.chunk_id)
-                    if (
-                        source is None
-                        or source.source_id != evidence.source_id
-                        or source.source_type != evidence.source_type
-                    ):
-                        raise AppError(
-                            code="UNGROUNDED_EVIDENCE",
-                            message="AI가 검색되지 않은 근거를 반환했습니다.",
-                            status_code=502,
-                        )
-                    if evidence.excerpt not in source.text:
-                        raise AppError(
-                            code="INVALID_EVIDENCE_QUOTE",
-                            message="AI 인용문이 검색된 원문과 일치하지 않습니다.",
-                            status_code=502,
-                        )
-                    if (
-                        evidence.page_number is not None
-                        and evidence.page_number != source.page_number
-                    ):
-                        raise AppError(
-                            code="INVALID_EVIDENCE_LOCATION",
-                            message="AI 근거의 페이지가 원문 위치와 일치하지 않습니다.",
-                            status_code=502,
-                        )
+            valid_claims = [
+                claim
+                for claim in candidate.claims
+                if self._is_valid_evidence(claim, chunks)
+            ]
+            removed_claim_count += len(candidate.claims) - len(valid_claims)
+            if candidate.claims and not valid_claims:
+                removed_candidate_ids.add(candidate.candidate_id)
+                continue
+            candidates.append(candidate.model_copy(update={"claims": valid_claims}))
+
+        questions = [
+            question.model_copy(update={"candidate_id": None})
+            if question.candidate_id in removed_candidate_ids
+            else question
+            for question in response.questions
+        ]
+        payload = response.model_dump()
+        payload.update({"candidates": candidates, "questions": questions})
+        if not candidates and not questions:
+            payload["no_update_reason"] = (
+                response.no_update_reason
+                or "근거 검증을 통과한 분석 결과가 없습니다."
+            )
+        filtered = AnalysisResponse.model_validate(payload)
+        if removed_claim_count:
+            logger.warning(
+                "Invalid AI evidence filtered: claims=%d candidates=%d",
+                removed_claim_count,
+                len(removed_candidate_ids),
+            )
+        return filtered
 
     def _add_existing_evidence(
         self,
@@ -207,8 +236,8 @@ class AnalysisOrchestrator:
                     message="AI가 관련 근거가 조회되지 않은 경험을 보강 대상으로 반환했습니다.",
                     status_code=502,
                 )
-        self._validate_evidence(response, grounded_chunks)
-        validated = self._policy_validator.validate(response)
+        grounded_response = self._filter_invalid_evidence(response, grounded_chunks)
+        validated = self._policy_validator.validate(grounded_response)
         completed_at = time.perf_counter()
         logger.info(
             "Analysis stages completed: index=%.3fs retrieve=%.3fs "
