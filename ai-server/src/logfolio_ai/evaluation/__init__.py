@@ -16,4 +16,19 @@ def evaluate_cases(cases: Iterable[EvaluationCase]) -> EvaluationReport:
     return evaluate(cases)
 
 
-__all__ = ["evaluate_cases", "load_cases"]
+def load_product_cases(path=None, case_id=None):
+    from logfolio_ai.evaluation.product_runner import (
+        DEFAULT_DATASET,
+        load_product_cases as load,
+    )
+
+    return load(path or DEFAULT_DATASET, case_id)
+
+
+async def run_product_eval(*args, **kwargs):
+    from logfolio_ai.evaluation.product_runner import run_product_eval as run
+
+    return await run(*args, **kwargs)
+
+
+__all__ = ["evaluate_cases", "load_cases", "load_product_cases", "run_product_eval"]

@@ -1,0 +1,10 @@
+{
+  "name": "product_core_v1",
+  "caseFiles": [
+    "cases/NEW_01.json",
+    "cases/UPDATE_01.json",
+    "cases/CONTEXT_01.json",
+    "cases/ATTRIBUTION_01.json",
+    "cases/MERGE_01.json"
+  ]
+}

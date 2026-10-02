@@ -1,0 +1,27 @@
+{
+  "caseId": "NEW_01",
+  "title": "명확한 신규 Experience",
+  "category": "NEW_EXPERIENCE",
+  "difficulty": "EASY",
+  "description": "Quick Log에 사용자의 문제, 행동, 결과가 직접 기록된 신규 경험",
+  "input": {
+    "analysisRunId": "10000000-0000-0000-0000-000000000001",
+    "projectId": "20000000-0000-0000-0000-000000000001",
+    "chunks": [{
+      "chunkId": "30000000-0000-0000-0000-000000000001",
+      "sourceId": "40000000-0000-0000-0000-000000000001",
+      "sourceType": "QUICK_LOG",
+      "sourceName": "30초 기록",
+      "text": "나는 로그인 오류가 반복되는 문제를 발견했고 JWT 갱신 로직을 수정했다. 이후 재로그인 오류가 사라졌다.",
+      "distance": 0.1,
+      "purposes": ["USER_CONTRIBUTION", "OUTCOME"]
+    }]
+  },
+  "expected": {
+    "resultType": "NEW_EXPERIENCE",
+    "expectedExperienceCount": 1,
+    "requiresQuestion": false,
+    "forbiddenPhrases": ["프로젝트 매니저"]
+  },
+  "humanRubric": ["JWT 갱신 로직 수정 행동을 핵심으로 잡는다", "자료에 없는 성과를 추가하지 않는다"]
+}

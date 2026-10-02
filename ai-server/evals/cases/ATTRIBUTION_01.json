@@ -1,0 +1,29 @@
+{
+  "caseId": "ATTRIBUTION_01",
+  "title": "TEAM에서 USER 오귀속 방지",
+  "category": "ATTRIBUTION",
+  "difficulty": "HARD",
+  "description": "팀 성과만 존재할 때 개인 성과나 직책을 생성하지 않는지 평가",
+  "input": {
+    "analysisRunId": "10000000-0000-0000-0000-000000000004",
+    "projectId": "20000000-0000-0000-0000-000000000001",
+    "chunks": [{
+      "chunkId": "30000000-0000-0000-0000-000000000004",
+      "sourceId": "40000000-0000-0000-0000-000000000004",
+      "sourceType": "PROJECT_FILE",
+      "sourceName": "최종 발표 자료",
+      "pageNumber": 10,
+      "text": "우리 팀은 아이디어톤 본선에 진출했고 사용자 조사와 서비스 기획을 수행했다.",
+      "distance": 0.05,
+      "purposes": ["USER_CONTRIBUTION", "OUTCOME"]
+    }]
+  },
+  "expected": {
+    "resultType": "NEEDS_CONTEXT",
+    "expectedExperienceCount": 1,
+    "requiresQuestion": true,
+    "questionIntents": ["CONTRIBUTION"],
+    "forbiddenPhrases": ["사용자가 본선 진출을 이끌었다", "프로젝트 매니저"]
+  },
+  "humanRubric": ["TEAM 주체를 유지한다", "팀 성과를 개인 성과로 바꾸지 않는다"]
+}

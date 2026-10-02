@@ -32,6 +32,7 @@ embedding = [
 logfolio-ai = "logfolio_ai.main:run"
 logfolio-ai-eval = "logfolio_ai.evaluation.runner:main"
 logfolio-ai-e5-eval = "logfolio_ai.evaluation.embedding_runner:main"
+logfolio-ai-product-eval = "logfolio_ai.evaluation.product_runner:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/logfolio_ai"]

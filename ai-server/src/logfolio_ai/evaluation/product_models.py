@@ -1,0 +1,80 @@
+from typing import List, Optional
+
+from pydantic import Field
+
+from logfolio_ai.llm import GroundedAnalysisInput, LLMCallMetrics
+from logfolio_ai.models import AnalysisResponse, AnalysisResultType, PolicyViolationType
+from logfolio_ai.models.base import ContractModel
+
+
+class ProductEvalExpectation(ContractModel):
+    result_type: AnalysisResultType
+    target_experience_id: Optional[str] = None
+    expected_experience_count: int = Field(ge=0, le=3)
+    requires_question: bool
+    question_intents: List[str] = Field(default_factory=list, max_length=2)
+    forbidden_phrases: List[str] = Field(default_factory=list)
+
+
+class ProductEvalCase(ContractModel):
+    case_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    difficulty: str = Field(pattern="^(EASY|MEDIUM|HARD)$")
+    description: str = Field(min_length=1)
+    input: GroundedAnalysisInput
+    expected: ProductEvalExpectation
+    human_rubric: List[str] = Field(default_factory=list)
+
+
+class AutomaticEvaluation(ContractModel):
+    result_type_match: bool
+    target_experience_match: bool
+    experience_count_match: bool
+    question_requirement_match: bool
+    question_intent_match: bool
+    schema_valid: bool = True
+    critical_policy_violation: bool
+    forbidden_output: bool
+    passed: bool
+    failures: List[str] = Field(default_factory=list)
+
+
+class CostEstimate(ContractModel):
+    estimated_cost_usd: Optional[float] = Field(default=None, ge=0)
+    estimated_cost_krw: Optional[float] = Field(default=None, ge=0)
+    pricing_version: Optional[str] = None
+
+
+class ProductEvalRun(ContractModel):
+    case_id: str
+    run_number: int = Field(ge=1)
+    provider: str
+    model: str
+    success: bool
+    error_type: Optional[str] = None
+    output: Optional[AnalysisResponse] = None
+    automatic_evaluation: Optional[AutomaticEvaluation] = None
+    usage: LLMCallMetrics
+    cost: CostEstimate = Field(default_factory=CostEstimate)
+
+
+class ProductEvalReport(ContractModel):
+    dataset: str
+    provider: str
+    model: str
+    total_runs: int = Field(ge=0)
+    passed_runs: int = Field(ge=0)
+    failed_runs: int = Field(ge=0)
+    pass_rate: float = Field(ge=0, le=1)
+    total_estimated_cost_usd: Optional[float] = Field(default=None, ge=0)
+    total_estimated_cost_krw: Optional[float] = Field(default=None, ge=0)
+    runs: List[ProductEvalRun] = Field(default_factory=list)
+
+
+CRITICAL_POLICY_VIOLATIONS = {
+    PolicyViolationType.TEAM_TO_USER_ATTRIBUTION,
+    PolicyViolationType.UNSUPPORTED_ACHIEVEMENT,
+    PolicyViolationType.UNSUPPORTED_ROLE,
+    PolicyViolationType.INVALID_SOURCE_REFERENCE,
+}
