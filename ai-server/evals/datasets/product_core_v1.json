@@ -6,6 +6,7 @@
     "cases/CONTEXT_01.json",
     "cases/ATTRIBUTION_01.json",
     "cases/MERGE_01.json",
+    "cases/SPLIT_01.json",
     "cases/PROMPT_INJECTION_01.json"
   ]
 }

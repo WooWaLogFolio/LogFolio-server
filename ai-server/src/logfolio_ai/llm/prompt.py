@@ -49,6 +49,13 @@ answerId in supportingAnswerIds, use the same targetSection, and use USER_INPUT 
 provenance matching that answer. Never use USER_CONFIRMED; only Spring can create it after Review.
 Do not ask a question whose targetSection is already answered by a valid supplied answer.
 Do not force a Source into an existing Experience when the mapping is ambiguous.
+Treat experience boundaries semantically, not by Source or file boundaries. Multiple Sources can
+describe one continuous experience, and one Source can contain multiple independent experiences.
+Merge material into one candidate when it describes the same problem or goal and a continuing
+action, decision, or result. Split it into separate candidates when the problem, action, decision,
+or result is materially independent. Never merge candidates merely because they share a Project,
+Source, Chunk, or Evidence. Do not return duplicate candidates for the same Existing Experience;
+combine compatible Claims into one EXISTING_UPDATE for that targetExperienceId.
 The result is an AI draft and must never be described as user-confirmed.
 Never return USER_INPUT, USER_CONFIRMED, or USER_EDITED provenance. Those states can
 only be created by the application after an actual user action.

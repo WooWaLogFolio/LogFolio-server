@@ -1,10 +1,12 @@
-from typing import Dict, Iterable, List, Sequence, Set
+from typing import Dict, Iterable, List, Sequence, Set, Tuple
 from uuid import UUID
 
 from logfolio_ai.models import (
     AnalysisResponse,
+    AnalysisResultType,
     Claim,
     ConflictDetail,
+    ExperienceCandidate,
     GapQuestion,
     InformationNeedType,
     PolicyViolationType,
@@ -179,6 +181,85 @@ class AIPolicyValidator:
     def _normalize_claim_content(value: str) -> str:
         return " ".join(value.lower().split())
 
+    def _claim_key(self, claim: Claim) -> Tuple[str, str]:
+        return (
+            claim.section_type.upper(),
+            self._normalize_claim_content(claim.content),
+        )
+
+    def _new_candidate_key(self, candidate: ExperienceCandidate) -> Tuple:
+        """Identify only exact duplicate new-experience proposals.
+
+        Shared Sources or Evidence are deliberately excluded: one Source can contain
+        multiple independent experiences, so evidence overlap alone is never a merge
+        signal.
+        """
+        return (
+            self._normalize_claim_content(candidate.title),
+            self._normalize_claim_content(candidate.summary),
+            tuple(sorted(self._claim_key(claim) for claim in candidate.claims)),
+        )
+
+    def _merge_candidates(
+        self,
+        candidates: Sequence[ExperienceCandidate],
+    ) -> Tuple[List[ExperienceCandidate], Dict[UUID, UUID]]:
+        merged: List[ExperienceCandidate] = []
+        positions: Dict[Tuple, int] = {}
+        candidate_id_remap: Dict[UUID, UUID] = {}
+
+        for candidate in candidates:
+            if candidate.result_type == AnalysisResultType.EXISTING_UPDATE:
+                key = ("EXISTING_UPDATE", candidate.target_experience_id)
+            else:
+                key = ("NEW_EXPERIENCE",) + self._new_candidate_key(candidate)
+
+            if key not in positions:
+                positions[key] = len(merged)
+                merged.append(candidate)
+                continue
+
+            kept_index = positions[key]
+            kept = merged[kept_index]
+            candidate_id_remap[candidate.candidate_id] = kept.candidate_id
+
+            claim_keys = {self._claim_key(item) for item in kept.claims}
+            combined_claims = list(kept.claims)
+            for item in candidate.claims:
+                item_key = self._claim_key(item)
+                if item_key not in claim_keys:
+                    claim_keys.add(item_key)
+                    combined_claims.append(item)
+
+            conflict_keys = {
+                (
+                    item.section_type.upper(),
+                    self._normalize_claim_content(item.existing_content),
+                    self._normalize_claim_content(item.proposed_content),
+                )
+                for item in kept.conflicts
+            }
+            combined_conflicts = list(kept.conflicts)
+            for item in candidate.conflicts:
+                item_key = (
+                    item.section_type.upper(),
+                    self._normalize_claim_content(item.existing_content),
+                    self._normalize_claim_content(item.proposed_content),
+                )
+                if item_key not in conflict_keys:
+                    conflict_keys.add(item_key)
+                    combined_conflicts.append(item)
+
+            merged[kept_index] = kept.model_copy(
+                update={
+                    "claims": combined_claims,
+                    "conflict": bool(combined_conflicts),
+                    "conflicts": combined_conflicts,
+                }
+            )
+
+        return merged, candidate_id_remap
+
     def _matches_rejected_evidence(
         self,
         claim: Claim,
@@ -291,7 +372,6 @@ class AIPolicyValidator:
     ) -> AnalysisResponse:
         answers_by_id = {answer.answer_id: answer for answer in user_answers}
         validated_candidates = []
-        all_claims: List[Claim] = []
         removed_candidate_ids = set()
         for candidate in response.candidates:
             claims = []
@@ -329,7 +409,6 @@ class AIPolicyValidator:
                 conflicts,
                 corrections,
             )
-            all_claims.extend(claims)
             validated_candidates.append(
                 candidate.model_copy(
                     update={
@@ -340,11 +419,24 @@ class AIPolicyValidator:
                 )
             )
 
+        validated_candidates, candidate_id_remap = self._merge_candidates(
+            validated_candidates
+        )
+        all_claims = [
+            claim for candidate in validated_candidates for claim in candidate.claims
+        ]
         questions = self._filter_questions(response, all_claims, user_answers)
         questions = [
-            question.model_copy(update={"candidate_id": None})
-            if question.candidate_id in removed_candidate_ids
-            else question
+            question.model_copy(
+                update={
+                    "candidate_id": candidate_id_remap.get(
+                        question.candidate_id,
+                        question.candidate_id,
+                    )
+                }
+            )
+            if question.candidate_id not in removed_candidate_ids
+            else question.model_copy(update={"candidate_id": None})
             for question in questions
         ]
         payload = response.model_dump()

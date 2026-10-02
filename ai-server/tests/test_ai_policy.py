@@ -401,3 +401,115 @@ def test_user_edit_from_other_experience_does_not_create_conflict() -> None:
     )
 
     assert result.candidates[0].conflict is False
+
+
+def test_existing_updates_for_same_experience_are_merged() -> None:
+    experience_id = uuid4()
+    first_id = uuid4()
+    second_id = uuid4()
+    first_claim = claim(section_type="ACTION", content="JWT 갱신 로직을 수정했다.")
+    second_claim = claim(section_type="RESULT", content="재로그인 오류가 사라졌다.")
+    follow_up = GapQuestion(
+        question_id=uuid4(),
+        candidate_id=second_id,
+        target_section="LEARNING",
+        question="이 경험에서 무엇을 배웠나요?",
+    )
+    draft = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="기존 경험 보강 초안",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=first_id,
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                title="로그인 오류 해결",
+                summary="문제를 발견했다.",
+                claims=[first_claim],
+            ),
+            ExperienceCandidate(
+                candidate_id=second_id,
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                title="로그인 오류 해결",
+                summary="오류를 해결했다.",
+                claims=[second_claim],
+            ),
+        ],
+        questions=[follow_up],
+    )
+
+    result = AIPolicyValidator().validate(draft)
+
+    assert len(result.candidates) == 1
+    assert result.candidates[0].candidate_id == first_id
+    assert [item.content for item in result.candidates[0].claims] == [
+        first_claim.content,
+        second_claim.content,
+    ]
+    assert result.questions[0].candidate_id == first_id
+
+
+def test_exact_duplicate_new_experiences_are_removed() -> None:
+    shared_claim = claim(content="JWT 갱신 로직을 수정했다.")
+    first_id = uuid4()
+    draft = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="신규 경험 초안",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=first_id,
+                title="로그인 오류 해결",
+                summary="갱신 오류를 해결했다.",
+                claims=[shared_claim],
+            ),
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="로그인 오류 해결",
+                summary="갱신 오류를 해결했다.",
+                claims=[shared_claim],
+            ),
+        ],
+    )
+
+    result = AIPolicyValidator().validate(draft)
+
+    assert len(result.candidates) == 1
+    assert result.candidates[0].candidate_id == first_id
+
+
+def test_shared_source_does_not_merge_independent_new_experiences() -> None:
+    shared_evidence = evidence(
+        "나는 로그인 오류를 해결했고 별도로 온보딩 단계를 줄였다."
+    )
+    login_claim = claim(
+        content="JWT 갱신 오류를 해결했다.", evidences=[shared_evidence]
+    )
+    onboarding_claim = claim(
+        content="온보딩 단계를 줄였다.", evidences=[shared_evidence]
+    )
+    draft = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="서로 다른 경험 두 개",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="로그인 오류 해결",
+                summary="인증 오류를 해결했다.",
+                claims=[login_claim],
+            ),
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="온보딩 개선",
+                summary="가입 단계를 개선했다.",
+                claims=[onboarding_claim],
+            ),
+        ],
+    )
+
+    result = AIPolicyValidator().validate(draft)
+
+    assert len(result.candidates) == 2
