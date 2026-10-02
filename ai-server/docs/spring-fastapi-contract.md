@@ -74,6 +74,22 @@ X-Internal-API-Key: <shared-secret>
 
 응답의 `items[].status`는 `INDEXED`, `DUPLICATE`, `FAILED`입니다. 여기서 `DUPLICATE`는 영구적인 Source State가 아니라 인덱싱 요청 결과입니다. `DUPLICATE`이면 Spring은 새 Source가 기존 `duplicateOfSourceId`와 완전히 동일함을 사용자에게 안내하고, 새 Source를 분석 대상에 넣지 않습니다. 기존 Source와 Evidence는 그대로 유지합니다. 새 Source DB 행을 생성하기 전 해시를 검사하는 방식을 권장하며, 이미 행을 만든 뒤 FastAPI를 호출한다면 해당 행을 어떻게 정리할지는 Spring 트랜잭션 정책으로 결정해야 합니다.
 
+### Source 삭제 시 RAG 인덱스 제거
+
+Spring이 사용자 권한과 Source 소유 프로젝트를 확인하고 원본 Source 삭제를 확정한 뒤 아래 API를 호출합니다.
+
+```text
+DELETE /api/v1/projects/{projectId}/sources/{sourceId}/index
+X-Internal-API-Key: <shared-secret>
+```
+
+- 성공 응답: `204 No Content`
+- 이미 인덱스가 없는 Source를 다시 요청해도 `204`를 반환하는 멱등 API
+- FastAPI는 반드시 `projectId + sourceId`가 모두 일치하는 Chunk와 중복 판별용 해시만 제거
+- Spring DB의 Project File/Quick Log, S3 원본, Evidence, Review, 사용자 확정 Experience는 이 API가 삭제하지 않음
+- Review에서 이번 분석만 제외하는 동작에는 이 API를 호출하지 않음
+- 삭제된 Source와 연결된 기존 Evidence를 화면에 어떻게 표시할지는 Spring의 별도 데이터 정책으로 결정
+
 ## 2. 프로젝트 AI 분석
 
 ```text

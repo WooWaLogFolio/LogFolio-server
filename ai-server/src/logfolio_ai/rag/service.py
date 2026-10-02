@@ -220,6 +220,11 @@ class RagService:
             items=items,
         )
 
+    async def delete_source_index(self, project_id: UUID, source_id: UUID) -> None:
+        """Remove a deleted Spring Source from retrieval without touching domain data."""
+
+        await self._vector_store.delete_source(project_id, source_id)
+
     async def retrieve(
         self,
         project_id: UUID,

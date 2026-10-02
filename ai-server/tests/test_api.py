@@ -260,3 +260,54 @@ def test_source_index_endpoint_accepts_project_file_and_quick_log() -> None:
         "PROJECT_FILE",
         "QUICK_LOG",
     ]
+
+
+def test_source_index_delete_is_project_scoped_and_idempotent() -> None:
+    class RecordingRagService:
+        def __init__(self):
+            self.calls = []
+
+        async def delete_source_index(self, project_id, source_id):
+            self.calls.append((project_id, source_id))
+
+    service = RecordingRagService()
+    project_id = uuid4()
+    source_id = uuid4()
+    app.dependency_overrides[get_rag_service] = lambda: service
+    try:
+        first = client.delete(
+            f"/api/v1/projects/{project_id}/sources/{source_id}/index"
+        )
+        second = client.delete(
+            f"/api/v1/projects/{project_id}/sources/{source_id}/index"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert first.status_code == 204
+    assert first.content == b""
+    assert second.status_code == 204
+    assert service.calls == [(project_id, source_id), (project_id, source_id)]
+
+
+def test_source_index_delete_requires_internal_api_key_when_configured() -> None:
+    class RecordingRagService:
+        async def delete_source_index(self, project_id, source_id):
+            raise AssertionError("unauthenticated deletion must not reach the service")
+
+    project_id = uuid4()
+    source_id = uuid4()
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_auth_required=True,
+        internal_api_key="spring-secret",
+    )
+    app.dependency_overrides[get_rag_service] = lambda: RecordingRagService()
+    try:
+        response = client.delete(
+            f"/api/v1/projects/{project_id}/sources/{source_id}/index"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "INTERNAL_AUTH_FAILED"
