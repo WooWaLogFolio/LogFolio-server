@@ -6,8 +6,13 @@ from fastapi.testclient import TestClient
 
 from logfolio_ai.analysis.dependencies import get_analysis_orchestrator, get_rag_service
 from logfolio_ai.core.config import Settings, get_settings
+from logfolio_ai.core.errors import AppError
 from logfolio_ai.main import app, prepare_runtime
-from logfolio_ai.models import SourceIndexItem, SourceIndexResponse
+from logfolio_ai.models import (
+    AIUsageRecord,
+    SourceIndexItem,
+    SourceIndexResponse,
+)
 
 client = TestClient(app)
 
@@ -108,6 +113,15 @@ def test_fake_analysis_preserves_tracking_ids() -> None:
     assert body["summary"] == "Fake LLM 근거 기반 분석 결과입니다."
     assert body["candidates"] == []
     assert body["questions"] == []
+    assert body["aiUsage"]["provider"] == "fake"
+    assert body["aiUsage"]["model"] == "fake"
+    assert body["aiUsage"]["inputTokens"] == 0
+    assert body["aiUsage"]["outputTokens"] == 0
+    assert body["aiUsage"]["latencyMs"] >= 0
+    assert body["aiUsage"]["retryCount"] == 0
+    assert body["aiUsage"]["taskType"] == "PROJECT_ANALYSIS"
+    assert body["aiUsage"]["estimatedCostUsd"] is None
+    assert body["aiUsage"]["estimatedCostKrw"] is None
 
 
 def test_validation_error_uses_shared_error_shape() -> None:
@@ -209,6 +223,37 @@ def test_analysis_timeout_uses_shared_error_shape() -> None:
         "message": "AI 분석 제한 시간을 초과했습니다.",
         "details": [],
     }
+
+
+def test_provider_failure_can_return_usage_without_exposing_secrets() -> None:
+    class FailingOrchestrator:
+        async def analyze(self, request):
+            del request
+            raise AppError(
+                code="LLM_PROVIDER_ERROR",
+                message="LLM 공급자 호출에 실패했습니다.",
+                status_code=502,
+                ai_usage=AIUsageRecord(
+                    provider="gemini",
+                    model="test-model",
+                    latency_ms=1200,
+                    retry_count=1,
+                    success=False,
+                    error_type="LLM_PROVIDER_ERROR",
+                ),
+            )
+
+    app.dependency_overrides[get_analysis_orchestrator] = lambda: FailingOrchestrator()
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 502
+    assert response.json()["aiUsage"]["provider"] == "gemini"
+    assert response.json()["aiUsage"]["retryCount"] == 1
+    assert response.json()["aiUsage"]["success"] is False
+    assert response.json()["aiUsage"]["errorType"] == "LLM_PROVIDER_ERROR"
 
 
 def test_source_index_endpoint_accepts_project_file_and_quick_log() -> None:

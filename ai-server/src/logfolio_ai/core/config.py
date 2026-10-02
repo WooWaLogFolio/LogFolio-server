@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     existing_experience_match_distance: float = Field(default=0.4, ge=0, le=2)
     project_source_match_distance: float = Field(default=0.65, ge=0, le=2)
     max_related_experiences: int = Field(default=3, ge=1, le=10)
+    pricing_version: Optional[str] = None
+    llm_input_per_million_usd: Optional[float] = Field(default=None, ge=0)
+    llm_cached_input_per_million_usd: Optional[float] = Field(default=None, ge=0)
+    llm_output_per_million_usd: Optional[float] = Field(default=None, ge=0)
+    llm_reasoning_per_million_usd: Optional[float] = Field(default=None, ge=0)
+    usd_to_krw: Optional[float] = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":

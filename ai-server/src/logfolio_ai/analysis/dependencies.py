@@ -3,6 +3,7 @@ from typing import AsyncIterator
 
 from logfolio_ai.analysis.orchestrator import AnalysisOrchestrator
 from logfolio_ai.core.config import get_settings
+from logfolio_ai.core.usage import UsageCostCalculator, UsagePricing
 from logfolio_ai.embedding import get_embedding_provider
 from logfolio_ai.llm import get_llm_provider
 from logfolio_ai.rag import RagService
@@ -58,4 +59,18 @@ async def get_analysis_orchestrator() -> AsyncIterator[AnalysisOrchestrator]:
             rag_service,
             get_llm_provider(),
             max_grounded_chunks=settings.max_grounded_chunks,
+            usage_cost_calculator=UsageCostCalculator(
+                UsagePricing(
+                    version=settings.pricing_version,
+                    input_per_million_usd=settings.llm_input_per_million_usd,
+                    cached_input_per_million_usd=(
+                        settings.llm_cached_input_per_million_usd
+                    ),
+                    output_per_million_usd=settings.llm_output_per_million_usd,
+                    reasoning_per_million_usd=(
+                        settings.llm_reasoning_per_million_usd
+                    ),
+                    usd_to_krw=settings.usd_to_krw,
+                )
+            ),
         )

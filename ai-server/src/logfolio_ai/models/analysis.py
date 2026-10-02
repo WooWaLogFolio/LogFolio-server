@@ -16,6 +16,7 @@ from logfolio_ai.models.enums import (
     SourceWarningType,
     VerificationStatus,
 )
+from logfolio_ai.models.usage import AIUsageRecord
 
 
 class DocumentPage(ContractModel):
@@ -266,6 +267,10 @@ class AnalysisResponse(ContractModel):
     information_need_reason: Optional[str] = Field(default=None, min_length=1)
     result_types: List[AnalysisResultType] = Field(default_factory=list)
     no_update_reason: Optional[str] = None
+    ai_usage: Optional[AIUsageRecord] = Field(
+        default=None,
+        description="Server-owned LLM usage and estimated cost for this analysis.",
+    )
 
     @model_validator(mode="after")
     def validate_question_candidate_references(self) -> "AnalysisResponse":

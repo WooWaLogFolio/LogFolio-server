@@ -31,11 +31,13 @@ from logfolio_ai.models.enums import (
     SourceWarningType,
     VerificationStatus,
 )
+from logfolio_ai.models.usage import AIUsageRecord, LLMCallMetrics
 
 __all__ = [
     "AnalysisRequest",
     "AnalysisResponse",
     "AnalysisResultType",
+    "AIUsageRecord",
     "Claim",
     "ConflictDetail",
     "DocumentPage",
@@ -43,6 +45,7 @@ __all__ = [
     "Evidence",
     "EvidenceType",
     "InformationNeedType",
+    "LLMCallMetrics",
     "ExperienceCandidate",
     "GapQuestion",
     "ProjectContext",

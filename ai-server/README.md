@@ -329,6 +329,8 @@ python -m logfolio_ai.evaluation.product_runner \
 
 실제 Provider Eval은 외부 API 비용이 발생할 수 있으므로 명시적으로 실행할 때만 호출합니다. 사용법과 Dataset 관리 기준은 [`evals/README.md`](evals/README.md)를 참고합니다.
 
+실제 프로젝트 분석에서 LLM을 호출하면 응답의 `aiUsage`에 Provider, Model, Token, Latency, Retry와 추정 비용을 반환합니다. 가격과 환율은 변할 수 있으므로 코드에 고정하지 않고 환경변수로 주입하며, 가격 설정이 불완전하면 비용을 임의 계산하지 않습니다. Spring은 이 값을 `analysisRunId` 및 인증된 사용자와 연결해 저장해야 합니다.
+
 기본 설정은 외부 호출이 없는 Fake Provider입니다.
 
 ```bash

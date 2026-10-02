@@ -75,6 +75,13 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
             "summary": "프로젝트 자료를 분석했습니다.",
             "candidates": [],
             "questions": [],
+            "aiUsage": {
+                "provider": "spoofed",
+                "model": "spoofed",
+                "inputTokens": 999999,
+                "latencyMs": 1,
+                "retryCount": 0,
+            },
         }
     )
     generate_content = AsyncMock(
@@ -105,6 +112,7 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert result.summary == "프로젝트 자료를 분석했습니다."
     assert result.input_source_ids == []
     assert result.referenced_source_ids == []
+    assert result.ai_usage is None
     assert provider.last_call_metrics.provider == "gemini"
     assert provider.last_call_metrics.model == "test-model"
     assert provider.last_call_metrics.input_tokens == 120
@@ -165,6 +173,9 @@ async def test_gemini_provider_maps_timeout_to_app_error() -> None:
     assert error.value.code == "LLM_TIMEOUT"
     assert error.value.status_code == 504
     assert generate_content.await_count == 2
+    assert provider.last_call_metrics.success is False
+    assert provider.last_call_metrics.error_type == "LLM_TIMEOUT"
+    assert provider.last_call_metrics.retry_count == 1
 
 
 @pytest.mark.asyncio
