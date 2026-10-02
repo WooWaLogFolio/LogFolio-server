@@ -1,0 +1,243 @@
+// LogFolio PostgreSQL ERD
+// This file is the canonical logical model. The executable schema is
+// src/main/resources/db/migration/V1__initial_schema.sql.
+
+Table users {
+  id uuid [pk]
+  email varchar(255) [not null, unique]
+  name varchar(100) [not null]
+  status varchar(30) [not null, default: 'ACTIVE']
+  onboarding_completed_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+}
+
+Table auth_accounts {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  provider varchar(30) [not null]
+  provider_user_id varchar(255) [not null]
+  provider_email varchar(255)
+  password_hash varchar(255)
+  created_at timestamp [not null]
+
+  indexes {
+    (provider, provider_user_id) [unique]
+  }
+}
+
+Table user_sessions {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  refresh_token_hash varchar(255) [not null, unique]
+  expires_at timestamp [not null]
+  revoked_at timestamp
+  created_at timestamp [not null]
+}
+
+Table password_reset_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar(255) [not null, unique]
+  expires_at timestamp [not null]
+  used_at timestamp
+  created_at timestamp [not null]
+}
+
+Table projects {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  name varchar(200) [not null]
+  status varchar(30) [not null]
+  activity_type varchar(100)
+  user_role varchar(200)
+  team_size int
+  started_at date
+  ended_at date
+  description varchar(200)
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+}
+
+Table project_tags {
+  project_id uuid [not null, ref: > projects.id]
+  display_order int [not null]
+  tag varchar(50) [not null]
+
+  indexes {
+    (project_id, display_order) [pk]
+    (project_id, tag) [unique]
+  }
+}
+
+Table quick_logs {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  project_id uuid [ref: > projects.id]
+  content text [not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+}
+
+Table project_suggestions {
+  id uuid [pk]
+  quick_log_id uuid [not null, ref: > quick_logs.id]
+  project_id uuid [not null, ref: > projects.id]
+  confidence decimal(5,4)
+  status varchar(30) [not null]
+  created_at timestamp [not null]
+
+  indexes {
+    (quick_log_id, project_id) [unique]
+  }
+}
+
+Table project_files {
+  id uuid [pk]
+  project_id uuid [not null, ref: > projects.id]
+  user_id uuid [not null, ref: > users.id]
+  original_name varchar(255) [not null]
+  storage_key varchar(500) [not null, unique]
+  mime_type varchar(100) [not null]
+  size_bytes bigint [not null]
+  processing_status varchar(30) [not null]
+  created_at timestamp [not null]
+  deleted_at timestamp
+}
+
+Table analysis_runs {
+  id uuid [pk]
+  project_id uuid [not null, ref: > projects.id]
+  run_type varchar(30) [not null]
+  status varchar(30) [not null]
+  model_version varchar(100)
+  started_at timestamp
+  completed_at timestamp
+  created_at timestamp [not null]
+}
+
+Table analysis_input_files {
+  analysis_run_id uuid [not null, ref: > analysis_runs.id]
+  project_file_id uuid [not null, ref: > project_files.id]
+
+  indexes {
+    (analysis_run_id, project_file_id) [pk]
+  }
+}
+
+Table analysis_input_logs {
+  analysis_run_id uuid [not null, ref: > analysis_runs.id]
+  quick_log_id uuid [not null, ref: > quick_logs.id]
+
+  indexes {
+    (analysis_run_id, quick_log_id) [pk]
+  }
+}
+
+Table experience_candidates {
+  id uuid [pk]
+  analysis_run_id uuid [not null, ref: > analysis_runs.id]
+  merged_into_id uuid [ref: > experience_candidates.id]
+  candidate_type varchar(30) [not null, default: 'NEW', note: 'NEW 또는 ENHANCE_EXISTING']
+  target_experience_id uuid [ref: > experiences.id, note: '기존 경험 보강 대상']
+  match_confidence decimal(5,4)
+  match_reason text
+  title varchar(255) [not null]
+  summary text
+  draft_content jsonb
+  status varchar(30) [not null]
+  created_at timestamp [not null]
+}
+
+Table experiences {
+  id uuid [pk]
+  project_id uuid [not null, ref: > projects.id]
+  candidate_id uuid [ref: > experience_candidates.id]
+  title varchar(255) [not null]
+  summary text
+  context text
+  contribution text
+  decision_reason text
+  action text
+  result text
+  learning text
+  status varchar(30) [not null]
+  version int [not null, default: 1]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  deleted_at timestamp
+}
+
+Table evidence_items {
+  id uuid [pk]
+  project_id uuid [not null, ref: > projects.id]
+  project_file_id uuid [ref: > project_files.id]
+  quick_log_id uuid [ref: > quick_logs.id]
+  excerpt text
+  location varchar(255)
+  created_at timestamp [not null]
+}
+
+Table experience_evidence {
+  experience_id uuid [not null, ref: > experiences.id]
+  evidence_item_id uuid [not null, ref: > evidence_items.id]
+  section_type varchar(30) [not null]
+
+  indexes {
+    (experience_id, evidence_item_id, section_type) [pk]
+  }
+}
+
+Table review_sessions {
+  id uuid [pk]
+  project_id uuid [not null, ref: > projects.id]
+  analysis_run_id uuid [ref: > analysis_runs.id]
+  status varchar(30) [not null]
+  started_at timestamp [not null]
+  completed_at timestamp
+}
+
+Table review_items {
+  id uuid [pk]
+  review_session_id uuid [not null, ref: > review_sessions.id]
+  experience_id uuid [ref: > experiences.id]
+  candidate_id uuid [ref: > experience_candidates.id]
+  item_type varchar(40) [not null]
+  proposed_content text
+  confirmed_content text
+  decision varchar(30) [not null, default: 'PENDING']
+  display_order int [not null]
+  reviewed_at timestamp
+}
+
+Table review_item_evidence {
+  review_item_id uuid [not null, ref: > review_items.id]
+  evidence_item_id uuid [not null, ref: > evidence_items.id]
+
+  indexes {
+    (review_item_id, evidence_item_id) [pk]
+  }
+}
+
+Table gap_questions {
+  id uuid [pk]
+  review_item_id uuid [ref: > review_items.id]
+  experience_id uuid [not null, ref: > experiences.id]
+  target_section varchar(30) [not null]
+  question text [not null]
+  suggested_answers jsonb
+  display_order int [not null]
+  created_at timestamp [not null]
+}
+
+Table gap_answers {
+  id uuid [pk]
+  question_id uuid [not null, ref: > gap_questions.id]
+  user_id uuid [not null, ref: > users.id]
+  answer text
+  answer_type varchar(30) [not null]
+  created_at timestamp [not null]
+}
