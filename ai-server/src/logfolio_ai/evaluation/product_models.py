@@ -3,7 +3,12 @@ from typing import List, Optional
 from pydantic import Field
 
 from logfolio_ai.llm import GroundedAnalysisInput, LLMCallMetrics
-from logfolio_ai.models import AnalysisResponse, AnalysisResultType, PolicyViolationType
+from logfolio_ai.models import (
+    AnalysisResponse,
+    AnalysisResultType,
+    InformationNeedType,
+    PolicyViolationType,
+)
 from logfolio_ai.models.base import ContractModel
 
 
@@ -13,6 +18,8 @@ class ProductEvalExpectation(ContractModel):
     expected_experience_count: int = Field(ge=0, le=3)
     requires_question: bool
     question_intents: List[str] = Field(default_factory=list, max_length=2)
+    information_need: Optional[InformationNeedType] = None
+    conflict: Optional[bool] = None
     forbidden_phrases: List[str] = Field(default_factory=list)
 
 
@@ -33,6 +40,8 @@ class AutomaticEvaluation(ContractModel):
     experience_count_match: bool
     question_requirement_match: bool
     question_intent_match: bool
+    information_need_match: bool
+    conflict_match: bool
     schema_valid: bool = True
     critical_policy_violation: bool
     forbidden_output: bool

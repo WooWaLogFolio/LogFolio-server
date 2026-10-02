@@ -321,6 +321,8 @@ python -m logfolio_ai.evaluation.runner
 
 Experience 경계는 Source 경계가 아니라 문제·행동·결정·결과의 의미를 기준으로 판단합니다. 여러 Source가 하나의 흐름이면 한 Experience로 합치고, 하나의 Source 안에서도 독립적인 흐름이면 별도 Experience로 분리합니다. FastAPI Policy Validator는 같은 기존 Experience를 가리키는 중복 Update를 합치고, 신규 후보는 내용이 완전히 같은 경우에만 제거합니다.
 
+Product Gold Dataset은 신규·보강·정보 부족·오귀속·병합·분리뿐 아니라 기존 확정값 충돌, 추가 Source 필요, 반영 없음, 거절값 재제안 방지와 Prompt Injection도 포함합니다. 실제 Provider 호출 전에는 이 Case들의 Schema와 자동 평가기를 오프라인 테스트로 검증합니다.
+
 ```bash
 python -m logfolio_ai.evaluation.product_runner \
   --provider gemini \

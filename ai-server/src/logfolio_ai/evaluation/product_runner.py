@@ -97,6 +97,23 @@ def evaluate_product_output(
             f"questionIntents expected={expected.question_intents} actual={actual_intents}"
         )
 
+    information_need_match = (
+        expected.information_need is None
+        or output.information_need == expected.information_need
+    )
+    if not information_need_match:
+        failures.append(
+            f"informationNeed expected={expected.information_need.value} "
+            f"actual={output.information_need.value if output.information_need else None}"
+        )
+
+    actual_conflict = any(candidate.conflict for candidate in output.candidates)
+    conflict_match = expected.conflict is None or actual_conflict == expected.conflict
+    if not conflict_match:
+        failures.append(
+            f"conflict expected={expected.conflict} actual={actual_conflict}"
+        )
+
     violations = {
         violation
         for candidate in output.candidates
@@ -124,6 +141,8 @@ def evaluate_product_output(
         experience_count_match=experience_count_match,
         question_requirement_match=question_requirement_match,
         question_intent_match=question_intent_match,
+        information_need_match=information_need_match,
+        conflict_match=conflict_match,
         critical_policy_violation=critical_policy_violation,
         forbidden_output=forbidden_output,
         passed=not failures,
