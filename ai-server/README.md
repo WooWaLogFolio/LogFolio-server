@@ -115,6 +115,8 @@ MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터�
 
 새 Source가 사용자 확정 Experience와 충돌하면 `EXISTING_UPDATE` Candidate에 `conflict=true`와 구조화된 `conflicts`를 반환합니다. 각 충돌은 Spring이 전달한 실제 기존 Claim 또는 사용자 수정값과 새 Candidate Claim을 함께 참조해야 하며, 서버 검증을 통과하지 못한 가짜 기존 값은 거부됩니다. 실제 Experience 수정은 사용자 Review 이후 Spring에서만 수행합니다.
 
+각 분석 응답의 `analyzedSourceIds`는 해당 `analysisRunId`가 사용한 Source 입력 스냅샷입니다. Review 진행 중 새 Source가 추가되어도 현재 결과에는 합치지 않으며, 새 Source는 다음 사용자 실행의 새 Analysis Run에서 처리합니다. FastAPI는 스냅샷을 반환하고 Review 상태 및 다음 실행 대상 관리는 Spring이 담당합니다.
+
 ### 5. Generate a structured draft
 
 검색된 Chunk만 외부 LLM에 근거로 전달합니다. LLM은 자유 형식의 글이 아니라 약속된 JSON 구조로 다음 결과를 생성합니다.

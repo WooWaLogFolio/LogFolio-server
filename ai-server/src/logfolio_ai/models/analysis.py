@@ -235,6 +235,7 @@ class SourceWarning(ContractModel):
 class AnalysisResponse(ContractModel):
     analysis_run_id: UUID
     project_id: UUID
+    analyzed_source_ids: List[UUID] = Field(default_factory=list, max_length=50)
     summary: str = Field(min_length=1)
     candidates: List[ExperienceCandidate] = Field(default_factory=list, max_length=3)
     questions: List[GapQuestion] = Field(default_factory=list, max_length=2)

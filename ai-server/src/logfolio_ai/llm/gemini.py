@@ -124,5 +124,6 @@ class GeminiLLMProvider:
             update={
                 "analysis_run_id": analysis_run_id,
                 "project_id": project_id,
+                "analyzed_source_ids": [],
             }
         )

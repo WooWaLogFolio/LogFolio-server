@@ -296,6 +296,20 @@ def test_empty_analysis_is_classified_as_no_update() -> None:
     assert response.result_types == [AnalysisResultType.NO_UPDATE]
 
 
+def test_analysis_response_serializes_source_snapshot_with_camel_case() -> None:
+    source_ids = [uuid4(), uuid4()]
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        analyzed_source_ids=source_ids,
+        summary="분석 완료",
+    )
+
+    payload = response.model_dump(mode="json", by_alias=True)
+
+    assert payload["analyzedSourceIds"] == [str(value) for value in source_ids]
+
+
 def test_quick_log_is_a_supported_source_type() -> None:
     source = DocumentSource(
         source_id=uuid4(),

@@ -177,7 +177,7 @@ async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
     llm = RecordingLLMProvider(empty_response(analysis_request))
     orchestrator = AnalysisOrchestrator(rag, llm, max_grounded_chunks=15)
 
-    await orchestrator.analyze(analysis_request)
+    response = await orchestrator.analyze(analysis_request)
 
     assert rag.indexed_documents == analysis_request.documents
     assert llm.grounded_input is not None
@@ -189,6 +189,9 @@ async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
         AnalysisPurpose.OUTCOME,
     ]
     assert "검색되지 않을 비밀 문장" not in grounded.text
+    assert response.analyzed_source_ids == [
+        document.source_id for document in analysis_request.documents
+    ]
 
 
 @pytest.mark.asyncio
@@ -238,7 +241,12 @@ async def test_orchestrator_accepts_exact_excerpt_from_retrieved_chunk() -> None
     )
     orchestrator = AnalysisOrchestrator(rag, RecordingLLMProvider(response))
 
-    assert await orchestrator.analyze(analysis_request) == response
+    actual = await orchestrator.analyze(analysis_request)
+
+    assert actual.model_copy(update={"analyzed_source_ids": []}) == response
+    assert actual.analyzed_source_ids == [
+        document.source_id for document in analysis_request.documents
+    ]
 
 
 @pytest.mark.asyncio
@@ -470,6 +478,9 @@ async def test_no_indexed_source_chunks_returns_no_update_without_llm_call() -> 
     assert response.candidates == []
     assert response.questions == []
     assert "인덱싱" in response.no_update_reason
+    assert response.analyzed_source_ids == [
+        document.source_id for document in analysis_request.documents
+    ]
     assert llm.grounded_input is None
 
 
