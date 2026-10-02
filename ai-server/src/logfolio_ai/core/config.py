@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     llm_provider: Literal["fake", "gemini"] = "fake"
     gemini_api_key: Optional[SecretStr] = None
     gemini_model: str = "gemini-3.5-flash"
-    llm_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
+    llm_timeout_seconds: float = Field(default=14.0, gt=0, le=30)
     analysis_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
     internal_auth_required: bool = False
     internal_api_key: Optional[SecretStr] = None
@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     def validate_chunk_window(self) -> "Settings":
         if self.chunk_overlap_tokens >= self.chunk_size_tokens:
             raise ValueError("chunk overlap must be smaller than chunk size")
+        if (
+            self.llm_provider == "gemini"
+            and self.llm_timeout_seconds * 2 >= self.analysis_timeout_seconds
+        ):
+            raise ValueError(
+                "analysis timeout must allow two LLM attempts within the total limit"
+            )
         return self
 
 

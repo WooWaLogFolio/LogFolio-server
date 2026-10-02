@@ -11,6 +11,8 @@ from logfolio_ai.models import AnalysisResponse
 
 
 logger = logging.getLogger(__name__)
+_RETRYABLE_CODES = {"LLM_TIMEOUT", "LLM_PROVIDER_ERROR", "LLM_INVALID_RESPONSE"}
+_RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429}
 
 
 class GeminiLLMProvider:
@@ -20,6 +22,7 @@ class GeminiLLMProvider:
         model: str,
         timeout_seconds: float,
         client: Optional[Any] = None,
+        max_attempts: int = 2,
     ) -> None:
         if client is None:
             from google import genai
@@ -28,15 +31,29 @@ class GeminiLLMProvider:
         self._client = client
         self._model = model
         self._timeout_seconds = timeout_seconds
+        self._max_attempts = max_attempts
 
     async def analyze_grounded(
         self, request: GroundedAnalysisInput
     ) -> AnalysisResponse:
-        return await self._generate(
-            build_grounded_analysis_prompt(request),
-            request.analysis_run_id,
-            request.project_id,
-        )
+        prompt = build_grounded_analysis_prompt(request)
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                return await self._generate(
+                    prompt,
+                    request.analysis_run_id,
+                    request.project_id,
+                )
+            except AppError as exc:
+                if exc.code not in _RETRYABLE_CODES or attempt >= self._max_attempts:
+                    raise
+                logger.warning(
+                    "Retrying Gemini request: attempt=%d next_attempt=%d code=%s",
+                    attempt,
+                    attempt + 1,
+                    exc.code,
+                )
+        raise RuntimeError("unreachable")
 
     async def _generate(
         self,
@@ -77,6 +94,16 @@ class GeminiLLMProvider:
                 status_code,
                 provider_message,
             )
+            if (
+                isinstance(status_code, int)
+                and 400 <= status_code < 500
+                and status_code not in _RETRYABLE_HTTP_STATUSES
+            ):
+                raise AppError(
+                    code="LLM_REQUEST_ERROR",
+                    message="LLM 요청 설정 또는 인증을 확인해야 합니다.",
+                    status_code=502,
+                ) from exc
             raise AppError(
                 code="LLM_PROVIDER_ERROR",
                 message="LLM 공급자 호출에 실패했습니다.",
