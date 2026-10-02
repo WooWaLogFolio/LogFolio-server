@@ -72,6 +72,16 @@ class GeminiLLMProvider:
                 return result
             except AppError as exc:
                 if exc.code not in _RETRYABLE_CODES or attempt >= self._max_attempts:
+                    self._last_call_metrics.set(LLMCallMetrics(
+                        provider="gemini",
+                        model=self._model,
+                        latency_ms=max(
+                            0, round((time.perf_counter() - started) * 1000)
+                        ),
+                        retry_count=attempt - 1,
+                        success=False,
+                        error_type=exc.code,
+                    ))
                     raise
                 logger.warning(
                     "Retrying Gemini request: attempt=%d next_attempt=%d code=%s",
@@ -157,6 +167,7 @@ class GeminiLLMProvider:
                 "project_id": project_id,
                 "input_source_ids": [],
                 "referenced_source_ids": [],
+                "ai_usage": None,
             }
         )
         return normalized, getattr(response, "usage_metadata", None)

@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from logfolio_ai.core.errors import AppError
+from logfolio_ai.core.usage import UsageCostCalculator, UsagePricing
 from logfolio_ai.llm import GroundedAnalysisInput, GroundedChunk, LLMProvider
 from logfolio_ai.models import AnalysisRequest, AnalysisResponse
 from logfolio_ai.policy import AIPolicyValidator
@@ -26,11 +27,15 @@ class AnalysisOrchestrator:
         *,
         max_grounded_chunks: int = 15,
         policy_validator: Optional[AIPolicyValidator] = None,
+        usage_cost_calculator: Optional[UsageCostCalculator] = None,
     ) -> None:
         self._rag_service = rag_service
         self._llm_provider = llm_provider
         self._max_grounded_chunks = max_grounded_chunks
         self._policy_validator = policy_validator or AIPolicyValidator()
+        self._usage_cost_calculator = usage_cost_calculator or UsageCostCalculator(
+            UsagePricing()
+        )
 
     def _build_grounded_chunks(
         self,
@@ -376,7 +381,13 @@ class AnalysisOrchestrator:
             retrieved_at - indexed_at,
             len(grounded_chunks),
         )
-        response = await self._llm_provider.analyze_grounded(grounded_input)
+        try:
+            response = await self._llm_provider.analyze_grounded(grounded_input)
+        except AppError as exc:
+            metrics = getattr(self._llm_provider, "last_call_metrics", None)
+            if metrics is not None:
+                exc.ai_usage = self._usage_cost_calculator.build_record(metrics)
+            raise
         generated_at = time.perf_counter()
         self._validate_conflict_references(response, request)
         existing_ids = {
@@ -409,6 +420,12 @@ class AnalysisOrchestrator:
             grounded_response,
             user_answers=request.answers,
         )
+        metrics = getattr(self._llm_provider, "last_call_metrics", None)
+        ai_usage = (
+            self._usage_cost_calculator.build_record(metrics)
+            if metrics is not None
+            else None
+        )
         completed_at = time.perf_counter()
         logger.info(
             "Analysis stages completed: index=%.3fs retrieve=%.3fs "
@@ -424,5 +441,6 @@ class AnalysisOrchestrator:
             update={
                 "input_source_ids": source_ids,
                 "referenced_source_ids": referenced_source_ids,
+                "ai_usage": ai_usage,
             }
         )

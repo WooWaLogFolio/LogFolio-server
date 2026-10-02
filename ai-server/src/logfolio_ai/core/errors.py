@@ -7,6 +7,7 @@ from pydantic import Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from logfolio_ai.models.base import ContractModel
+from logfolio_ai.models.usage import AIUsageRecord
 
 
 class ErrorItem(ContractModel):
@@ -19,6 +20,7 @@ class ErrorResponse(ContractModel):
     code: str
     message: str
     details: List[ErrorItem] = Field(default_factory=list)
+    ai_usage: Optional[AIUsageRecord] = None
 
 
 class AppError(Exception):
@@ -28,12 +30,21 @@ class AppError(Exception):
         message: str,
         status_code: int = 400,
         details: Optional[List[ErrorItem]] = None,
+        ai_usage: Optional[AIUsageRecord] = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = status_code
         self.details = details or []
+        self.ai_usage = ai_usage
+
+
+def _response_content(payload: ErrorResponse) -> Dict[str, Any]:
+    content = payload.model_dump(mode="json", by_alias=True)
+    if payload.ai_usage is None:
+        content.pop("aiUsage", None)
+    return content
 
 
 def _field_path(location: Any) -> Optional[str]:
@@ -64,7 +75,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(
             status_code=422,
-            content=payload.model_dump(mode="json", by_alias=True),
+            content=_response_content(payload),
         )
 
     @app.exception_handler(AppError)
@@ -74,10 +85,11 @@ def register_exception_handlers(app: FastAPI) -> None:
             code=exc.code,
             message=exc.message,
             details=exc.details,
+            ai_usage=exc.ai_usage,
         )
         return JSONResponse(
             status_code=exc.status_code,
-            content=payload.model_dump(mode="json", by_alias=True),
+            content=_response_content(payload),
         )
 
     @app.exception_handler(StarletteHTTPException)
@@ -94,7 +106,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         payload = ErrorResponse(code=code, message=message)
         return JSONResponse(
             status_code=exc.status_code,
-            content=payload.model_dump(mode="json", by_alias=True),
+            content=_response_content(payload),
         )
 
     @app.exception_handler(Exception)
@@ -108,5 +120,5 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(
             status_code=500,
-            content=payload.model_dump(mode="json", by_alias=True),
+            content=_response_content(payload),
         )

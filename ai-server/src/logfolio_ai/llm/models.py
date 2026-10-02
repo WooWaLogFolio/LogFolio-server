@@ -6,6 +6,7 @@ from pydantic import Field
 from logfolio_ai.models.base import ContractModel
 from logfolio_ai.models.analysis import ExistingExperience, UserAnswer, UserCorrection
 from logfolio_ai.models.enums import SourceType
+from logfolio_ai.models.usage import LLMCallMetrics
 from logfolio_ai.rag.models import AnalysisPurpose
 
 
@@ -33,14 +34,3 @@ class GroundedAnalysisInput(ContractModel):
     )
     corrections: List[UserCorrection] = Field(default_factory=list, max_length=100)
     answers: List[UserAnswer] = Field(default_factory=list, max_length=100)
-
-
-class LLMCallMetrics(ContractModel):
-    provider: str
-    model: str
-    input_tokens: Optional[int] = Field(default=None, ge=0)
-    cached_input_tokens: Optional[int] = Field(default=None, ge=0)
-    output_tokens: Optional[int] = Field(default=None, ge=0)
-    reasoning_tokens: Optional[int] = Field(default=None, ge=0)
-    latency_ms: int = Field(ge=0)
-    retry_count: int = Field(default=0, ge=0)

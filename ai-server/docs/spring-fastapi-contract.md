@@ -251,13 +251,65 @@ Spring 재호출 규칙:
   "informationNeed": "USER_ANSWER",
   "informationNeedReason": null,
   "resultTypes": ["EXISTING_UPDATE", "NEEDS_CONTEXT"],
-  "noUpdateReason": null
+  "noUpdateReason": null,
+  "aiUsage": {
+    "provider": "gemini",
+    "model": "configured-model-name",
+    "inputTokens": 8500,
+    "cachedInputTokens": 0,
+    "outputTokens": 1100,
+    "reasoningTokens": null,
+    "latencyMs": 7200,
+    "retryCount": 0,
+    "success": true,
+    "errorType": null,
+    "taskType": "PROJECT_ANALYSIS",
+    "estimatedCostUsd": 0.008,
+    "estimatedCostKrw": 11.2,
+    "pricingVersion": "provider-price-YYYY-MM-DD"
+  }
 }
 ```
 
 - `resultType`: `EXISTING_UPDATE` 또는 `NEW_EXPERIENCE`
 - `inputSourceIds`: Spring이 이번 분석 대상으로 보낸 새 Source 스냅샷
 - `referencedSourceIds`: RAG가 관련 기존 Experience Evidence에서 실제로 추가 조회한 누적 Source 스냅샷
+- `aiUsage`: 실제 LLM 호출이 있었을 때 FastAPI가 생성한 사용량·비용 기록. LLM이 생성한 값은 신뢰하지 않고 덮어씀
+- Provider가 특정 Token 종류를 제공하지 않으면 해당 값은 `null`
+- 가격 설정이 완전하지 않으면 Token·Latency·Retry는 반환하고 `estimatedCostUsd/Krw`만 `null`
+- LLM 호출 전에 Source 경고 또는 Retrieval 0건으로 종료되면 `aiUsage`는 `null`
+
+### Spring 비용 저장 요구사항
+
+Spring은 응답의 `aiUsage`를 `analysisRunId`, `projectId`, 인증된 `userId`와 연결해 저장합니다. FastAPI 요청에는 사용자 식별자를 보내지 않으므로 사용자별 월 비용 집계의 책임은 Spring에 있습니다.
+
+권장 저장 필드:
+
+```text
+analysis_run_id
+user_id
+project_id
+provider
+model
+task_type
+input_tokens
+cached_input_tokens
+output_tokens
+reasoning_tokens
+latency_ms
+retry_count
+estimated_cost_usd
+estimated_cost_krw
+pricing_version
+created_at
+```
+
+- 같은 `analysisRunId` 재시도 응답을 중복 합산하지 않도록 Unique 또는 Upsert 정책 필요
+- Review 승인 후 `created/updated/accepted/rejected Experience count`를 같은 Analysis Run에 연결
+- 그래야 사용자 월 비용과 `Cost per Accepted Experience`를 계산할 수 있음
+- 실제 저장 테이블 또는 `analysis_runs` 컬럼 확장은 Spring ERD 담당자가 결정
+
+LLM Provider 실패 응답에도 호출이 시작된 경우 `aiUsage`가 포함될 수 있습니다. 이때 `success=false`, `errorType`, `retryCount`, `latencyMs`를 저장하고 Provider가 Token을 제공하지 않으면 Token과 비용은 `null`로 유지합니다. 인증·요청 검증 실패나 LLM 호출 전 실패에는 `aiUsage`가 없습니다.
 - 두 목록은 LLM 출력이 아니라 FastAPI가 실제 요청·검색 결과로 확정
 - 질문이 있으면 `informationNeed=USER_ANSWER`, `resultTypes`에 `NEEDS_CONTEXT` 포함
 - 후보·질문이 없더라도 `informationNeed=ADDITIONAL_SOURCE`이면 자료 보완이 필요한 상태이며 `NO_UPDATE`가 아님
