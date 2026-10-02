@@ -14,8 +14,16 @@ class VectorStore(Protocol):
         embeddings: Sequence[Sequence[float]],
         *,
         embedding_model: str,
+        content_hash: Optional[str] = None,
     ) -> None:
         """Atomically replace all stored chunks for one project file."""
+
+    async def find_source_by_content_hash(
+        self,
+        project_id: UUID,
+        content_hash: str,
+    ) -> Optional[UUID]:
+        """Return an already indexed Source with identical content in this project."""
 
     async def search(
         self,

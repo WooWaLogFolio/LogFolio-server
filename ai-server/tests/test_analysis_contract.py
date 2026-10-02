@@ -64,6 +64,25 @@ def test_request_accepts_at_most_three_documents() -> None:
         )
 
 
+def test_source_content_hash_must_be_lowercase_sha256() -> None:
+    with pytest.raises(ValidationError):
+        DocumentSource(
+            source_id=uuid4(),
+            source_name="project.pdf",
+            content_hash="NOT-A-SHA256",
+            pages=[DocumentPage(text="프로젝트 자료")],
+        )
+
+    source = DocumentSource(
+        source_id=uuid4(),
+        source_name="project.pdf",
+        content_hash="a" * 64,
+        pages=[DocumentPage(text="프로젝트 자료")],
+    )
+
+    assert source.content_hash == "a" * 64
+
+
 def test_response_accepts_at_most_three_candidates_and_two_questions() -> None:
     candidates = [
         ExperienceCandidate(

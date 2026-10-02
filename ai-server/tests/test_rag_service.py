@@ -44,6 +44,7 @@ class RecordingVectorStore:
         self.chunks: List[DocumentChunk] = []
         self.get_chunk_calls: List[dict] = []
         self.get_source_chunk_calls: List[dict] = []
+        self.content_hash_sources = {}
 
     async def replace_source_chunks(
         self,
@@ -53,6 +54,7 @@ class RecordingVectorStore:
         embeddings: Sequence[Sequence[float]],
         *,
         embedding_model: str,
+        content_hash: Optional[str] = None,
     ) -> None:
         self.replace_calls.append(
             {
@@ -61,8 +63,18 @@ class RecordingVectorStore:
                 "chunks": list(chunks),
                 "embeddings": list(embeddings),
                 "embedding_model": embedding_model,
+                "content_hash": content_hash,
             }
         )
+        if content_hash is not None:
+            self.content_hash_sources[(project_id, content_hash)] = source_id
+
+    async def find_source_by_content_hash(
+        self,
+        project_id: UUID,
+        content_hash: str,
+    ) -> Optional[UUID]:
+        return self.content_hash_sources.get((project_id, content_hash))
 
     async def search(
         self,
@@ -149,6 +161,59 @@ async def test_index_connects_chunking_embedding_and_atomic_source_replace() -> 
     assert store.replace_calls[0]["project_id"] == project_id
     assert store.replace_calls[0]["source_id"] == document.source_id
     assert store.replace_calls[0]["embedding_model"] == "test-e5"
+    assert len(store.replace_calls[0]["content_hash"]) == 64
+
+
+@pytest.mark.asyncio
+async def test_exact_duplicate_source_skips_chunking_and_embedding() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    service = rag_service(embedding, store)
+    project_id = uuid4()
+    original = source("완전히 같은 자료")
+    duplicate = source("완전히 같은 자료")
+
+    first = await service.index_sources(project_id, [original])
+    second = await service.index_sources(project_id, [duplicate])
+
+    assert first.indexed_count == 1
+    assert second.duplicate_count == 1
+    assert second.items[0].status == "DUPLICATE"
+    assert second.items[0].duplicate_of_source_id == original.source_id
+    assert len(embedding.document_calls) == 1
+    assert len(store.replace_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_same_content_in_different_projects_is_not_duplicate() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    service = rag_service(embedding, store)
+    first = source("같은 텍스트")
+    second = source("같은 텍스트")
+
+    await service.index_sources(uuid4(), [first])
+    result = await service.index_sources(uuid4(), [second])
+
+    assert result.indexed_count == 1
+    assert result.duplicate_count == 0
+    assert len(embedding.document_calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_same_source_id_can_be_reindexed() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    service = rag_service(embedding, store)
+    project_id = uuid4()
+    document = source("같은 Source 갱신")
+
+    await service.index_sources(project_id, [document])
+    result = await service.index_sources(project_id, [document])
+
+    assert result.indexed_count == 1
+    assert result.duplicate_count == 0
+    assert len(store.replace_calls) == 2
 
 
 @pytest.mark.asyncio

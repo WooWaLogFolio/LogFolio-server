@@ -79,6 +79,8 @@ FastAPI는 긴 문서를 섹션, 문단, 문장 경계를 고려해 작은 Chunk
 
 초기 구현은 페이지 경계를 넘어서 Chunk를 합치지 않으며, 기본 크기 700단위와 Overlap 100단위로 시작합니다. 현재 단위 계산은 모델별 토크나이저가 아닌 가벼운 결정적 추정 방식이므로 실제 검색 품질 평가에 따라 조정합니다. 같은 Source ID·Type과 같은 원문에는 동일한 Chunk ID를 생성하여 재시도 시 중복을 줄입니다.
 
+완전히 동일한 Source의 재업로드는 `contentHash`(SHA-256)로 판별합니다. 같은 프로젝트에 이미 동일 해시가 있으면 다시 Chunking·Embedding하지 않고 `DUPLICATE`와 기존 Source ID를 반환합니다. 비슷한 문서나 수정본을 자동 병합하는 기능은 MVP 범위가 아닙니다.
+
 ### 3. Create embeddings
 
 각 Chunk는 로컬 Embedding 모델을 통해 의미를 나타내는 벡터로 변환됩니다. 초기 후보 모델은 한국어를 포함한 다국어 검색을 지원하는 `intfloat/multilingual-e5-base`입니다.
@@ -336,7 +338,7 @@ LOGFOLIO_AI_MAX_RELATED_EXPERIENCES=3
 
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.
 
-Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`부터 순서대로 적용합니다. `003_support_unified_sources.sql`은 파일 전용 컬럼을 통합 Source 컬럼으로 바꾸고 Quick Log를 지원합니다. SQL은 pgvector 확장을 활성화하므로 개발·운영 DB에 적용하기 전에 Spring 담당자와 실행 주체 및 백업 정책을 확인해야 합니다. 저장소에 추가된 것만으로 실제 DB에는 자동 적용되지 않습니다.
+Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`부터 순서대로 적용합니다. `003_support_unified_sources.sql`은 파일 전용 컬럼을 통합 Source 컬럼으로 바꾸고 Quick Log를 지원하며, `004_add_source_content_hash.sql`은 정확한 Source 중복 판별용 SHA-256을 저장합니다. SQL은 pgvector 확장을 활성화하므로 개발·운영 DB에 적용하기 전에 Spring 담당자와 실행 주체 및 백업 정책을 확인해야 합니다. 저장소에 추가된 것만으로 실제 DB에는 자동 적용되지 않습니다.
 
 ## Docker integration environment
 
