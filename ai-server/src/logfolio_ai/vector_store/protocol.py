@@ -1,4 +1,4 @@
-from typing import List, Protocol, Sequence
+from typing import List, Optional, Protocol, Sequence
 from uuid import UUID
 
 from logfolio_ai.chunking import DocumentChunk
@@ -9,7 +9,7 @@ class VectorStore(Protocol):
     async def replace_source_chunks(
         self,
         project_id: UUID,
-        project_file_id: UUID,
+        source_id: UUID,
         chunks: Sequence[DocumentChunk],
         embeddings: Sequence[Sequence[float]],
         *,
@@ -23,5 +23,6 @@ class VectorStore(Protocol):
         query_embedding: Sequence[float],
         *,
         top_k: int = 5,
+        source_ids: Optional[Sequence[UUID]] = None,
     ) -> List[VectorSearchResult]:
         """Search only within one authorized project."""

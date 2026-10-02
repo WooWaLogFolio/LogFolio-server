@@ -1,6 +1,6 @@
 import asyncio
 import math
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 from uuid import UUID
 
 from logfolio_ai.chunking import DocumentChunk
@@ -19,7 +19,7 @@ class MemoryVectorStore:
     async def replace_source_chunks(
         self,
         project_id: UUID,
-        project_file_id: UUID,
+        source_id: UUID,
         chunks: Sequence[DocumentChunk],
         embeddings: Sequence[Sequence[float]],
         *,
@@ -28,14 +28,14 @@ class MemoryVectorStore:
         del embedding_model
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
-        if any(chunk.project_file_id != project_file_id for chunk in chunks):
-            raise ValueError("every chunk must belong to project_file_id")
+        if any(chunk.source_id != source_id for chunk in chunks):
+            raise ValueError("every chunk must belong to source_id")
         values = [
             (chunk, [float(value) for value in embedding])
             for chunk, embedding in zip(chunks, embeddings)
         ]
         async with self._lock:
-            self._sources[(project_id, project_file_id)] = values
+            self._sources[(project_id, source_id)] = values
 
     @staticmethod
     def _cosine_distance(left: Sequence[float], right: Sequence[float]) -> float:
@@ -56,14 +56,20 @@ class MemoryVectorStore:
         query_embedding: Sequence[float],
         *,
         top_k: int = 5,
+        source_ids: Optional[Sequence[UUID]] = None,
     ) -> List[VectorSearchResult]:
         if top_k < 1 or top_k > 20:
             raise ValueError("top_k must be between 1 and 20")
         async with self._lock:
+            allowed_source_ids = set(source_ids) if source_ids else None
             project_rows = [
                 item
-                for (stored_project_id, _), items in self._sources.items()
+                for (stored_project_id, stored_source_id), items in self._sources.items()
                 if stored_project_id == project_id
+                and (
+                    allowed_source_ids is None
+                    or stored_source_id in allowed_source_ids
+                )
                 for item in items
             ]
         ranked = sorted(
@@ -76,8 +82,9 @@ class MemoryVectorStore:
         return [
             VectorSearchResult(
                 chunk_id=chunk.chunk_id,
-                project_file_id=chunk.project_file_id,
-                original_name=chunk.original_name,
+                source_id=chunk.source_id,
+                source_type=chunk.source_type,
+                source_name=chunk.source_name,
                 sequence=chunk.sequence,
                 page_number=chunk.page_number,
                 section_title=chunk.section_title,
@@ -89,9 +96,9 @@ class MemoryVectorStore:
             for distance, chunk in ranked
         ]
 
-    async def delete_source(self, project_id: UUID, project_file_id: UUID) -> None:
+    async def delete_source(self, project_id: UUID, source_id: UUID) -> None:
         async with self._lock:
-            self._sources.pop((project_id, project_file_id), None)
+            self._sources.pop((project_id, source_id), None)
 
     async def delete_project(self, project_id: UUID) -> None:
         async with self._lock:

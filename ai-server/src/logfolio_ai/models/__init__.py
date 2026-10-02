@@ -7,18 +7,27 @@ from logfolio_ai.models.analysis import (
     Evidence,
     ExperienceCandidate,
     GapQuestion,
+    ExistingClaim,
+    ExistingExperience,
+    SourceIndexItem,
+    SourceIndexRequest,
+    SourceIndexResponse,
+    UserCorrection,
 )
 from logfolio_ai.models.enums import (
+    AnalysisResultType,
     EvidenceType,
     PolicyViolationType,
     ProvenanceType,
     SubjectType,
+    SourceType,
     VerificationStatus,
 )
 
 __all__ = [
     "AnalysisRequest",
     "AnalysisResponse",
+    "AnalysisResultType",
     "Claim",
     "DocumentPage",
     "DocumentSource",
@@ -26,8 +35,15 @@ __all__ = [
     "EvidenceType",
     "ExperienceCandidate",
     "GapQuestion",
+    "ExistingClaim",
+    "ExistingExperience",
     "PolicyViolationType",
     "ProvenanceType",
     "SubjectType",
+    "SourceType",
+    "SourceIndexItem",
+    "SourceIndexRequest",
+    "SourceIndexResponse",
+    "UserCorrection",
     "VerificationStatus",
 ]

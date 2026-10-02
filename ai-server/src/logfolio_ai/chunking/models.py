@@ -4,12 +4,14 @@ from uuid import UUID
 from pydantic import Field
 
 from logfolio_ai.models.base import ContractModel
+from logfolio_ai.models.enums import SourceType
 
 
 class DocumentChunk(ContractModel):
     chunk_id: UUID
-    project_file_id: UUID
-    original_name: str
+    source_id: UUID
+    source_type: SourceType = SourceType.PROJECT_FILE
+    source_name: str
     sequence: int = Field(ge=0)
     page_number: Optional[int] = Field(default=None, ge=1)
     section_title: Optional[str] = None

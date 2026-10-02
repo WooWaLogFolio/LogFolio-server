@@ -9,8 +9,8 @@ from logfolio_ai.vector_store import MemoryVectorStore
 def chunk(text: str) -> DocumentChunk:
     return DocumentChunk(
         chunk_id=uuid4(),
-        project_file_id=uuid4(),
-        original_name="project.pdf",
+        source_id=uuid4(),
+        source_name="project.pdf",
         sequence=0,
         page_number=1,
         char_start=0,
@@ -30,14 +30,14 @@ async def test_memory_search_isolated_by_project() -> None:
 
     await store.replace_source_chunks(
         first_project,
-        first.project_file_id,
+        first.source_id,
         [first],
         [[1.0, 0.0]],
         embedding_model="fake",
     )
     await store.replace_source_chunks(
         second_project,
-        second.project_file_id,
+        second.source_id,
         [second],
         [[1.0, 0.0]],
         embedding_model="fake",
@@ -57,14 +57,14 @@ async def test_memory_store_ranks_by_cosine_distance() -> None:
 
     await store.replace_source_chunks(
         project_id,
-        close.project_file_id,
+        close.source_id,
         [close],
         [[1.0, 0.0]],
         embedding_model="fake",
     )
     await store.replace_source_chunks(
         project_id,
-        far.project_file_id,
+        far.source_id,
         [far],
         [[0.0, 1.0]],
         embedding_model="fake",

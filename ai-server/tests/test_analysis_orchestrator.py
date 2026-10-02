@@ -41,7 +41,7 @@ class RecordingRagService:
         )
 
     async def retrieve_analysis_context(
-        self, project_id: UUID
+        self, project_id: UUID, *, source_ids: Optional[List[UUID]] = None
     ) -> List[RetrievalContext]:
         assert project_id == self.indexed_project_id
         return self.contexts
@@ -68,8 +68,8 @@ def request() -> AnalysisRequest:
         project_id=uuid4(),
         documents=[
             DocumentSource(
-                project_file_id=uuid4(),
-                original_name="project.pdf",
+                source_id=uuid4(),
+                source_name="project.pdf",
                 pages=[
                     DocumentPage(
                         page_number=1,
@@ -84,8 +84,8 @@ def request() -> AnalysisRequest:
 def search_result(*, distance: float = 0.2) -> VectorSearchResult:
     return VectorSearchResult(
         chunk_id=uuid4(),
-        project_file_id=uuid4(),
-        original_name="project.pdf",
+        source_id=uuid4(),
+        source_name="project.pdf",
         sequence=0,
         page_number=1,
         char_start=0,
@@ -162,7 +162,7 @@ async def test_orchestrator_accepts_exact_excerpt_from_retrieved_chunk() -> None
                         evidence_type=EvidenceType.DIRECT,
                         evidences=[
                             Evidence(
-                                project_file_id=result.project_file_id,
+                                source_id=result.source_id,
                                 chunk_id=result.chunk_id,
                                 page_number=1,
                                 excerpt="JWT 인증 API를 구현했다.",
@@ -212,7 +212,7 @@ async def test_orchestrator_rejects_evidence_not_in_retrieved_chunks() -> None:
                         evidence_type=EvidenceType.DIRECT,
                         evidences=[
                             Evidence(
-                                project_file_id=uuid4(),
+                                source_id=uuid4(),
                                 chunk_id=uuid4(),
                                 excerpt="존재하지 않는 인용문",
                             )

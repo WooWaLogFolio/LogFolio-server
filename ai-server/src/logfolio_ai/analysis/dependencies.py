@@ -14,7 +14,7 @@ def _memory_vector_store() -> MemoryVectorStore:
     return MemoryVectorStore()
 
 
-async def get_analysis_orchestrator() -> AsyncIterator[AnalysisOrchestrator]:
+async def get_rag_service() -> AsyncIterator[RagService]:
     settings = get_settings()
     vector_store: VectorStore
     pg_store = None
@@ -33,7 +33,7 @@ async def get_analysis_orchestrator() -> AsyncIterator[AnalysisOrchestrator]:
         )
         vector_store = pg_store
 
-    rag_service = RagService(
+    service = RagService(
         get_embedding_provider(),
         vector_store,
         embedding_model=settings.embedding_model,
@@ -42,11 +42,17 @@ async def get_analysis_orchestrator() -> AsyncIterator[AnalysisOrchestrator]:
         top_k=settings.retrieval_top_k,
     )
     try:
+        yield service
+    finally:
+        if pg_store is not None:
+            await pg_store.close()
+
+
+async def get_analysis_orchestrator() -> AsyncIterator[AnalysisOrchestrator]:
+    settings = get_settings()
+    async for rag_service in get_rag_service():
         yield AnalysisOrchestrator(
             rag_service,
             get_llm_provider(),
             max_grounded_chunks=settings.max_grounded_chunks,
         )
-    finally:
-        if pg_store is not None:
-            await pg_store.close()

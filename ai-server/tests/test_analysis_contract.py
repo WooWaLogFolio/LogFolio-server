@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from logfolio_ai.models import (
+    AnalysisResultType,
     AnalysisRequest,
     AnalysisResponse,
     Claim,
@@ -12,24 +13,26 @@ from logfolio_ai.models import (
     Evidence,
     EvidenceType,
     ExperienceCandidate,
+    ExistingExperience,
     GapQuestion,
     ProvenanceType,
     SubjectType,
+    SourceType,
     VerificationStatus,
 )
 
 
 def make_document() -> DocumentSource:
     return DocumentSource(
-        project_file_id=uuid4(),
-        original_name="project.pdf",
+        source_id=uuid4(),
+        source_name="project.pdf",
         pages=[DocumentPage(page_number=1, text="JWT 인증 API를 구현했다.")],
     )
 
 
 def make_evidence() -> Evidence:
     return Evidence(
-        project_file_id=uuid4(),
+        source_id=uuid4(),
         chunk_id=uuid4(),
         page_number=1,
         excerpt="박수빈은 JWT 인증 API 구현을 담당했다.",
@@ -156,7 +159,7 @@ def test_contract_serializes_with_camel_case_keys() -> None:
 
     assert "analysisRunId" in payload
     assert "projectId" in payload
-    assert "projectFileId" in payload["documents"][0]
+    assert "sourceId" in payload["documents"][0]
     assert "pageNumber" in payload["documents"][0]["pages"][0]
 
 
@@ -168,11 +171,76 @@ def test_contract_rejects_unknown_fields() -> None:
                 "projectId": str(uuid4()),
                 "documents": [
                     {
-                        "projectFileId": str(uuid4()),
-                        "originalName": "project.pdf",
+                        "sourceId": str(uuid4()),
+                        "sourceName": "project.pdf",
                         "pages": [{"text": "프로젝트 자료"}],
                     }
                 ],
                 "unexpectedField": True,
             }
         )
+
+
+def test_request_accepts_preindexed_sources_and_existing_experiences() -> None:
+    source_id = uuid4()
+    experience_id = uuid4()
+
+    request = AnalysisRequest(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        source_ids=[source_id],
+        existing_experiences=[
+            ExistingExperience(
+                experience_id=experience_id,
+                title="인증 개선",
+                summary="JWT 인증을 개선한 경험",
+            )
+        ],
+    )
+
+    assert request.source_ids == [source_id]
+    assert request.existing_experiences[0].experience_id == experience_id
+
+
+def test_request_rejects_mixed_inline_and_preindexed_sources() -> None:
+    with pytest.raises(ValidationError, match="cannot be used together"):
+        AnalysisRequest(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            source_ids=[uuid4()],
+            documents=[make_document()],
+        )
+
+
+def test_existing_update_requires_target_experience() -> None:
+    with pytest.raises(ValidationError, match="requires targetExperienceId"):
+        ExperienceCandidate(
+            candidate_id=uuid4(),
+            result_type=AnalysisResultType.EXISTING_UPDATE,
+            title="기존 경험 보강",
+            summary="새 근거를 추가합니다.",
+        )
+
+
+def test_empty_analysis_is_classified_as_no_update() -> None:
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="반영할 내용이 없습니다.",
+        candidates=[],
+        questions=[],
+        no_update_reason="새롭게 구조화할 정보가 없습니다.",
+    )
+
+    assert response.result_types == [AnalysisResultType.NO_UPDATE]
+
+
+def test_quick_log_is_a_supported_source_type() -> None:
+    source = DocumentSource(
+        source_id=uuid4(),
+        source_type=SourceType.QUICK_LOG,
+        source_name="30초 기록",
+        pages=[DocumentPage(text="사용자 테스트 결과를 보고 기능을 수정했다.")],
+    )
+
+    assert source.source_type == SourceType.QUICK_LOG

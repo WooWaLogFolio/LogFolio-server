@@ -20,8 +20,8 @@ def call_analysis() -> tuple[dict, float]:
         "projectId": PROJECT_ID,
         "documents": [
             {
-                "projectFileId": SOURCE_ID,
-                "originalName": "e5-rag-smoke.txt",
+                "sourceId": SOURCE_ID,
+                "sourceName": "e5-rag-smoke.txt",
                 "mimeType": "text/plain",
                 "pages": [
                     {
@@ -73,7 +73,7 @@ async def verify_pgvector() -> dict:
                 MAX(vector_dims(embedding)) AS max_dimension,
                 ARRAY_AGG(DISTINCT embedding_model) AS models
             FROM ai_document_chunks
-            WHERE project_id = $1::uuid AND project_file_id = $2::uuid
+            WHERE project_id = $1::uuid AND source_id = $2::uuid
             """,
             PROJECT_ID,
             SOURCE_ID,
@@ -82,7 +82,7 @@ async def verify_pgvector() -> dict:
             """
             SELECT COUNT(*)
             FROM ai_document_chunks
-            WHERE project_id = $1::uuid AND project_file_id = $2::uuid
+            WHERE project_id = $1::uuid AND source_id = $2::uuid
             """,
             "50000000-0000-0000-0000-000000000099",
             SOURCE_ID,
