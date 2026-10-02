@@ -20,6 +20,7 @@ class GroundedChunk(ContractModel):
     distance: float = Field(ge=0)
     purposes: List[AnalysisPurpose] = Field(default_factory=list)
     related_experience_ids: List[UUID] = Field(default_factory=list)
+    retrieval_fallback: bool = False
 
 
 class GroundedAnalysisInput(ContractModel):

@@ -107,6 +107,8 @@ AI 전용 원문 조각과 벡터는 `ai_document_chunks` 테이블에서 관리
 
 MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터가 충분히 쌓여 검색 속도와 재현율을 측정한 뒤 추가합니다.
 
+의미 검색 결과가 0건이면 기존 Experience를 추측으로 연결하지 않습니다. 대신 이번 Analysis Run의 `sourceIds`에 해당하는 새 Source Chunk 원문만 다시 불러와 신규 경험 가능성을 분석합니다. 해당 Chunk도 존재하지 않으면 LLM을 호출하지 않고 `NO_UPDATE`와 인덱싱 필요 사유를 반환합니다.
+
 ### 5. Generate a structured draft
 
 검색된 Chunk만 외부 LLM에 근거로 전달합니다. LLM은 자유 형식의 글이 아니라 약속된 JSON 구조로 다음 결과를 생성합니다.

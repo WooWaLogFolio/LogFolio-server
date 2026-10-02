@@ -2,7 +2,7 @@ import asyncio
 from typing import Dict, Iterable, List, Optional, Sequence
 from uuid import UUID
 
-from logfolio_ai.chunking import chunk_documents
+from logfolio_ai.chunking import DocumentChunk, chunk_documents
 from logfolio_ai.core.errors import AppError
 from logfolio_ai.embedding import EmbeddingProvider
 from logfolio_ai.models import (
@@ -252,3 +252,16 @@ class RagService:
                     )
                 )
         return contexts
+
+    async def retrieve_source_chunks(
+        self,
+        project_id: UUID,
+        source_ids: Sequence[UUID],
+        *,
+        limit: int,
+    ) -> List[DocumentChunk]:
+        return await self._vector_store.get_source_chunks(
+            project_id,
+            source_ids,
+            limit=limit,
+        )

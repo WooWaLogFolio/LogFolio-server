@@ -119,6 +119,26 @@ class MemoryVectorStore:
         chunks.sort(key=lambda chunk: str(chunk.chunk_id))
         return chunks
 
+    async def get_source_chunks(
+        self,
+        project_id: UUID,
+        source_ids: Sequence[UUID],
+        *,
+        limit: int,
+    ) -> List[DocumentChunk]:
+        requested = set(source_ids)
+        if not requested or limit < 1:
+            return []
+        async with self._lock:
+            chunks = [
+                chunk
+                for (stored_project_id, stored_source_id), items in self._sources.items()
+                if stored_project_id == project_id and stored_source_id in requested
+                for chunk, _ in items
+            ]
+        chunks.sort(key=lambda chunk: (str(chunk.source_id), chunk.sequence))
+        return chunks[:limit]
+
     async def delete_project(self, project_id: UUID) -> None:
         async with self._lock:
             keys = [key for key in self._sources if key[0] == project_id]
