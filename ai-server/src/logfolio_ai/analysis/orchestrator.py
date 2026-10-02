@@ -307,6 +307,7 @@ class AnalysisOrchestrator:
                 return AnalysisResponse(
                     analysis_run_id=request.analysis_run_id,
                     project_id=request.project_id,
+                    analyzed_source_ids=source_ids,
                     summary="현재 프로젝트와 관련성이 낮아 보이는 Source가 있습니다.",
                     candidates=[],
                     questions=[],
@@ -334,6 +335,7 @@ class AnalysisOrchestrator:
                 return AnalysisResponse(
                     analysis_run_id=request.analysis_run_id,
                     project_id=request.project_id,
+                    analyzed_source_ids=source_ids,
                     summary="검색 가능한 새 Source 근거가 없습니다.",
                     candidates=[],
                     questions=[],
@@ -404,4 +406,4 @@ class AnalysisOrchestrator:
             completed_at - started_at,
             len(grounded_chunks),
         )
-        return validated
+        return validated.model_copy(update={"analyzed_source_ids": source_ids})

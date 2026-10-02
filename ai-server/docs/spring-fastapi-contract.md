@@ -189,6 +189,10 @@ Spring 재호출 규칙:
 {
   "analysisRunId": "10000000-0000-0000-0000-000000000001",
   "projectId": "20000000-0000-0000-0000-000000000001",
+  "analyzedSourceIds": [
+    "30000000-0000-0000-0000-000000000001",
+    "30000000-0000-0000-0000-000000000002"
+  ],
   "summary": "프로젝트 자료를 분석한 AI 초안입니다.",
   "candidates": [
     {
@@ -219,6 +223,7 @@ Spring 재호출 규칙:
 ```
 
 - `resultType`: `EXISTING_UPDATE` 또는 `NEW_EXPERIENCE`
+- `analyzedSourceIds`: 이번 `analysisRunId`가 사용한 Source 스냅샷. LLM이 아닌 FastAPI가 요청값으로 확정
 - 질문이 있으면 `informationNeed=USER_ANSWER`, `resultTypes`에 `NEEDS_CONTEXT` 포함
 - 후보·질문이 없더라도 `informationNeed=ADDITIONAL_SOURCE`이면 자료 보완이 필요한 상태이며 `NO_UPDATE`가 아님
 - `informationNeed`도 없고 후보·질문·경고가 모두 없을 때만 `NO_UPDATE`
@@ -299,6 +304,18 @@ Spring 재호출 규칙:
 ```
 
 이 경우 Spring은 기존 Source를 `INDEXED`로 유지하고 별도의 보류 상태로 바꾸지 않습니다. 새 Quick Log 또는 Project File이 추가되면 다음 Analysis Run에서 기존 Source와 함께 다시 사용합니다.
+
+### Review 진행 중 새 Source 추가
+
+- Spring은 `analysisRunId + analyzedSourceIds`를 Analysis Run 입력 스냅샷으로 저장
+- Review Item은 이 Analysis Run 결과에만 연결
+- Review가 진행되는 중 새 Source가 저장되면 정상적으로 전처리하여 `INDEXED`로 유지
+- 새 Source를 진행 중인 Review 또는 기존 `analyzedSourceIds`에 추가하지 않음
+- 사용자가 현재 Review를 이어갈 때는 기존 Candidate·Question을 그대로 제공
+- 새 Source는 다음 사용자 실행에서 새로운 `analysisRunId`와 함께 전달
+- 동일 Analysis Run의 재시도라면 최초 Source 목록을 유지하여 결과 기준이 바뀌지 않게 함
+
+FastAPI는 응답에 실제 요청 Source 목록을 다시 넣어 반환하지만 Review Session 상태와 다음 분석 대상 여부는 Spring이 관리합니다.
 - `questions[].candidateId`는 응답에 포함된 경험 후보를 가리킴
 - 근거가 부족해 경험 후보 자체를 만들 수 없는 질문은 `candidateId`가 `null`일 수 있음
 - 결과는 AI 초안이며 바로 경험 DB에 확정 저장하지 않음
