@@ -19,6 +19,8 @@ from logfolio_ai.models import (
     ExistingEvidence,
     ExistingExperience,
     ProvenanceType,
+    ProjectContext,
+    SourceWarning,
     SubjectType,
     VerificationStatus,
 )
@@ -37,12 +39,25 @@ class RecordingRagService:
         contexts: List[RetrievalContext],
         existing_contexts: Optional[List[ExistingExperienceContext]] = None,
         source_chunks: Optional[List[DocumentChunk]] = None,
+        source_warnings: Optional[List[SourceWarning]] = None,
     ) -> None:
         self.contexts = contexts
         self.existing_contexts = existing_contexts or []
         self.source_chunks = source_chunks or []
+        self.source_warnings = source_warnings or []
         self.indexed_project_id: Optional[UUID] = None
         self.indexed_documents: List[DocumentSource] = []
+
+    async def find_suspected_project_mismatches(
+        self,
+        project_id: UUID,
+        source_ids: List[UUID],
+        project_context: ProjectContext,
+        *,
+        confirmed_source_ids=(),
+    ) -> List[SourceWarning]:
+        del project_id, source_ids, project_context, confirmed_source_ids
+        return self.source_warnings
 
     async def index_documents(
         self, project_id: UUID, documents: List[DocumentSource]
@@ -452,4 +467,28 @@ async def test_no_indexed_source_chunks_returns_no_update_without_llm_call() -> 
     assert response.candidates == []
     assert response.questions == []
     assert "인덱싱" in response.no_update_reason
+    assert llm.grounded_input is None
+
+
+@pytest.mark.asyncio
+async def test_suspected_project_mismatch_waits_for_user_without_llm_call() -> None:
+    analysis_request = request()
+    analysis_request.project_context = ProjectContext(
+        name="LogFolio",
+        description="경험 정리 서비스",
+    )
+    source = analysis_request.documents[0]
+    warning = SourceWarning(
+        source_id=source.source_id,
+        source_name=source.source_name,
+        distance=0.9,
+        message="현재 프로젝트와 관련성이 낮아 보입니다.",
+    )
+    rag = RecordingRagService([], source_warnings=[warning])
+    llm = RecordingLLMProvider(empty_response(analysis_request))
+
+    response = await AnalysisOrchestrator(rag, llm).analyze(analysis_request)
+
+    assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+    assert response.source_warnings == [warning]
     assert llm.grounded_input is None

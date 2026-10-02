@@ -11,6 +11,8 @@ from logfolio_ai.models.enums import (
     ProvenanceType,
     SubjectType,
     SourceType,
+    SourceWarningAction,
+    SourceWarningType,
     VerificationStatus,
 )
 
@@ -28,10 +30,19 @@ class DocumentSource(ContractModel):
     pages: List[DocumentPage] = Field(min_length=1)
 
 
+class ProjectContext(ContractModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    activity_type: Optional[str] = Field(default=None, max_length=100)
+    user_role: Optional[str] = Field(default=None, max_length=200)
+
+
 class AnalysisRequest(ContractModel):
     analysis_run_id: UUID
     project_id: UUID
     source_ids: List[UUID] = Field(default_factory=list, max_length=50)
+    project_context: Optional[ProjectContext] = None
+    confirmed_source_ids: List[UUID] = Field(default_factory=list, max_length=50)
     documents: List[DocumentSource] = Field(
         default_factory=list,
         max_length=3,
@@ -49,6 +60,11 @@ class AnalysisRequest(ContractModel):
             raise ValueError("sourceIds or legacy documents must contain at least one source")
         if self.source_ids and self.documents:
             raise ValueError("sourceIds and legacy documents cannot be used together")
+        effective_source_ids = set(self.source_ids) or {
+            document.source_id for document in self.documents
+        }
+        if not set(self.confirmed_source_ids).issubset(effective_source_ids):
+            raise ValueError("confirmedSourceIds must be included in analysis sources")
         return self
 
 
@@ -169,12 +185,27 @@ class GapQuestion(ContractModel):
     suggested_answers: List[str] = Field(default_factory=list)
 
 
+class SourceWarning(ContractModel):
+    source_id: UUID
+    source_name: str = Field(min_length=1, max_length=255)
+    warning_type: SourceWarningType = SourceWarningType.POSSIBLE_PROJECT_MISMATCH
+    distance: float = Field(ge=0, le=2)
+    message: str = Field(min_length=1)
+    allowed_actions: List[SourceWarningAction] = Field(
+        default_factory=lambda: [
+            SourceWarningAction.EXCLUDE_FROM_ANALYSIS,
+            SourceWarningAction.INCLUDE_ANYWAY,
+        ]
+    )
+
+
 class AnalysisResponse(ContractModel):
     analysis_run_id: UUID
     project_id: UUID
     summary: str = Field(min_length=1)
     candidates: List[ExperienceCandidate] = Field(default_factory=list, max_length=3)
     questions: List[GapQuestion] = Field(default_factory=list, max_length=2)
+    source_warnings: List[SourceWarning] = Field(default_factory=list, max_length=50)
     result_types: List[AnalysisResultType] = Field(default_factory=list)
     no_update_reason: Optional[str] = None
 
@@ -192,12 +223,16 @@ class AnalysisResponse(ContractModel):
         result_types = {candidate.result_type for candidate in self.candidates}
         if self.questions:
             result_types.add(AnalysisResultType.NEEDS_CONTEXT)
-        if not self.candidates and not self.questions:
+        if self.source_warnings:
+            result_types.add(AnalysisResultType.NEEDS_CONTEXT)
+        if not self.candidates and not self.questions and not self.source_warnings:
             result_types.add(AnalysisResultType.NO_UPDATE)
         if AnalysisResultType.NO_UPDATE in result_types and (
-            self.candidates or self.questions
+            self.candidates or self.questions or self.source_warnings
         ):
-            raise ValueError("NO_UPDATE cannot include candidates or questions")
+            raise ValueError(
+                "NO_UPDATE cannot include candidates, questions, or source warnings"
+            )
         self.result_types = sorted(result_types, key=lambda value: value.value)
         return self
 

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     retrieval_top_k: int = Field(default=5, ge=1, le=20)
     max_grounded_chunks: int = Field(default=15, ge=1, le=25)
     existing_experience_match_distance: float = Field(default=0.4, ge=0, le=2)
+    project_source_match_distance: float = Field(default=0.65, ge=0, le=2)
     max_related_experiences: int = Field(default=3, ge=1, le=10)
 
     @model_validator(mode="after")

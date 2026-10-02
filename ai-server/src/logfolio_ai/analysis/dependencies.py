@@ -41,6 +41,7 @@ async def get_rag_service() -> AsyncIterator[RagService]:
         chunk_overlap_tokens=settings.chunk_overlap_tokens,
         top_k=settings.retrieval_top_k,
         existing_experience_match_distance=settings.existing_experience_match_distance,
+        project_source_match_distance=settings.project_source_match_distance,
         max_related_experiences=settings.max_related_experiences,
     )
     try:

@@ -19,6 +19,15 @@ class AnalysisResultType(str, Enum):
     NO_UPDATE = "NO_UPDATE"
 
 
+class SourceWarningType(str, Enum):
+    POSSIBLE_PROJECT_MISMATCH = "POSSIBLE_PROJECT_MISMATCH"
+
+
+class SourceWarningAction(str, Enum):
+    EXCLUDE_FROM_ANALYSIS = "EXCLUDE_FROM_ANALYSIS"
+    INCLUDE_ANYWAY = "INCLUDE_ANYWAY"
+
+
 class ProvenanceType(str, Enum):
     SOURCE_EXTRACTED = "SOURCE_EXTRACTED"
     AI_INFERRED = "AI_INFERRED"

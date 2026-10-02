@@ -198,6 +198,30 @@ class AnalysisOrchestrator:
         source_ids = request.source_ids or [
             document.source_id for document in request.documents
         ]
+        if request.project_context is not None:
+            source_warnings = (
+                await self._rag_service.find_suspected_project_mismatches(
+                    request.project_id,
+                    source_ids,
+                    request.project_context,
+                    confirmed_source_ids=request.confirmed_source_ids,
+                )
+            )
+            if source_warnings:
+                logger.info(
+                    "Analysis waiting for possible project mismatch confirmation: "
+                    "project_id=%s sources=%d",
+                    request.project_id,
+                    len(source_warnings),
+                )
+                return AnalysisResponse(
+                    analysis_run_id=request.analysis_run_id,
+                    project_id=request.project_id,
+                    summary="현재 프로젝트와 관련성이 낮아 보이는 Source가 있습니다.",
+                    candidates=[],
+                    questions=[],
+                    source_warnings=source_warnings,
+                )
         contexts = await self._rag_service.retrieve_analysis_context(
             request.project_id,
             source_ids=source_ids,
