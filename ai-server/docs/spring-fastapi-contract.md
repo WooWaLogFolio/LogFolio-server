@@ -191,6 +191,14 @@ Spring 처리 기준:
 | 502, 503, 504 | 일시적 AI·DB·타임아웃 오류일 수 있으므로 동일 `analysisRunId`로 최대 1회 재시도 |
 | 그 외 5xx | 실패 로그를 남기고 자동 재시도는 최대 1회로 제한 |
 
+Evidence 부분 실패는 HTTP 오류로 전체 분석을 중단하지 않습니다.
+
+- 검색되지 않은 `chunkId`, 원문과 다른 인용문, 잘못된 페이지가 포함된 Claim만 제외
+- 같은 Candidate에 정상 Claim이 남아 있으면 Candidate 유지
+- 모든 Claim이 제외된 Candidate는 Review 대상으로 반환하지 않음
+- 제외된 Candidate를 가리키던 질문은 `candidateId=null`로 유지하여 사용자 확인 가능
+- 정상 Candidate와 질문이 모두 없으면 `NO_UPDATE`와 사유 반환
+
 ## Timeout
 
 - FastAPI 전체 분석 제한: 30초

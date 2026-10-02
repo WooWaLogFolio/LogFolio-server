@@ -5,7 +5,6 @@ import pytest
 
 from logfolio_ai.analysis import AnalysisOrchestrator
 from logfolio_ai.chunking import DocumentChunk
-from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm import GroundedAnalysisInput
 from logfolio_ai.models import (
     AnalysisRequest,
@@ -213,7 +212,7 @@ async def test_orchestrator_accepts_exact_excerpt_from_retrieved_chunk() -> None
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_rejects_evidence_not_in_retrieved_chunks() -> None:
+async def test_orchestrator_excludes_candidate_with_ungrounded_evidence() -> None:
     analysis_request = request()
     result = search_result()
     response = AnalysisResponse(
@@ -258,10 +257,75 @@ async def test_orchestrator_rejects_evidence_not_in_retrieved_chunks() -> None:
     )
     orchestrator = AnalysisOrchestrator(rag, RecordingLLMProvider(response))
 
-    with pytest.raises(AppError) as error:
-        await orchestrator.analyze(analysis_request)
+    result_response = await orchestrator.analyze(analysis_request)
 
-    assert error.value.code == "UNGROUNDED_EVIDENCE"
+    assert result_response.candidates == []
+    assert result_response.result_types == [AnalysisResultType.NO_UPDATE]
+    assert result_response.no_update_reason == "근거 검증을 통과한 분석 결과가 없습니다."
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_keeps_valid_claim_when_sibling_evidence_is_invalid() -> None:
+    analysis_request = request()
+    retrieved = search_result()
+    valid_claim = Claim(
+        section_type="ACTION",
+        content="JWT 인증 API를 구현했다.",
+        subject_type=SubjectType.TEAM,
+        provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+        verification_status=VerificationStatus.VERIFIED,
+        evidence_type=EvidenceType.DIRECT,
+        evidences=[
+            Evidence(
+                source_id=retrieved.source_id,
+                chunk_id=retrieved.chunk_id,
+                page_number=1,
+                excerpt="JWT 인증 API를 구현했다.",
+            )
+        ],
+        requires_user_confirmation=False,
+    )
+    invalid_claim = valid_claim.model_copy(
+        update={
+            "content": "검색되지 않은 성과",
+            "evidences": [
+                Evidence(
+                    source_id=uuid4(),
+                    chunk_id=uuid4(),
+                    excerpt="없는 인용문",
+                )
+            ],
+        }
+    )
+    response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="일부 근거 기반 분석",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="인증 구현",
+                summary="검증된 Claim만 유지",
+                claims=[valid_claim, invalid_claim],
+            )
+        ],
+    )
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.USER_CONTRIBUTION,
+                query="기여",
+                chunks=[retrieved],
+            )
+        ]
+    )
+
+    result_response = await AnalysisOrchestrator(
+        rag, RecordingLLMProvider(response)
+    ).analyze(analysis_request)
+
+    assert len(result_response.candidates) == 1
+    assert result_response.candidates[0].claims == [valid_claim]
 
 
 @pytest.mark.asyncio
