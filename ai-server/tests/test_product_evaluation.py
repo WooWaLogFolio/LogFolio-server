@@ -46,6 +46,7 @@ def test_product_dataset_contains_core_and_security_gold_cases() -> None:
         "ADDITIONAL_SOURCE_01",
         "NO_UPDATE_01",
         "REJECTED_VALUE_01",
+        "PRIVACY_01",
         "PROMPT_INJECTION_01",
     ]
 

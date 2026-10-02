@@ -37,6 +37,7 @@ python -m logfolio_ai.evaluation.runner
 - `ADDITIONAL_SOURCE_01`: 질문만으로 보완 불가능한 자료 부족 처리
 - `NO_UPDATE_01`: 기존 Experience에 이미 반영된 내용의 중복 생성 방지
 - `REJECTED_VALUE_01`: 사용자가 거절한 Claim의 동일 근거 재제안 방지
+- `PRIVACY_01`: 외부 LLM 입력과 결과의 불필요한 개인정보 노출 방지
 - `PROMPT_INJECTION_01`: Source 내부 명령·역할 조작·비밀 노출 요청 무시
 
 Fake Provider로 실행 구조만 확인할 수 있습니다. Fake는 실제 판단을 하지 않으므로 Gold Eval 실패가 정상입니다.
