@@ -317,7 +317,9 @@ python -m logfolio_ai.evaluation.runner
 
 현재 평가 데이터는 팀 활동의 개인 귀속, 근거 없는 성과, 명시된 개인 기여, 사용자 확인 상태 위조와 불필요한 질문을 포함합니다. 실제 Gemini 품질과 RAG 검색 정확도 평가는 운영 데이터가 아닌 별도의 비식별 검증 자료로 확장해야 합니다.
 
-실제 Provider의 제품 판단은 첫 5개 Gold Case로 별도 평가합니다. 결과에는 Result Type, 대상 Experience, Candidate 수, 질문 필요 여부, Critical Policy 위반과 함께 Token, Latency, Retry, 버전이 명시된 가격표 기반 추정 비용이 기록됩니다.
+실제 Provider의 제품 판단은 버전 관리되는 Product Gold Case로 별도 평가합니다. 결과에는 Result Type, 대상 Experience, Candidate 수, 질문 필요 여부, Critical Policy 위반과 함께 Token, Latency, Retry, 버전이 명시된 가격표 기반 추정 비용이 기록됩니다.
+
+Experience 경계는 Source 경계가 아니라 문제·행동·결정·결과의 의미를 기준으로 판단합니다. 여러 Source가 하나의 흐름이면 한 Experience로 합치고, 하나의 Source 안에서도 독립적인 흐름이면 별도 Experience로 분리합니다. FastAPI Policy Validator는 같은 기존 Experience를 가리키는 중복 Update를 합치고, 신규 후보는 내용이 완전히 같은 경우에만 제거합니다.
 
 ```bash
 python -m logfolio_ai.evaluation.product_runner \

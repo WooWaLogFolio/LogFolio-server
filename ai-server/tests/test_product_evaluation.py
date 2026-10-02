@@ -41,6 +41,7 @@ def test_product_dataset_contains_core_and_security_gold_cases() -> None:
         "CONTEXT_01",
         "ATTRIBUTION_01",
         "MERGE_01",
+        "SPLIT_01",
         "PROMPT_INJECTION_01",
     ]
 
