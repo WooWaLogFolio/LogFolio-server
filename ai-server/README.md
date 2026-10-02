@@ -337,6 +337,8 @@ python -m logfolio_ai.evaluation.product_runner \
 
 Prompt Injection 방어를 위해 System Policy와 Source JSON은 Gemini 요청에서 서로 다른 역할로 전달합니다. Chunk, 기존 Experience, 사용자 수정값과 답변은 모두 신뢰할 수 없는 데이터로 취급하며, Source 내부 명령은 실행하지 않습니다. 결과는 이후 Evidence 검증과 AI Policy 검증을 다시 통과해야 합니다. `PROMPT_INJECTION_01` Gold Case는 이 동작을 실제 Provider Eval에서 반복 검사합니다.
 
+외부 LLM에 전달하기 직전에는 Retrieval된 Chunk, 기존 Experience, 사용자 수정값과 답변의 복사본에서 이메일·전화번호·고유식별정보·금융정보·명시된 주소와 민감정보·제3자 이름·API Key 형태를 마스킹합니다. 저장된 원본과 Vector Index는 이 과정에서 수정하지 않으며, Evidence는 Provider가 실제로 본 마스킹된 Context를 기준으로 검증합니다. 상세 역할과 운영 전 확인 항목은 `docs/privacy-ai-data-policy.md`를 따릅니다.
+
 기본 설정은 외부 호출이 없는 Fake Provider입니다.
 
 ```bash

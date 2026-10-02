@@ -11,6 +11,7 @@
     "cases/ADDITIONAL_SOURCE_01.json",
     "cases/NO_UPDATE_01.json",
     "cases/REJECTED_VALUE_01.json",
+    "cases/PRIVACY_01.json",
     "cases/PROMPT_INJECTION_01.json"
   ]
 }

@@ -8,6 +8,7 @@ from logfolio_ai.core.usage import UsageCostCalculator, UsagePricing
 from logfolio_ai.llm import GroundedAnalysisInput, GroundedChunk, LLMProvider
 from logfolio_ai.models import AnalysisRequest, AnalysisResponse
 from logfolio_ai.policy import AIPolicyValidator
+from logfolio_ai.privacy import PrivacyRedactor
 from logfolio_ai.rag import (
     AnalysisPurpose,
     ExistingExperienceContext,
@@ -28,6 +29,7 @@ class AnalysisOrchestrator:
         max_grounded_chunks: int = 15,
         policy_validator: Optional[AIPolicyValidator] = None,
         usage_cost_calculator: Optional[UsageCostCalculator] = None,
+        privacy_redactor: Optional[PrivacyRedactor] = None,
     ) -> None:
         self._rag_service = rag_service
         self._llm_provider = llm_provider
@@ -36,6 +38,7 @@ class AnalysisOrchestrator:
         self._usage_cost_calculator = usage_cost_calculator or UsageCostCalculator(
             UsagePricing()
         )
+        self._privacy_redactor = privacy_redactor or PrivacyRedactor()
 
     def _build_grounded_chunks(
         self,
@@ -375,6 +378,15 @@ class AnalysisOrchestrator:
             corrections=request.corrections,
             answers=request.answers,
         )
+        provider_input, redaction_summary = (
+            self._privacy_redactor.sanitize_grounded_input(grounded_input)
+        )
+        if redaction_summary.total:
+            logger.info(
+                "Sensitive provider input minimized: fields=%d categories=%s",
+                redaction_summary.total,
+                sorted(redaction_summary.counts),
+            )
         logger.info(
             "Analysis grounding prepared: index=%.3fs retrieve=%.3fs chunks=%d",
             indexed_at - started_at,
@@ -382,14 +394,14 @@ class AnalysisOrchestrator:
             len(grounded_chunks),
         )
         try:
-            response = await self._llm_provider.analyze_grounded(grounded_input)
+            response = await self._llm_provider.analyze_grounded(provider_input)
         except AppError as exc:
             metrics = getattr(self._llm_provider, "last_call_metrics", None)
             if metrics is not None:
                 exc.ai_usage = self._usage_cost_calculator.build_record(metrics)
             raise
         generated_at = time.perf_counter()
-        self._validate_conflict_references(response, request)
+        self._validate_conflict_references(response, provider_input)
         existing_ids = {
             experience.experience_id for experience in request.existing_experiences
         }
@@ -415,7 +427,10 @@ class AnalysisOrchestrator:
                     message="AI가 관련 근거가 조회되지 않은 경험을 보강 대상으로 반환했습니다.",
                     status_code=502,
                 )
-        grounded_response = self._filter_invalid_evidence(response, grounded_chunks)
+        grounded_response = self._filter_invalid_evidence(
+            response,
+            provider_input.chunks,
+        )
         validated = self._policy_validator.validate(
             grounded_response,
             user_answers=request.answers,

@@ -895,3 +895,68 @@ async def test_full_pipeline_keeps_independent_experiences_from_one_source() -> 
         "JWT 오류 해결",
         "온보딩 개선",
     }
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_redacts_provider_input_and_validates_masked_evidence() -> None:
+    analysis_request = request()
+    source = analysis_request.documents[0]
+    raw_text = "담당자 이메일 minsu@example.com으로 결과를 전달했다."
+    retrieved = search_result().model_copy(
+        update={
+            "source_id": source.source_id,
+            "source_name": "minsu@example.com 회의록",
+            "text": raw_text,
+            "char_end": len(raw_text),
+        }
+    )
+    masked_excerpt = "담당자 이메일 [이메일]으로 결과를 전달했다."
+    response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="개인정보를 최소화한 분석",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="결과 전달",
+                summary="결과를 전달했다.",
+                claims=[
+                    Claim(
+                        section_type="ACTION",
+                        content="담당자에게 결과를 전달했다.",
+                        subject_type=SubjectType.TEAM,
+                        provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+                        verification_status=VerificationStatus.VERIFIED,
+                        evidence_type=EvidenceType.DIRECT,
+                        evidences=[
+                            Evidence(
+                                source_id=retrieved.source_id,
+                                chunk_id=retrieved.chunk_id,
+                                page_number=retrieved.page_number,
+                                excerpt=masked_excerpt,
+                            )
+                        ],
+                        requires_user_confirmation=False,
+                    )
+                ],
+            )
+        ],
+    )
+    provider = RecordingLLMProvider(response)
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.USER_CONTRIBUTION,
+                query="사용자 기여",
+                chunks=[retrieved],
+            )
+        ]
+    )
+
+    result = await AnalysisOrchestrator(rag, provider).analyze(analysis_request)
+
+    assert provider.grounded_input is not None
+    assert provider.grounded_input.chunks[0].text == masked_excerpt
+    assert provider.grounded_input.chunks[0].source_name == "[이메일] 회의록"
+    assert retrieved.text == raw_text
+    assert result.candidates[0].claims[0].evidences[0].excerpt == masked_excerpt

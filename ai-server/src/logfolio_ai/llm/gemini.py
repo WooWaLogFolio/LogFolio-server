@@ -10,6 +10,7 @@ from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm.models import GroundedAnalysisInput, LLMCallMetrics
 from logfolio_ai.llm.prompt import SYSTEM_POLICY, build_grounded_analysis_prompt
 from logfolio_ai.models import AnalysisResponse
+from logfolio_ai.privacy import PrivacyRedactor
 
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class GeminiLLMProvider:
         timeout_seconds: float,
         client: Optional[Any] = None,
         max_attempts: int = 2,
+        privacy_redactor: Optional[PrivacyRedactor] = None,
     ) -> None:
         if client is None:
             from google import genai
@@ -34,6 +36,7 @@ class GeminiLLMProvider:
         self._model = model
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
+        self._privacy_redactor = privacy_redactor or PrivacyRedactor()
         self._last_call_metrics: ContextVar[Optional[LLMCallMetrics]] = ContextVar(
             "gemini_llm_call_metrics",
             default=None,
@@ -46,7 +49,16 @@ class GeminiLLMProvider:
     async def analyze_grounded(
         self, request: GroundedAnalysisInput
     ) -> AnalysisResponse:
-        prompt = build_grounded_analysis_prompt(request)
+        provider_input, redaction_summary = (
+            self._privacy_redactor.sanitize_grounded_input(request)
+        )
+        if redaction_summary.total:
+            logger.info(
+                "Gemini input minimized: fields=%d categories=%s",
+                redaction_summary.total,
+                sorted(redaction_summary.counts),
+            )
+        prompt = build_grounded_analysis_prompt(provider_input)
         started = time.perf_counter()
         for attempt in range(1, self._max_attempts + 1):
             try:

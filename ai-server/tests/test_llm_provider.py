@@ -162,6 +162,38 @@ async def test_gemini_provider_accepts_additional_source_outcome() -> None:
 
 
 @pytest.mark.asyncio
+async def test_gemini_provider_always_redacts_sensitive_input() -> None:
+    request = grounded_request()
+    request.chunks[0].text = (
+        "담당자 minsu@example.com에게 010-1234-5678로 연락했다."
+    )
+    response_text = json.dumps(
+        {
+            "analysisRunId": str(uuid4()),
+            "projectId": str(uuid4()),
+            "summary": "개인정보를 제외하고 분석했습니다.",
+            "candidates": [],
+            "questions": [],
+        }
+    )
+    generate_content = AsyncMock(return_value=SimpleNamespace(text=response_text))
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+
+    await GeminiLLMProvider(
+        "test-key", "test-model", 30, client=client
+    ).analyze_grounded(request)
+
+    prompt = generate_content.await_args.kwargs["contents"]
+    assert "minsu@example.com" not in prompt
+    assert "010-1234-5678" not in prompt
+    assert "[이메일]" in prompt
+    assert "[전화번호]" in prompt
+    assert request.chunks[0].text.endswith("연락했다.")
+
+
+@pytest.mark.asyncio
 async def test_gemini_provider_maps_timeout_to_app_error() -> None:
     generate_content = AsyncMock(side_effect=asyncio.TimeoutError)
     client = SimpleNamespace(
