@@ -23,6 +23,7 @@ from logfolio_ai.models import (
     SourceType,
     SourceWarning,
     VerificationStatus,
+    UserAnswer,
 )
 
 
@@ -223,6 +224,39 @@ def test_request_accepts_preindexed_sources_and_existing_experiences() -> None:
 
     assert request.source_ids == [source_id]
     assert request.existing_experiences[0].experience_id == experience_id
+
+
+def test_request_accepts_stored_user_answers_for_reanalysis() -> None:
+    source_id = uuid4()
+    answer = UserAnswer(
+        answer_id=uuid4(),
+        question_id=uuid4(),
+        target_section="CONTRIBUTION",
+        answer="백엔드 API 설계를 직접 담당했습니다.",
+        provenance_type=ProvenanceType.USER_INPUT,
+    )
+    request = AnalysisRequest(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        source_ids=[source_id],
+        answers=[answer],
+    )
+
+    payload = request.model_dump(mode="json", by_alias=True)
+
+    assert payload["answers"][0]["answerId"] == str(answer.answer_id)
+    assert payload["answers"][0]["provenanceType"] == "USER_INPUT"
+
+
+def test_user_answer_cannot_claim_user_confirmed_provenance() -> None:
+    with pytest.raises(ValidationError, match="USER_INPUT or USER_EDITED"):
+        UserAnswer(
+            answer_id=uuid4(),
+            question_id=uuid4(),
+            target_section="RESULT",
+            answer="사용자가 답한 내용",
+            provenance_type=ProvenanceType.USER_CONFIRMED,
+        )
 
 
 def test_request_rejects_mixed_inline_and_preindexed_sources() -> None:

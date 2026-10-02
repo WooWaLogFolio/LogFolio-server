@@ -17,6 +17,7 @@ from logfolio_ai.models.analysis import (
     SourceIndexRequest,
     SourceIndexResponse,
     UserCorrection,
+    UserAnswer,
 )
 from logfolio_ai.models.enums import (
     AnalysisResultType,
@@ -59,5 +60,6 @@ __all__ = [
     "SourceIndexRequest",
     "SourceIndexResponse",
     "UserCorrection",
+    "UserAnswer",
     "VerificationStatus",
 ]

@@ -12,6 +12,7 @@ from logfolio_ai.models import (
     ProvenanceType,
     SubjectType,
     VerificationStatus,
+    UserAnswer,
 )
 from logfolio_ai.policy import AIPolicyValidator
 
@@ -176,3 +177,84 @@ def test_removed_answered_question_recomputes_response_state() -> None:
     assert result.questions == []
     assert result.information_need is None
     assert result.result_types == [AnalysisResultType.NEW_EXPERIENCE]
+
+
+def test_claim_can_use_valid_stored_user_answer_provenance() -> None:
+    answer = UserAnswer(
+        answer_id=uuid4(),
+        question_id=uuid4(),
+        target_section="CONTRIBUTION",
+        answer="백엔드 API 설계를 직접 담당했습니다.",
+    )
+    answered_claim = claim(
+        section_type="CONTRIBUTION",
+        content="백엔드 API 설계를 담당했다.",
+        subject_type=SubjectType.USER,
+        provenance_type=ProvenanceType.USER_INPUT,
+        verification_status=VerificationStatus.VERIFIED,
+        evidence_type=EvidenceType.NONE,
+        evidences=[],
+        supporting_answer_ids=[answer.answer_id],
+        requires_user_confirmation=False,
+    )
+    questions = [
+        GapQuestion(
+            question_id=uuid4(),
+            target_section="CONTRIBUTION",
+            question="직접 담당한 부분은 무엇인가요?",
+        )
+    ]
+
+    result = AIPolicyValidator().validate(
+        response([answered_claim], questions),
+        user_answers=[answer],
+    )
+    validated_claim = result.candidates[0].claims[0]
+
+    assert validated_claim.provenance_type == ProvenanceType.USER_INPUT
+    assert validated_claim.subject_type == SubjectType.USER
+    assert validated_claim.verification_status == VerificationStatus.VERIFIED
+    assert result.questions == []
+
+
+def test_unknown_answer_id_cannot_create_user_input_provenance() -> None:
+    unsupported = claim(
+        section_type="CONTRIBUTION",
+        content="백엔드 API 설계를 담당했다.",
+        subject_type=SubjectType.USER,
+        provenance_type=ProvenanceType.USER_INPUT,
+        verification_status=VerificationStatus.VERIFIED,
+        evidence_type=EvidenceType.NONE,
+        evidences=[],
+        supporting_answer_ids=[uuid4()],
+        requires_user_confirmation=False,
+    )
+
+    result = AIPolicyValidator().validate(response([unsupported]))
+    validated_claim = result.candidates[0].claims[0]
+
+    assert validated_claim.provenance_type == ProvenanceType.AI_INFERRED
+    assert validated_claim.verification_status == VerificationStatus.NEEDS_CONFIRMATION
+    assert PolicyViolationType.INVALID_PROVENANCE in validated_claim.policy_violations
+
+
+def test_stored_answer_removes_repeated_question_without_generated_claim() -> None:
+    answer = UserAnswer(
+        answer_id=uuid4(),
+        question_id=uuid4(),
+        target_section="RESULT",
+        answer="오류 문의가 줄었습니다.",
+    )
+    repeated_question = GapQuestion(
+        question_id=uuid4(),
+        target_section="RESULT",
+        question="어떤 결과가 있었나요?",
+    )
+
+    result = AIPolicyValidator().validate(
+        response([], [repeated_question]),
+        user_answers=[answer],
+    )
+
+    assert result.questions == []
+    assert result.information_need is None

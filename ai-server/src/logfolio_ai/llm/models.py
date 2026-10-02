@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import Field
 
 from logfolio_ai.models.base import ContractModel
-from logfolio_ai.models.analysis import ExistingExperience, UserCorrection
+from logfolio_ai.models.analysis import ExistingExperience, UserAnswer, UserCorrection
 from logfolio_ai.models.enums import SourceType
 from logfolio_ai.rag.models import AnalysisPurpose
 
@@ -32,3 +32,4 @@ class GroundedAnalysisInput(ContractModel):
         max_length=100,
     )
     corrections: List[UserCorrection] = Field(default_factory=list, max_length=100)
+    answers: List[UserAnswer] = Field(default_factory=list, max_length=100)

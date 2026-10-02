@@ -11,6 +11,7 @@ from logfolio_ai.models import (
     ProvenanceType,
     SubjectType,
     VerificationStatus,
+    UserAnswer,
 )
 from logfolio_ai.models.base import ContractModel
 
@@ -39,6 +40,7 @@ class EvaluationCase(ContractModel):
     description: str = Field(min_length=1)
     source_text: str = Field(min_length=1)
     raw_response: AnalysisResponse
+    user_answers: List[UserAnswer] = Field(default_factory=list)
     expected: EvaluationExpectation
 
 

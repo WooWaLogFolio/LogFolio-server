@@ -117,7 +117,18 @@ X-Internal-API-Key: <shared-secret>
       ]
     }
   ],
-  "corrections": []
+  "corrections": [],
+  "answers": [
+    {
+      "answerId": "90000000-0000-0000-0000-000000000001",
+      "questionId": "50000000-0000-0000-0000-000000000001",
+      "candidateId": "40000000-0000-0000-0000-000000000001",
+      "experienceId": null,
+      "targetSection": "RESULT",
+      "answer": "인증 오류 문의가 줄었습니다.",
+      "provenanceType": "USER_INPUT"
+    }
+  ]
 }
 ```
 
@@ -131,6 +142,9 @@ X-Internal-API-Key: <shared-secret>
 - `existingExperiences`에는 현재 프로젝트의 기존 Experience 요약·Claim·Evidence ID를 전달
 - `evidences`의 `sourceId + chunkId`는 관련 Experience가 선택됐을 때 FastAPI가 기존 Evidence 원문을 정확히 다시 조회하는 키
 - `corrections`에는 사용자가 이전에 수정하거나 거절한 내용을 전달
+- `answers`에는 Spring의 `gap_answers`에 실제 저장된 사용자 답변만 전달
+- 최초 답변은 `USER_INPUT`, 사용자가 답변을 직접 수정한 경우는 `USER_EDITED`
+- `USER_CONFIRMED`는 AI 초안을 사용자가 승인한 뒤 Spring이 만드는 상태이므로 답변 입력에 사용하지 않음
 - Spring이 S3 원본을 보관하고 파일 텍스트를 추출
 - 동일 분석 작업의 재시도에는 같은 `analysisRunId` 사용
 - `projectId`의 접근 권한과 삭제 상태를 Spring에서 확인한 뒤 호출
@@ -321,6 +335,28 @@ Spring 재호출 규칙:
 - 동일 Analysis Run의 재시도라면 최초 Source 목록을 유지하여 결과 기준이 바뀌지 않게 함
 
 FastAPI는 응답에 실제 요청 Source 목록을 다시 넣어 반환하지만 Review Session 상태와 다음 분석 대상 여부는 Spring이 관리합니다.
+
+### 사용자 답변 후 AI 재판단
+
+```text
+보완 질문 반환
+→ Spring이 gap_answers에 사용자 답변 저장
+→ 새 analysisRunId로 기존 Source + Existing Experience + answers 전달
+→ FastAPI가 답변을 Gemini Context에 포함
+→ Candidate/Question 재생성
+→ 답변으로 충분해진 섹션의 중복 질문 제거
+```
+
+답변 기반 Claim의 검증 규칙:
+
+- Claim은 `supportingAnswerIds`에 실제 `answerId`를 포함해야 함
+- Claim의 `sectionType`과 답변의 `targetSection`이 일치해야 함
+- Claim과 답변의 Provenance가 `USER_INPUT` 또는 `USER_EDITED`로 일치해야 함
+- 위 조건을 통과한 답변 기반 Claim은 문서 Evidence가 없어도 `evidenceType=NONE`으로 허용
+- 존재하지 않는 답변 ID, 다른 섹션의 답변, `USER_CONFIRMED` 위조는 `AI_INFERRED + NEEDS_CONFIRMATION`으로 강등
+- 답변 원문도 프롬프트 명령이 아니라 사용자 데이터로만 취급
+
+Spring은 답변 저장과 새 Analysis Run 생성을 담당합니다. FastAPI는 `gap_answers` 테이블을 직접 수정하지 않습니다.
 - `questions[].candidateId`는 응답에 포함된 경험 후보를 가리킴
 - 근거가 부족해 경험 후보 자체를 만들 수 없는 질문은 `candidateId`가 `null`일 수 있음
 - 결과는 AI 초안이며 바로 경험 DB에 확정 저장하지 않음
