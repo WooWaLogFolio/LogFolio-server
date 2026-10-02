@@ -70,7 +70,8 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
         {
             "analysisRunId": str(generated_run_id),
             "projectId": str(generated_project_id),
-            "analyzedSourceIds": [str(generated_source_id)],
+            "inputSourceIds": [str(generated_source_id)],
+            "referencedSourceIds": [str(generated_source_id)],
             "summary": "프로젝트 자료를 분석했습니다.",
             "candidates": [],
             "questions": [],
@@ -92,7 +93,8 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert result.analysis_run_id == request.analysis_run_id
     assert result.project_id == request.project_id
     assert result.summary == "프로젝트 자료를 분석했습니다."
-    assert result.analyzed_source_ids == []
+    assert result.input_source_ids == []
+    assert result.referenced_source_ids == []
     call = generate_content.await_args.kwargs
     assert call["model"] == "test-model"
     assert "팀은 인터뷰를 진행했다." in call["contents"]

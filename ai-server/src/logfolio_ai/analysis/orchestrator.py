@@ -307,7 +307,8 @@ class AnalysisOrchestrator:
                 return AnalysisResponse(
                     analysis_run_id=request.analysis_run_id,
                     project_id=request.project_id,
-                    analyzed_source_ids=source_ids,
+                    input_source_ids=source_ids,
+                    referenced_source_ids=[],
                     summary="현재 프로젝트와 관련성이 낮아 보이는 Source가 있습니다.",
                     candidates=[],
                     questions=[],
@@ -335,7 +336,8 @@ class AnalysisOrchestrator:
                 return AnalysisResponse(
                     analysis_run_id=request.analysis_run_id,
                     project_id=request.project_id,
-                    analyzed_source_ids=source_ids,
+                    input_source_ids=source_ids,
+                    referenced_source_ids=[],
                     summary="검색 가능한 새 Source 근거가 없습니다.",
                     candidates=[],
                     questions=[],
@@ -351,6 +353,14 @@ class AnalysisOrchestrator:
         grounded_chunks = self._add_existing_evidence(
             grounded_chunks,
             existing_contexts,
+        )
+        input_source_id_set = set(source_ids)
+        referenced_source_ids = list(
+            dict.fromkeys(
+                chunk.source_id
+                for chunk in grounded_chunks
+                if chunk.source_id not in input_source_id_set
+            )
         )
         grounded_input = GroundedAnalysisInput(
             analysis_run_id=request.analysis_run_id,
@@ -406,4 +416,9 @@ class AnalysisOrchestrator:
             completed_at - started_at,
             len(grounded_chunks),
         )
-        return validated.model_copy(update={"analyzed_source_ids": source_ids})
+        return validated.model_copy(
+            update={
+                "input_source_ids": source_ids,
+                "referenced_source_ids": referenced_source_ids,
+            }
+        )

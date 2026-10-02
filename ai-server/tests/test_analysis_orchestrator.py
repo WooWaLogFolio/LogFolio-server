@@ -160,7 +160,9 @@ def empty_response(analysis_request: AnalysisRequest) -> AnalysisResponse:
 @pytest.mark.asyncio
 async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
     analysis_request = request()
-    result = search_result()
+    result = search_result().model_copy(
+        update={"source_id": analysis_request.documents[0].source_id}
+    )
     contexts = [
         RetrievalContext(
             purpose=AnalysisPurpose.USER_CONTRIBUTION,
@@ -189,15 +191,18 @@ async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
         AnalysisPurpose.OUTCOME,
     ]
     assert "검색되지 않을 비밀 문장" not in grounded.text
-    assert response.analyzed_source_ids == [
+    assert response.input_source_ids == [
         document.source_id for document in analysis_request.documents
     ]
+    assert response.referenced_source_ids == []
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_accepts_exact_excerpt_from_retrieved_chunk() -> None:
     analysis_request = request()
-    result = search_result()
+    result = search_result().model_copy(
+        update={"source_id": analysis_request.documents[0].source_id}
+    )
     response = AnalysisResponse(
         analysis_run_id=analysis_request.analysis_run_id,
         project_id=analysis_request.project_id,
@@ -243,10 +248,13 @@ async def test_orchestrator_accepts_exact_excerpt_from_retrieved_chunk() -> None
 
     actual = await orchestrator.analyze(analysis_request)
 
-    assert actual.model_copy(update={"analyzed_source_ids": []}) == response
-    assert actual.analyzed_source_ids == [
+    assert actual.model_copy(
+        update={"input_source_ids": [], "referenced_source_ids": []}
+    ) == response
+    assert actual.input_source_ids == [
         document.source_id for document in analysis_request.documents
     ]
+    assert actual.referenced_source_ids == []
 
 
 @pytest.mark.asyncio
@@ -436,6 +444,8 @@ async def test_orchestrator_adds_selected_existing_evidence_before_final_analysi
     result = await AnalysisOrchestrator(rag, llm).analyze(analysis_request)
 
     assert result.candidates[0].target_experience_id == experience_id
+    assert result.input_source_ids == [new_source.source_id]
+    assert result.referenced_source_ids == [old_source_id]
     assert llm.grounded_input is not None
     assert llm.grounded_input.chunks[0].chunk_id == old_chunk_id
     assert llm.grounded_input.chunks[0].related_experience_ids == [experience_id]
@@ -478,9 +488,10 @@ async def test_no_indexed_source_chunks_returns_no_update_without_llm_call() -> 
     assert response.candidates == []
     assert response.questions == []
     assert "인덱싱" in response.no_update_reason
-    assert response.analyzed_source_ids == [
+    assert response.input_source_ids == [
         document.source_id for document in analysis_request.documents
     ]
+    assert response.referenced_source_ids == []
     assert llm.grounded_input is None
 
 
