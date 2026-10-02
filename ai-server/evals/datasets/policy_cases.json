@@ -683,5 +683,62 @@
       "informationNeed": "ADDITIONAL_SOURCE",
       "resultTypes": ["NEEDS_CONTEXT"]
     }
+  },
+  {
+    "caseId": "accept-stored-user-answer-provenance",
+    "category": "user-answer",
+    "description": "Spring이 저장한 실제 사용자 답변 ID와 섹션이 일치할 때만 USER_INPUT Claim을 허용한다.",
+    "sourceText": "사용자가 보완 질문에 직접 답했다.",
+    "userAnswers": [
+      {
+        "answerId": "90000000-0000-0000-0000-000000000001",
+        "questionId": "60000000-0000-0000-0000-000000000018",
+        "targetSection": "CONTRIBUTION",
+        "answer": "백엔드 API 설계를 직접 담당했습니다.",
+        "provenanceType": "USER_INPUT"
+      }
+    ],
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000017",
+      "projectId": "20000000-0000-0000-0000-000000000017",
+      "summary": "사용자 답변 반영",
+      "candidates": [
+        {
+          "candidateId": "40000000-0000-0000-0000-000000000017",
+          "title": "백엔드 API 설계",
+          "summary": "사용자 답변으로 기여를 보완했습니다.",
+          "claims": [
+            {
+              "sectionType": "CONTRIBUTION",
+              "content": "백엔드 API 설계를 담당했다.",
+              "subjectType": "USER",
+              "provenanceType": "USER_INPUT",
+              "verificationStatus": "VERIFIED",
+              "evidenceType": "NONE",
+              "evidences": [],
+              "supportingAnswerIds": ["90000000-0000-0000-0000-000000000001"],
+              "policyViolations": [],
+              "requiresUserConfirmation": false
+            }
+          ]
+        }
+      ],
+      "questions": []
+    },
+    "expected": {
+      "claims": [
+        {
+          "candidateIndex": 0,
+          "claimIndex": 0,
+          "subjectType": "USER",
+          "provenanceType": "USER_INPUT",
+          "verificationStatus": "VERIFIED",
+          "evidenceType": "NONE",
+          "requiresUserConfirmation": false,
+          "violationsContain": []
+        }
+      ],
+      "questionTargets": []
+    }
   }
 ]

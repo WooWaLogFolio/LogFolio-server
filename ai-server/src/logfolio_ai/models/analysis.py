@@ -59,6 +59,7 @@ class AnalysisRequest(ContractModel):
         max_length=100,
     )
     corrections: List["UserCorrection"] = Field(default_factory=list, max_length=100)
+    answers: List["UserAnswer"] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def validate_analysis_sources(self) -> "AnalysisRequest":
@@ -102,6 +103,25 @@ class UserCorrection(ContractModel):
     decision: str = Field(pattern="^(EDITED|REJECTED)$")
 
 
+class UserAnswer(ContractModel):
+    answer_id: UUID
+    question_id: UUID
+    candidate_id: Optional[UUID] = None
+    experience_id: Optional[UUID] = None
+    target_section: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    provenance_type: ProvenanceType = ProvenanceType.USER_INPUT
+
+    @model_validator(mode="after")
+    def validate_user_provenance(self) -> "UserAnswer":
+        if self.provenance_type not in {
+            ProvenanceType.USER_INPUT,
+            ProvenanceType.USER_EDITED,
+        }:
+            raise ValueError("answer provenanceType must be USER_INPUT or USER_EDITED")
+        return self
+
+
 class Evidence(ContractModel):
     source_id: UUID
     source_type: SourceType = SourceType.PROJECT_FILE
@@ -121,6 +141,7 @@ class Claim(ContractModel):
     verification_status: VerificationStatus
     evidence_type: EvidenceType
     evidences: List[Evidence] = Field(default_factory=list)
+    supporting_answer_ids: List[UUID] = Field(default_factory=list, max_length=20)
     policy_violations: List[PolicyViolationType] = Field(default_factory=list)
     requires_user_confirmation: bool
 

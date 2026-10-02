@@ -117,6 +117,8 @@ MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터�
 
 각 분석 응답은 이번 요청의 새 자료를 `inputSourceIds`, RAG가 누적 자료에서 추가로 읽은 기존 Evidence 자료를 `referencedSourceIds`로 구분합니다. Review 진행 중 새 Source가 추가되어도 현재 입력 스냅샷에는 합치지 않으며, 새 Source는 다음 사용자 실행의 새 Analysis Run에서 처리합니다. FastAPI는 두 스냅샷을 실제 검색 결과로 확정하고 Review 상태 및 다음 실행 대상 관리는 Spring이 담당합니다.
 
+보완 질문에 사용자가 답하면 Spring은 답변을 저장하고 다음 Analysis Run 요청의 `answers`에 전달합니다. 답변 기반 Claim은 실제 `answerId`를 `supportingAnswerIds`로 참조하고 섹션과 Provenance가 일치할 때만 `USER_INPUT` 또는 `USER_EDITED`로 인정됩니다. 존재하지 않는 답변을 AI가 참조하거나 `USER_CONFIRMED`를 위조하면 Policy Validator가 이를 신뢰하지 않습니다.
+
 ### 5. Generate a structured draft
 
 검색된 Chunk만 외부 LLM에 근거로 전달합니다. LLM은 자유 형식의 글이 아니라 약속된 JSON 구조로 다음 결과를 생성합니다.

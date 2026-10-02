@@ -26,6 +26,7 @@ from logfolio_ai.models import (
     SourceWarning,
     SubjectType,
     VerificationStatus,
+    UserAnswer,
 )
 from logfolio_ai.rag import (
     AnalysisPurpose,
@@ -160,6 +161,13 @@ def empty_response(analysis_request: AnalysisRequest) -> AnalysisResponse:
 @pytest.mark.asyncio
 async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
     analysis_request = request()
+    answer = UserAnswer(
+        answer_id=uuid4(),
+        question_id=uuid4(),
+        target_section="CONTRIBUTION",
+        answer="인증 API를 직접 구현했습니다.",
+    )
+    analysis_request.answers = [answer]
     result = search_result().model_copy(
         update={"source_id": analysis_request.documents[0].source_id}
     )
@@ -195,6 +203,7 @@ async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
         document.source_id for document in analysis_request.documents
     ]
     assert response.referenced_source_ids == []
+    assert llm.grounded_input.answers == [answer]
 
 
 @pytest.mark.asyncio

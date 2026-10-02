@@ -368,6 +368,7 @@ class AnalysisOrchestrator:
             chunks=grounded_chunks,
             existing_experiences=request.existing_experiences,
             corrections=request.corrections,
+            answers=request.answers,
         )
         logger.info(
             "Analysis grounding prepared: index=%.3fs retrieve=%.3fs chunks=%d",
@@ -404,7 +405,10 @@ class AnalysisOrchestrator:
                     status_code=502,
                 )
         grounded_response = self._filter_invalid_evidence(response, grounded_chunks)
-        validated = self._policy_validator.validate(grounded_response)
+        validated = self._policy_validator.validate(
+            grounded_response,
+            user_answers=request.answers,
+        )
         completed_at = time.perf_counter()
         logger.info(
             "Analysis stages completed: index=%.3fs retrieve=%.3fs "
