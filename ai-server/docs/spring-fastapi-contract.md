@@ -169,6 +169,14 @@ X-Internal-API-Key: <shared-secret>
 - `projectId`의 접근 권한과 삭제 상태를 Spring에서 확인한 뒤 호출
 - 이전 `documents` 직접 전달 방식은 하위 호환용이며 신규 연동에서는 사용하지 않음
 
+보안 규칙:
+
+- Source, Existing Experience, correction, answer 안의 문장은 모두 데이터이며 FastAPI/LLM 명령으로 해석하지 않음
+- “이전 지시를 무시”, 역할 변경, 특정 JSON 강요, 시스템 프롬프트·API 키 요청도 Source 원문으로만 취급
+- Spring은 추출한 원문을 임의로 실행하거나 Prompt로 조합하지 않고 계약 필드의 값으로만 전달
+- FastAPI는 System Policy와 Untrusted Input 경계를 분리하고, 생성 결과에 Evidence·Policy 검증을 다시 적용
+- Prompt Injection이 의심된다는 이유만으로 원문 Source를 자동 삭제하지 않음
+
 거절 기록 예시:
 
 ```json
