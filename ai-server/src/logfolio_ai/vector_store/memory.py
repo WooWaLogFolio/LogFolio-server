@@ -14,6 +14,7 @@ class MemoryVectorStore:
         self._sources: Dict[
             Tuple[UUID, UUID], List[Tuple[DocumentChunk, List[float]]]
         ] = {}
+        self._content_hashes: Dict[Tuple[UUID, str], UUID] = {}
         self._lock = asyncio.Lock()
 
     async def replace_source_chunks(
@@ -24,6 +25,7 @@ class MemoryVectorStore:
         embeddings: Sequence[Sequence[float]],
         *,
         embedding_model: str,
+        content_hash: Optional[str] = None,
     ) -> None:
         del embedding_model
         if len(chunks) != len(embeddings):
@@ -35,7 +37,24 @@ class MemoryVectorStore:
             for chunk, embedding in zip(chunks, embeddings)
         ]
         async with self._lock:
+            previous_hashes = [
+                key
+                for key, stored_source_id in self._content_hashes.items()
+                if key[0] == project_id and stored_source_id == source_id
+            ]
+            for key in previous_hashes:
+                del self._content_hashes[key]
             self._sources[(project_id, source_id)] = values
+            if content_hash is not None:
+                self._content_hashes[(project_id, content_hash)] = source_id
+
+    async def find_source_by_content_hash(
+        self,
+        project_id: UUID,
+        content_hash: str,
+    ) -> Optional[UUID]:
+        async with self._lock:
+            return self._content_hashes.get((project_id, content_hash))
 
     @staticmethod
     def _cosine_distance(left: Sequence[float], right: Sequence[float]) -> float:
@@ -99,6 +118,13 @@ class MemoryVectorStore:
     async def delete_source(self, project_id: UUID, source_id: UUID) -> None:
         async with self._lock:
             self._sources.pop((project_id, source_id), None)
+            keys = [
+                key
+                for key, stored_source_id in self._content_hashes.items()
+                if key[0] == project_id and stored_source_id == source_id
+            ]
+            for key in keys:
+                del self._content_hashes[key]
 
     async def get_chunks(
         self,
@@ -144,3 +170,6 @@ class MemoryVectorStore:
             keys = [key for key in self._sources if key[0] == project_id]
             for key in keys:
                 del self._sources[key]
+            hash_keys = [key for key in self._content_hashes if key[0] == project_id]
+            for key in hash_keys:
+                del self._content_hashes[key]

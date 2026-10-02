@@ -28,6 +28,11 @@ class DocumentSource(ContractModel):
     source_type: SourceType = SourceType.PROJECT_FILE
     source_name: str = Field(min_length=1, max_length=255)
     mime_type: Optional[str] = Field(default=None, max_length=100)
+    content_hash: Optional[str] = Field(
+        default=None,
+        pattern="^[a-f0-9]{64}$",
+        description="SHA-256 of the original file bytes or canonical Quick Log text.",
+    )
     pages: List[DocumentPage] = Field(min_length=1)
 
 
@@ -269,13 +274,15 @@ class SourceIndexRequest(ContractModel):
 class SourceIndexItem(ContractModel):
     source_id: UUID
     source_type: SourceType
-    status: str = Field(pattern="^(INDEXED|FAILED)$")
+    status: str = Field(pattern="^(INDEXED|DUPLICATE|FAILED)$")
     chunk_count: int = Field(default=0, ge=0)
+    duplicate_of_source_id: Optional[UUID] = None
     error_code: Optional[str] = None
 
 
 class SourceIndexResponse(ContractModel):
     project_id: UUID
     indexed_count: int = Field(ge=0)
+    duplicate_count: int = Field(default=0, ge=0)
     failed_count: int = Field(ge=0)
     items: List[SourceIndexItem]

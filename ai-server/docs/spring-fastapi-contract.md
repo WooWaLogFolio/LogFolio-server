@@ -21,6 +21,7 @@ X-Internal-API-Key: <shared-secret>
       "sourceType": "PROJECT_FILE",
       "sourceName": "project-report.pdf",
       "mimeType": "application/pdf",
+      "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "pages": [{"pageNumber": 1, "text": "프로젝트 팀은 인터뷰를 진행했다."}]
     },
     {
@@ -34,11 +35,44 @@ X-Internal-API-Key: <shared-secret>
 ```
 
 - `sourceType`: `PROJECT_FILE` 또는 `QUICK_LOG`
+- `contentHash`: 원본 파일 바이트의 SHA-256 소문자 64자리. Quick Log는 저장된 원문 UTF-8의 SHA-256 권장
 - 요청당 Source는 최대 20개
 - 각 Source는 독립 처리하며 일부가 실패해도 성공한 Source는 `INDEXED`로 유지
 - 같은 `projectId + sourceId`를 다시 보내면 기존 Chunk를 교체하므로 중복 저장하지 않음
+- 같은 프로젝트에서 다른 `sourceId`가 동일한 `contentHash`를 가지면 임베딩하지 않고 `DUPLICATE` 반환
+- `contentHash`가 없으면 FastAPI가 전달된 페이지 텍스트로 보조 해시를 계산하지만, 원본 파일 중복 판정은 Spring이 만든 해시가 더 정확함
+- 유사한 자료나 수정본은 중복으로 간주하지 않으며 MVP에서는 완전히 동일한 자료만 처리
 
-응답의 각 `items[].status`는 `INDEXED` 또는 `FAILED`입니다. Spring은 이 값을 Source의 처리 상태에 반영합니다.
+응답 예시:
+
+```json
+{
+  "projectId": "20000000-0000-0000-0000-000000000001",
+  "indexedCount": 1,
+  "duplicateCount": 1,
+  "failedCount": 0,
+  "items": [
+    {
+      "sourceId": "30000000-0000-0000-0000-000000000001",
+      "sourceType": "PROJECT_FILE",
+      "status": "INDEXED",
+      "chunkCount": 2,
+      "duplicateOfSourceId": null,
+      "errorCode": null
+    },
+    {
+      "sourceId": "30000000-0000-0000-0000-000000000002",
+      "sourceType": "PROJECT_FILE",
+      "status": "DUPLICATE",
+      "chunkCount": 0,
+      "duplicateOfSourceId": "30000000-0000-0000-0000-000000000001",
+      "errorCode": null
+    }
+  ]
+}
+```
+
+응답의 `items[].status`는 `INDEXED`, `DUPLICATE`, `FAILED`입니다. 여기서 `DUPLICATE`는 영구적인 Source State가 아니라 인덱싱 요청 결과입니다. `DUPLICATE`이면 Spring은 새 Source가 기존 `duplicateOfSourceId`와 완전히 동일함을 사용자에게 안내하고, 새 Source를 분석 대상에 넣지 않습니다. 기존 Source와 Evidence는 그대로 유지합니다. 새 Source DB 행을 생성하기 전 해시를 검사하는 방식을 권장하며, 이미 행을 만든 뒤 FastAPI를 호출한다면 해당 행을 어떻게 정리할지는 Spring 트랜잭션 정책으로 결정해야 합니다.
 
 ## 2. 프로젝트 AI 분석
 

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from typing import Dict, Iterable, List, Optional, Sequence
 from uuid import UUID
 
@@ -132,6 +133,7 @@ class RagService:
         chunk_count = 0
 
         for document in document_list:
+            content_hash = self._content_hash(document)
             chunks = chunk_documents(
                 [document],
                 chunk_size_tokens=self._chunk_size_tokens,
@@ -146,6 +148,7 @@ class RagService:
                 chunks,
                 embeddings,
                 embedding_model=self._embedding_model,
+                content_hash=content_hash,
             )
             chunk_count += len(chunks)
 
@@ -155,6 +158,13 @@ class RagService:
             embedding_model=self._embedding_model,
         )
 
+    @staticmethod
+    def _content_hash(source: DocumentSource) -> str:
+        if source.content_hash is not None:
+            return source.content_hash
+        canonical_text = "\n\f\n".join(page.text for page in source.pages)
+        return hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
+
     async def index_sources(
         self,
         project_id: UUID,
@@ -163,6 +173,26 @@ class RagService:
         items: List[SourceIndexItem] = []
         for source in sources:
             try:
+                content_hash = self._content_hash(source)
+                duplicate_source_id = (
+                    await self._vector_store.find_source_by_content_hash(
+                        project_id,
+                        content_hash,
+                    )
+                )
+                if (
+                    duplicate_source_id is not None
+                    and duplicate_source_id != source.source_id
+                ):
+                    items.append(
+                        SourceIndexItem(
+                            source_id=source.source_id,
+                            source_type=source.source_type,
+                            status="DUPLICATE",
+                            duplicate_of_source_id=duplicate_source_id,
+                        )
+                    )
+                    continue
                 result = await self.index_documents(project_id, [source])
                 items.append(
                     SourceIndexItem(
@@ -185,6 +215,7 @@ class RagService:
         return SourceIndexResponse(
             project_id=project_id,
             indexed_count=sum(item.status == "INDEXED" for item in items),
+            duplicate_count=sum(item.status == "DUPLICATE" for item in items),
             failed_count=sum(item.status == "FAILED" for item in items),
             items=items,
         )

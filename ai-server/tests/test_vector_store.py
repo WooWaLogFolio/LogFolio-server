@@ -31,6 +31,7 @@ class FakePool:
         self.fetch_calls: List[Any] = []
         self.execute_calls: List[Any] = []
         self.search_rows: List[dict] = []
+        self.fetchrow_result = None
 
     @asynccontextmanager
     async def acquire(self):
@@ -39,6 +40,10 @@ class FakePool:
     async def fetch(self, sql: str, *args: Any) -> List[dict]:
         self.fetch_calls.append((sql, args))
         return self.search_rows
+
+    async def fetchrow(self, sql: str, *args: Any):
+        self.fetch_calls.append((sql, args))
+        return self.fetchrow_result
 
     async def execute(self, sql: str, *args: Any) -> None:
         self.execute_calls.append((sql, args))
@@ -265,3 +270,20 @@ async def test_replace_source_deletes_and_inserts_in_one_transaction() -> None:
     assert "WHERE project_id = $1 AND source_id = $2" in delete_sql
     assert delete_args == (project_id, source_chunk.source_id)
     assert len(pool.connection.executemany_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_find_duplicate_source_is_scoped_to_project_and_hash() -> None:
+    pool = FakePool()
+    existing_source_id = uuid4()
+    pool.fetchrow_result = {"source_id": existing_source_id}
+    store = PgVectorStore(pool, vector_dimension=3)
+    project_id = uuid4()
+    content_hash = "a" * 64
+
+    result = await store.find_source_by_content_hash(project_id, content_hash)
+
+    sql, args = pool.fetch_calls[0]
+    assert "project_id = $1 AND content_hash = $2" in sql
+    assert args == (project_id, content_hash)
+    assert result == existing_source_id

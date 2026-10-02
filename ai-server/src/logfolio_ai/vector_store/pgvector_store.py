@@ -10,9 +10,9 @@ _UPSERT_SQL = """
 INSERT INTO ai_document_chunks (
     chunk_id, project_id, source_id, source_type, source_name, sequence, page_number,
     section_title, char_start, char_end, token_count, content, embedding,
-    embedding_model
+    embedding_model, content_hash
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 )
 ON CONFLICT (chunk_id) DO UPDATE SET
     project_id = EXCLUDED.project_id,
@@ -28,6 +28,7 @@ ON CONFLICT (chunk_id) DO UPDATE SET
     content = EXCLUDED.content,
     embedding = EXCLUDED.embedding,
     embedding_model = EXCLUDED.embedding_model,
+    content_hash = EXCLUDED.content_hash,
     updated_at = CURRENT_TIMESTAMP
 """
 
@@ -69,6 +70,14 @@ FROM ai_document_chunks
 WHERE project_id = $1 AND source_id = ANY($2::uuid[])
 ORDER BY source_id, sequence
 LIMIT $3
+"""
+
+_FIND_SOURCE_BY_CONTENT_HASH_SQL = """
+SELECT source_id
+FROM ai_document_chunks
+WHERE project_id = $1 AND content_hash = $2
+ORDER BY sequence
+LIMIT 1
 """
 
 
@@ -126,6 +135,7 @@ class PgVectorStore:
         embeddings: Sequence[Sequence[float]],
         *,
         embedding_model: str,
+        content_hash: Optional[str] = None,
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
@@ -148,6 +158,7 @@ class PgVectorStore:
                 chunk.text,
                 self._validate_vector(embedding),
                 embedding_model,
+                content_hash,
             )
             for chunk, embedding in zip(chunks, embeddings)
         ]
@@ -172,6 +183,7 @@ class PgVectorStore:
         embeddings: Sequence[Sequence[float]],
         *,
         embedding_model: str,
+        content_hash: Optional[str] = None,
     ) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
@@ -194,6 +206,7 @@ class PgVectorStore:
                 chunk.text,
                 self._validate_vector(embedding),
                 embedding_model,
+                content_hash,
             )
             for chunk, embedding in zip(chunks, embeddings)
         ]
@@ -212,6 +225,25 @@ class PgVectorStore:
                 message="파일 Chunk 교체에 실패했습니다.",
                 status_code=503,
             ) from exc
+
+    async def find_source_by_content_hash(
+        self,
+        project_id: UUID,
+        content_hash: str,
+    ) -> Optional[UUID]:
+        try:
+            row = await self._pool.fetchrow(
+                _FIND_SOURCE_BY_CONTENT_HASH_SQL,
+                project_id,
+                content_hash,
+            )
+        except Exception as exc:
+            raise AppError(
+                code="VECTOR_STORE_ERROR",
+                message="중복 Source 조회에 실패했습니다.",
+                status_code=503,
+            ) from exc
+        return row["source_id"] if row is not None else None
 
     async def search(
         self,
