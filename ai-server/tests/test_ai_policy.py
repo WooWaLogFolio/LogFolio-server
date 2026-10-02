@@ -316,3 +316,88 @@ def test_rejection_without_evidence_snapshot_does_not_block_evidenced_claim() ->
     )
 
     assert len(result.candidates) == 1
+
+
+def edited_update_response(experience_id, proposed_claim) -> AnalysisResponse:
+    return AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="기존 경험 보강 초안",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                title="사용자 인터뷰 경험",
+                summary="기존 경험 보강",
+                claims=[proposed_claim],
+            )
+        ],
+        questions=[],
+    )
+
+
+def test_user_edited_value_is_protected_with_conflict_review() -> None:
+    experience_id = uuid4()
+    proposed = claim(
+        section_type="ACTION",
+        content="사용자 인터뷰 진행까지 담당했다.",
+    )
+    correction = UserCorrection(
+        experience_id=experience_id,
+        section_type="ACTION",
+        original_content="사용자 인터뷰를 진행했다.",
+        corrected_content="인터뷰 질문지 작성만 담당했다.",
+        decision="EDITED",
+    )
+
+    result = AIPolicyValidator().validate(
+        edited_update_response(experience_id, proposed),
+        corrections=[correction],
+    )
+    candidate = result.candidates[0]
+
+    assert candidate.conflict is True
+    assert len(candidate.conflicts) == 1
+    assert candidate.conflicts[0].existing_content == correction.corrected_content
+    assert candidate.conflicts[0].proposed_content == proposed.content
+
+
+def test_same_user_edited_value_does_not_create_conflict() -> None:
+    experience_id = uuid4()
+    corrected_content = "인터뷰 질문지 작성만 담당했다."
+    proposed = claim(section_type="ACTION", content=corrected_content)
+    correction = UserCorrection(
+        experience_id=experience_id,
+        section_type="ACTION",
+        original_content="사용자 인터뷰를 진행했다.",
+        corrected_content=corrected_content,
+        decision="EDITED",
+    )
+
+    result = AIPolicyValidator().validate(
+        edited_update_response(experience_id, proposed),
+        corrections=[correction],
+    )
+
+    assert result.candidates[0].conflict is False
+    assert result.candidates[0].conflicts == []
+
+
+def test_user_edit_from_other_experience_does_not_create_conflict() -> None:
+    target_experience_id = uuid4()
+    proposed = claim(content="사용자 인터뷰 진행까지 담당했다.")
+    correction = UserCorrection(
+        experience_id=uuid4(),
+        section_type="ACTION",
+        original_content="사용자 인터뷰를 진행했다.",
+        corrected_content="인터뷰 질문지 작성만 담당했다.",
+        decision="EDITED",
+    )
+
+    result = AIPolicyValidator().validate(
+        edited_update_response(target_experience_id, proposed),
+        corrections=[correction],
+    )
+
+    assert result.candidates[0].conflict is False

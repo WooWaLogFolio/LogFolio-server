@@ -95,6 +95,18 @@ def evaluate_cases(cases: Iterable[EvaluationCase]) -> EvaluationReport:
                 f"result types: expected {case.expected.result_types}, got {output.result_types}"
             )
 
+        if case.expected.conflict_candidate_indices is not None:
+            actual_conflicts = [
+                index
+                for index, candidate in enumerate(output.candidates)
+                if candidate.conflict
+            ]
+            if actual_conflicts != case.expected.conflict_candidate_indices:
+                messages.append(
+                    "conflict candidate indices: expected "
+                    f"{case.expected.conflict_candidate_indices}, got {actual_conflicts}"
+                )
+
         failures.extend(
             EvaluationFailure(case_id=case.case_id, message=message)
             for message in messages
