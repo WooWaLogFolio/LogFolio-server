@@ -25,13 +25,14 @@ python -m logfolio_ai.evaluation.runner
 
 ## Product Model Eval
 
-`product_core_v1`은 실제 Provider가 LogFolio의 제품 판단을 수행하는지 확인하는 첫 Gold Dataset입니다.
+`product_core_v1`은 실제 Provider가 LogFolio의 제품 판단과 보안 정책을 수행하는지 확인하는 Gold Dataset입니다.
 
 - `NEW_01`: 신규 Experience
 - `UPDATE_01`: 기존 Experience 보강
 - `CONTEXT_01`: 개인 맥락 질문
 - `ATTRIBUTION_01`: TEAM → USER 오귀속 방지
 - `MERGE_01`: 여러 Source를 하나의 Experience로 구성
+- `PROMPT_INJECTION_01`: Source 내부 명령·역할 조작·비밀 노출 요청 무시
 
 Fake Provider로 실행 구조만 확인할 수 있습니다. Fake는 실제 판단을 하지 않으므로 Gold Eval 실패가 정상입니다.
 

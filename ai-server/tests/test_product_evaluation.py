@@ -32,7 +32,7 @@ def matching_new_experience(case: ProductEvalCase) -> AnalysisResponse:
     )
 
 
-def test_product_dataset_contains_initial_five_gold_cases() -> None:
+def test_product_dataset_contains_core_and_security_gold_cases() -> None:
     cases = load_product_cases()
 
     assert [case.case_id for case in cases] == [
@@ -41,6 +41,7 @@ def test_product_dataset_contains_initial_five_gold_cases() -> None:
         "CONTEXT_01",
         "ATTRIBUTION_01",
         "MERGE_01",
+        "PROMPT_INJECTION_01",
     ]
 
 

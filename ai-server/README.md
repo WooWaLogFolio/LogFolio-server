@@ -331,6 +331,8 @@ python -m logfolio_ai.evaluation.product_runner \
 
 실제 프로젝트 분석에서 LLM을 호출하면 응답의 `aiUsage`에 Provider, Model, Token, Latency, Retry와 추정 비용을 반환합니다. 가격과 환율은 변할 수 있으므로 코드에 고정하지 않고 환경변수로 주입하며, 가격 설정이 불완전하면 비용을 임의 계산하지 않습니다. Spring은 이 값을 `analysisRunId` 및 인증된 사용자와 연결해 저장해야 합니다.
 
+Prompt Injection 방어를 위해 System Policy와 Source JSON은 Gemini 요청에서 서로 다른 역할로 전달합니다. Chunk, 기존 Experience, 사용자 수정값과 답변은 모두 신뢰할 수 없는 데이터로 취급하며, Source 내부 명령은 실행하지 않습니다. 결과는 이후 Evidence 검증과 AI Policy 검증을 다시 통과해야 합니다. `PROMPT_INJECTION_01` Gold Case는 이 동작을 실제 Provider Eval에서 반복 검사합니다.
+
 기본 설정은 외부 호출이 없는 Fake Provider입니다.
 
 ```bash
