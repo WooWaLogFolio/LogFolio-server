@@ -691,3 +691,207 @@ async def test_conflict_rejects_existing_content_not_supplied_by_spring() -> Non
         )
 
     assert error.value.code == "INVALID_CONFLICT_REFERENCE"
+
+
+@pytest.mark.asyncio
+async def test_full_pipeline_merges_duplicate_updates_for_same_experience() -> None:
+    analysis_request = request()
+    source = analysis_request.documents[0]
+    retrieved = search_result().model_copy(
+        update={
+            "source_id": source.source_id,
+            "text": "JWT 갱신 문제를 발견했고 동기화 로직으로 중복 호출을 막았다.",
+            "char_end": 39,
+        }
+    )
+    experience_id = uuid4()
+    existing_source_id = uuid4()
+    existing_chunk_id = uuid4()
+    analysis_request.existing_experiences = [
+        ExistingExperience(
+            experience_id=experience_id,
+            title="JWT 갱신 오류 해결",
+            evidences=[
+                ExistingEvidence(
+                    evidence_id=uuid4(),
+                    source_id=existing_source_id,
+                    chunk_id=existing_chunk_id,
+                )
+            ],
+        )
+    ]
+
+    def grounded_claim(section_type: str, content: str, excerpt: str) -> Claim:
+        return Claim(
+            section_type=section_type,
+            content=content,
+            subject_type=SubjectType.USER,
+            provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+            verification_status=VerificationStatus.VERIFIED,
+            evidence_type=EvidenceType.DIRECT,
+            evidences=[
+                Evidence(
+                    source_id=retrieved.source_id,
+                    chunk_id=retrieved.chunk_id,
+                    page_number=retrieved.page_number,
+                    excerpt=excerpt,
+                )
+            ],
+            requires_user_confirmation=False,
+        )
+
+    first_candidate_id = uuid4()
+    llm_response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="기존 경험 보강",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=first_candidate_id,
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                title="JWT 문제 발견",
+                summary="갱신 문제를 발견했다.",
+                claims=[
+                    grounded_claim(
+                        "CONTEXT",
+                        "JWT 갱신 문제를 발견했다.",
+                        "JWT 갱신 문제를 발견했고",
+                    )
+                ],
+            ),
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                title="JWT 중복 호출 해결",
+                summary="동기화 로직으로 해결했다.",
+                claims=[
+                    grounded_claim(
+                        "ACTION",
+                        "동기화 로직으로 중복 호출을 막았다.",
+                        "동기화 로직으로 중복 호출을 막았다.",
+                    )
+                ],
+            ),
+        ],
+    )
+    old_chunk = DocumentChunk(
+        chunk_id=existing_chunk_id,
+        source_id=existing_source_id,
+        source_name="기존 근거",
+        sequence=0,
+        char_start=0,
+        char_end=8,
+        token_count=3,
+        text="기존 JWT 근거",
+    )
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.USER_CONTRIBUTION,
+                query="사용자 기여",
+                chunks=[retrieved],
+            )
+        ],
+        [
+            ExistingExperienceContext(
+                experience_id=experience_id,
+                relevance_distance=0.1,
+                chunks=[old_chunk],
+            )
+        ],
+    )
+
+    result = await AnalysisOrchestrator(
+        rag, RecordingLLMProvider(llm_response)
+    ).analyze(analysis_request)
+
+    assert len(result.candidates) == 1
+    assert result.candidates[0].candidate_id == first_candidate_id
+    assert result.candidates[0].target_experience_id == experience_id
+    assert [item.section_type for item in result.candidates[0].claims] == [
+        "CONTEXT",
+        "ACTION",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_full_pipeline_keeps_independent_experiences_from_one_source() -> None:
+    analysis_request = request()
+    source = analysis_request.documents[0]
+    retrieved = search_result().model_copy(
+        update={
+            "source_id": source.source_id,
+            "text": "나는 JWT 중복 호출을 해결했다. 별도로 온보딩 단계를 줄였다.",
+            "char_end": 36,
+        }
+    )
+
+    def grounded_claim(content: str, excerpt: str) -> Claim:
+        return Claim(
+            section_type="ACTION",
+            content=content,
+            subject_type=SubjectType.USER,
+            provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+            verification_status=VerificationStatus.VERIFIED,
+            evidence_type=EvidenceType.DIRECT,
+            evidences=[
+                Evidence(
+                    source_id=retrieved.source_id,
+                    chunk_id=retrieved.chunk_id,
+                    page_number=retrieved.page_number,
+                    excerpt=excerpt,
+                )
+            ],
+            requires_user_confirmation=False,
+        )
+
+    llm_response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="독립 경험 두 개",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="JWT 오류 해결",
+                summary="중복 호출을 해결했다.",
+                claims=[
+                    grounded_claim(
+                        "JWT 중복 호출을 해결했다.",
+                        "JWT 중복 호출을 해결했다.",
+                    )
+                ],
+            ),
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="온보딩 개선",
+                summary="가입 단계를 줄였다.",
+                claims=[
+                    grounded_claim(
+                        "온보딩 단계를 줄였다.",
+                        "온보딩 단계를 줄였다.",
+                    )
+                ],
+            ),
+        ],
+    )
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.USER_CONTRIBUTION,
+                query="사용자 기여",
+                chunks=[retrieved],
+            )
+        ]
+    )
+
+    result = await AnalysisOrchestrator(
+        rag, RecordingLLMProvider(llm_response)
+    ).analyze(analysis_request)
+
+    assert len(result.candidates) == 2
+    assert {item.title for item in result.candidates} == {
+        "JWT 오류 해결",
+        "온보딩 개선",
+    }

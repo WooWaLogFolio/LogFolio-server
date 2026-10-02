@@ -42,6 +42,10 @@ def test_product_dataset_contains_core_and_security_gold_cases() -> None:
         "ATTRIBUTION_01",
         "MERGE_01",
         "SPLIT_01",
+        "CONFLICT_01",
+        "ADDITIONAL_SOURCE_01",
+        "NO_UPDATE_01",
+        "REJECTED_VALUE_01",
         "PROMPT_INJECTION_01",
     ]
 
@@ -55,6 +59,50 @@ def test_product_evaluator_compares_product_decisions() -> None:
     assert result.result_type_match is True
     assert result.experience_count_match is True
     assert result.critical_policy_violation is False
+
+
+def test_product_evaluator_checks_information_need() -> None:
+    case = load_product_cases(case_id="ADDITIONAL_SOURCE_01")[0]
+    output = AnalysisResponse(
+        analysis_run_id=case.input.analysis_run_id,
+        project_id=case.input.project_id,
+        summary="추가 자료가 필요합니다.",
+        candidates=[],
+        questions=[],
+        information_need="ADDITIONAL_SOURCE",
+        information_need_reason="행동과 결정이 드러나는 기록이 필요합니다.",
+    )
+
+    result = evaluate_product_output(case, output)
+
+    assert result.passed is True
+    assert result.information_need_match is True
+
+
+def test_product_evaluator_detects_missing_conflict() -> None:
+    case = load_product_cases(case_id="CONFLICT_01")[0]
+    experience_id = case.input.existing_experiences[0].experience_id
+    output = AnalysisResponse(
+        analysis_run_id=case.input.analysis_run_id,
+        project_id=case.input.project_id,
+        summary="기존 경험 보강",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                result_type="EXISTING_UPDATE",
+                target_experience_id=experience_id,
+                title="인터뷰 경험",
+                summary="새 Source를 반영합니다.",
+                claims=[],
+            )
+        ],
+    )
+
+    result = evaluate_product_output(case, output)
+
+    assert result.passed is False
+    assert result.conflict_match is False
+    assert "conflict expected=True actual=False" in result.failures
 
 
 def test_cost_estimate_uses_versioned_pricing() -> None:

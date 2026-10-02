@@ -1,0 +1,36 @@
+{
+  "caseId": "CONFLICT_01",
+  "title": "사용자 확정값과 새 Source 충돌",
+  "category": "CONFLICT",
+  "difficulty": "HARD",
+  "description": "새 Source가 기존 사용자 확정 Claim과 다를 때 자동 덮어쓰기하지 않고 Conflict Review로 보내는지 평가",
+  "input": {
+    "analysisRunId": "10000000-0000-0000-0000-000000000009",
+    "projectId": "20000000-0000-0000-0000-000000000001",
+    "chunks": [{
+      "chunkId": "30000000-0000-0000-0000-000000000009",
+      "sourceId": "40000000-0000-0000-0000-000000000009",
+      "sourceType": "QUICK_LOG",
+      "sourceName": "인터뷰 회고",
+      "text": "나는 인터뷰 질문지 작성뿐 아니라 인터뷰 진행까지 담당했다.",
+      "distance": 0.06,
+      "purposes": ["USER_CONTRIBUTION"],
+      "relatedExperienceIds": ["50000000-0000-0000-0000-000000000009"]
+    }],
+    "existingExperiences": [{
+      "experienceId": "50000000-0000-0000-0000-000000000009",
+      "title": "사용자 인터뷰 설계",
+      "summary": "인터뷰 질문지를 작성했다.",
+      "claims": [{"sectionType": "ACTION", "content": "인터뷰 질문지만 작성했다."}]
+    }]
+  },
+  "expected": {
+    "resultType": "EXISTING_UPDATE",
+    "targetExperienceId": "50000000-0000-0000-0000-000000000009",
+    "expectedExperienceCount": 1,
+    "requiresQuestion": false,
+    "conflict": true,
+    "forbiddenPhrases": ["기존 내용을 자동 수정했습니다"]
+  },
+  "humanRubric": ["기존 사용자 확정값을 유지한다", "차이를 Conflict로 표시하고 자동 해결하지 않는다"]
+}

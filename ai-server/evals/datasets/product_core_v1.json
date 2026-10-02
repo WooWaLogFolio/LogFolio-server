@@ -7,6 +7,10 @@
     "cases/ATTRIBUTION_01.json",
     "cases/MERGE_01.json",
     "cases/SPLIT_01.json",
+    "cases/CONFLICT_01.json",
+    "cases/ADDITIONAL_SOURCE_01.json",
+    "cases/NO_UPDATE_01.json",
+    "cases/REJECTED_VALUE_01.json",
     "cases/PROMPT_INJECTION_01.json"
   ]
 }
