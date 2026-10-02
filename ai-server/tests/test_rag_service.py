@@ -4,7 +4,12 @@ from uuid import UUID, uuid4
 import pytest
 
 from logfolio_ai.chunking import DocumentChunk
-from logfolio_ai.models import DocumentPage, DocumentSource
+from logfolio_ai.models import (
+    DocumentPage,
+    DocumentSource,
+    ExistingEvidence,
+    ExistingExperience,
+)
 from logfolio_ai.rag import AnalysisPurpose, RagService
 from logfolio_ai.vector_store import VectorSearchResult
 
@@ -35,6 +40,8 @@ class RecordingVectorStore:
         self.replace_calls: List[dict] = []
         self.search_calls: List[dict] = []
         self.results: List[VectorSearchResult] = []
+        self.chunks: List[DocumentChunk] = []
+        self.get_chunk_calls: List[dict] = []
 
     async def replace_source_chunks(
         self,
@@ -72,6 +79,17 @@ class RecordingVectorStore:
             }
         )
         return self.results
+
+    async def get_chunks(
+        self,
+        project_id: UUID,
+        chunk_ids: Sequence[UUID],
+    ) -> List[DocumentChunk]:
+        self.get_chunk_calls.append(
+            {"project_id": project_id, "chunk_ids": list(chunk_ids)}
+        )
+        requested = set(chunk_ids)
+        return [chunk for chunk in self.chunks if chunk.chunk_id in requested]
 
 
 def source(text: str = "JWT 인증 API를 구현했다.") -> DocumentSource:
@@ -159,3 +177,62 @@ async def test_blank_query_is_rejected_before_embedding() -> None:
 
     assert embedding.query_calls == []
     assert store.search_calls == []
+
+
+@pytest.mark.asyncio
+async def test_related_experience_is_selected_before_exact_evidence_is_loaded() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    service = rag_service(embedding, store)
+    project_id = uuid4()
+    new_source_id = uuid4()
+    evidence_source_id = uuid4()
+    evidence_chunk_id = uuid4()
+    experience_id = uuid4()
+    store.results = [
+        VectorSearchResult(
+            chunk_id=uuid4(),
+            source_id=new_source_id,
+            source_name="new-log",
+            sequence=0,
+            char_start=0,
+            char_end=10,
+            text="JWT 인증을 개선했다.",
+            distance=0.2,
+        )
+    ]
+    store.chunks = [
+        DocumentChunk(
+            chunk_id=evidence_chunk_id,
+            source_id=evidence_source_id,
+            source_name="old-report.pdf",
+            sequence=0,
+            char_start=0,
+            char_end=13,
+            token_count=4,
+            text="기존 JWT 인증 구현 근거",
+        )
+    ]
+    experience = ExistingExperience(
+        experience_id=experience_id,
+        title="JWT 인증 구현",
+        evidences=[
+            ExistingEvidence(
+                evidence_id=uuid4(),
+                source_id=evidence_source_id,
+                chunk_id=evidence_chunk_id,
+            )
+        ],
+    )
+
+    contexts = await service.retrieve_related_experience_context(
+        project_id,
+        [new_source_id],
+        [experience],
+    )
+
+    assert len(contexts) == 1
+    assert contexts[0].experience_id == experience_id
+    assert contexts[0].chunks[0].chunk_id == evidence_chunk_id
+    assert store.search_calls[0]["source_ids"] == [new_source_id]
+    assert store.get_chunk_calls[0]["chunk_ids"] == [evidence_chunk_id]

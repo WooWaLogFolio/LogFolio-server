@@ -57,12 +57,19 @@ class ExistingClaim(ContractModel):
     content: str = Field(min_length=1)
 
 
+class ExistingEvidence(ContractModel):
+    evidence_id: UUID
+    source_id: UUID
+    chunk_id: UUID
+
+
 class ExistingExperience(ContractModel):
     experience_id: UUID
     title: str = Field(min_length=1, max_length=255)
     summary: Optional[str] = None
     claims: List[ExistingClaim] = Field(default_factory=list)
     evidence_ids: List[UUID] = Field(default_factory=list)
+    evidences: List[ExistingEvidence] = Field(default_factory=list)
 
 
 class UserCorrection(ContractModel):

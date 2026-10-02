@@ -7,10 +7,16 @@ from logfolio_ai.core.errors import AppError
 from logfolio_ai.embedding import EmbeddingProvider
 from logfolio_ai.models import (
     DocumentSource,
+    ExistingExperience,
     SourceIndexItem,
     SourceIndexResponse,
 )
-from logfolio_ai.rag.models import AnalysisPurpose, IndexingResult, RetrievalContext
+from logfolio_ai.rag.models import (
+    AnalysisPurpose,
+    ExistingExperienceContext,
+    IndexingResult,
+    RetrievalContext,
+)
 from logfolio_ai.vector_store import VectorSearchResult, VectorStore
 
 DEFAULT_ANALYSIS_QUERIES: Dict[AnalysisPurpose, str] = {
@@ -32,6 +38,8 @@ class RagService:
         chunk_size_tokens: int = 700,
         chunk_overlap_tokens: int = 100,
         top_k: int = 5,
+        existing_experience_match_distance: float = 0.4,
+        max_related_experiences: int = 3,
     ) -> None:
         self._embedding_provider = embedding_provider
         self._vector_store = vector_store
@@ -39,6 +47,16 @@ class RagService:
         self._chunk_size_tokens = chunk_size_tokens
         self._chunk_overlap_tokens = chunk_overlap_tokens
         self._top_k = top_k
+        self._existing_experience_match_distance = existing_experience_match_distance
+        self._max_related_experiences = max_related_experiences
+
+    @staticmethod
+    def _experience_query(experience: ExistingExperience) -> str:
+        parts = [experience.title]
+        if experience.summary:
+            parts.append(experience.summary)
+        parts.extend(claim.content for claim in experience.claims)
+        return "\n".join(parts)
 
     async def index_documents(
         self,
@@ -164,3 +182,73 @@ class RagService:
                 )
             )
         )
+
+    async def retrieve_related_experience_context(
+        self,
+        project_id: UUID,
+        source_ids: Sequence[UUID],
+        existing_experiences: Sequence[ExistingExperience],
+    ) -> List[ExistingExperienceContext]:
+        """Match new Sources first, then load exact evidence for related Experiences."""
+
+        eligible = [experience for experience in existing_experiences if experience.evidences]
+        if not source_ids or not eligible:
+            return []
+
+        queries = [self._experience_query(experience) for experience in eligible]
+        embeddings = await self._embedding_provider.embed_queries(queries)
+        if len(embeddings) != len(eligible):
+            raise AppError(
+                code="EMBEDDING_COUNT_MISMATCH",
+                message="기존 경험과 Embedding 개수가 일치하지 않습니다.",
+                status_code=500,
+            )
+
+        async def match(experience: ExistingExperience, embedding: List[float]):
+            results = await self._vector_store.search(
+                project_id,
+                embedding,
+                top_k=1,
+                source_ids=source_ids,
+            )
+            if not results:
+                return None
+            return experience, results[0].distance
+
+        matches = await asyncio.gather(
+            *(match(experience, embedding) for experience, embedding in zip(eligible, embeddings))
+        )
+        related = sorted(
+            (
+                item
+                for item in matches
+                if item is not None
+                and item[1] <= self._existing_experience_match_distance
+            ),
+            key=lambda item: (item[1], str(item[0].experience_id)),
+        )[: self._max_related_experiences]
+
+        contexts: List[ExistingExperienceContext] = []
+        for experience, distance in related:
+            chunks = await self._vector_store.get_chunks(
+                project_id,
+                [evidence.chunk_id for evidence in experience.evidences],
+            )
+            allowed = {
+                (evidence.source_id, evidence.chunk_id)
+                for evidence in experience.evidences
+            }
+            verified_chunks = [
+                chunk
+                for chunk in chunks
+                if (chunk.source_id, chunk.chunk_id) in allowed
+            ]
+            if verified_chunks:
+                contexts.append(
+                    ExistingExperienceContext(
+                        experience_id=experience.experience_id,
+                        relevance_distance=distance,
+                        chunks=verified_chunks,
+                    )
+                )
+        return contexts

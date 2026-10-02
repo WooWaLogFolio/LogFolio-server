@@ -66,7 +66,14 @@ X-Internal-API-Key: <shared-secret>
       "title": "사용자 인터뷰 설계",
       "summary": "인터뷰 질문지를 설계한 경험",
       "claims": [{"sectionType": "ACTION", "content": "질문지를 작성했다."}],
-      "evidenceIds": []
+      "evidenceIds": ["70000000-0000-0000-0000-000000000001"],
+      "evidences": [
+        {
+          "evidenceId": "70000000-0000-0000-0000-000000000001",
+          "sourceId": "30000000-0000-0000-0000-000000000003",
+          "chunkId": "80000000-0000-0000-0000-000000000001"
+        }
+      ]
     }
   ],
   "corrections": []
@@ -79,11 +86,25 @@ X-Internal-API-Key: <shared-secret>
 - JSON 필드는 camelCase
 - `sourceIds`는 이번 Analysis Run에 새로 반영할 `INDEXED` Source이며 최대 50개
 - `existingExperiences`에는 현재 프로젝트의 기존 Experience 요약·Claim·Evidence ID를 전달
+- `evidences`의 `sourceId + chunkId`는 관련 Experience가 선택됐을 때 FastAPI가 기존 Evidence 원문을 정확히 다시 조회하는 키
 - `corrections`에는 사용자가 이전에 수정하거나 거절한 내용을 전달
 - Spring이 S3 원본을 보관하고 파일 텍스트를 추출
 - 동일 분석 작업의 재시도에는 같은 `analysisRunId` 사용
 - `projectId`의 접근 권한과 삭제 상태를 Spring에서 확인한 뒤 호출
 - 이전 `documents` 직접 전달 방식은 하위 호환용이며 신규 연동에서는 사용하지 않음
+
+분석 순서:
+
+```text
+새 Source 검색
+→ Existing Experience 전체의 제목·요약·Claim과 의미 비교
+→ 거리 기준을 통과한 관련 Experience를 최대 3개 선택
+→ 선택된 Experience의 evidence chunkId로 기존 원문 조회
+→ 새 Source + 관련 기존 Evidence를 LLM에 전달
+→ 최종 분류
+```
+
+기본 의미 거리 기준은 `0.4`이며 운영 평가 데이터로 조정합니다. 기준을 통과하지 못한 Experience는 강제로 보강 대상으로 연결하지 않습니다.
 
 ## Success response
 

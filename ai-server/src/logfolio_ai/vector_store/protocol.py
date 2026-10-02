@@ -26,3 +26,10 @@ class VectorStore(Protocol):
         source_ids: Optional[Sequence[UUID]] = None,
     ) -> List[VectorSearchResult]:
         """Search only within one authorized project."""
+
+    async def get_chunks(
+        self,
+        project_id: UUID,
+        chunk_ids: Sequence[UUID],
+    ) -> List[DocumentChunk]:
+        """Load exact evidence chunks within one authorized project."""

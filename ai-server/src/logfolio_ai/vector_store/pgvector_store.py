@@ -52,6 +52,15 @@ DELETE FROM ai_document_chunks
 WHERE project_id = $1 AND source_id = $2
 """
 
+_GET_CHUNKS_SQL = """
+SELECT
+    chunk_id, source_id, source_type, source_name, sequence, page_number,
+    section_title, char_start, char_end, token_count, content
+FROM ai_document_chunks
+WHERE project_id = $1 AND chunk_id = ANY($2::uuid[])
+ORDER BY chunk_id
+"""
+
 
 class PgVectorStore:
     def __init__(self, pool: Any, *, vector_dimension: int = 768) -> None:
@@ -236,6 +245,38 @@ class PgVectorStore:
                 char_end=row["char_end"],
                 text=row["content"],
                 distance=float(row["distance"]),
+            )
+            for row in rows
+        ]
+
+    async def get_chunks(
+        self,
+        project_id: UUID,
+        chunk_ids: Sequence[UUID],
+    ) -> List[DocumentChunk]:
+        if not chunk_ids:
+            return []
+        try:
+            rows = await self._pool.fetch(_GET_CHUNKS_SQL, project_id, list(chunk_ids))
+        except Exception as exc:
+            raise AppError(
+                code="VECTOR_STORE_ERROR",
+                message="기존 경험 근거 조회에 실패했습니다.",
+                status_code=503,
+            ) from exc
+        return [
+            DocumentChunk(
+                chunk_id=row["chunk_id"],
+                source_id=row["source_id"],
+                source_type=row["source_type"],
+                source_name=row["source_name"],
+                sequence=row["sequence"],
+                page_number=row["page_number"],
+                section_title=row["section_title"],
+                char_start=row["char_start"],
+                char_end=row["char_end"],
+                token_count=row["token_count"],
+                text=row["content"],
             )
             for row in rows
         ]

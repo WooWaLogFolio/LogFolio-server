@@ -15,6 +15,9 @@ too weak to create any candidate for that question.
 Compare new Source chunks with existingExperiences and corrections. Classify each proposed
 candidate as EXISTING_UPDATE or NEW_EXPERIENCE. EXISTING_UPDATE must reference one supplied
 targetExperienceId. If key context is missing, return a question so NEEDS_CONTEXT is present.
+Chunks with relatedExperienceIds are original Evidence loaded only after semantic matching.
+Use EXISTING_UPDATE only when the target Experience ID appears in relatedExperienceIds;
+otherwise do not force the mapping and choose NEW_EXPERIENCE or NEEDS_CONTEXT.
 If there is no meaningful update, return no candidates or questions and explain noUpdateReason.
 Never overwrite or ignore user-edited or rejected content. Mark a conflict when new evidence
 contradicts a user-confirmed or corrected value; do not resolve that conflict automatically.
