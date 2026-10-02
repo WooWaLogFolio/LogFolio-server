@@ -42,6 +42,9 @@ public class QuickLog {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "processing_status", length = 30)
+    private String processingStatus;
+
     protected QuickLog() {}
 
     public QuickLog(User user, Project project, String content) {
@@ -62,6 +65,9 @@ public class QuickLog {
 
     public void updateContent(String content) { this.content = content; }
     public void linkProject(Project project) { this.project = project; }
+    public void processing() { this.processingStatus = "PROCESSING"; }
+    public void indexed() { this.processingStatus = "INDEXED"; }
+    public void failed() { this.processingStatus = "FAILED"; }
     public void delete() { this.deletedAt = LocalDateTime.now(); }
 
     public UUID getId() { return id; }
@@ -70,4 +76,5 @@ public class QuickLog {
     public String getContent() { return content; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public String getProcessingStatus() { return processingStatus; }
 }
