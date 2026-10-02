@@ -7,6 +7,18 @@ class SubjectType(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class SourceType(str, Enum):
+    PROJECT_FILE = "PROJECT_FILE"
+    QUICK_LOG = "QUICK_LOG"
+
+
+class AnalysisResultType(str, Enum):
+    EXISTING_UPDATE = "EXISTING_UPDATE"
+    NEW_EXPERIENCE = "NEW_EXPERIENCE"
+    NEEDS_CONTEXT = "NEEDS_CONTEXT"
+    NO_UPDATE = "NO_UPDATE"
+
+
 class ProvenanceType(str, Enum):
     SOURCE_EXTRACTED = "SOURCE_EXTRACTED"
     AI_INFERRED = "AI_INFERRED"

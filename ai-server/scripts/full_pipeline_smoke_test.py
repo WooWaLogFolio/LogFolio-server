@@ -30,7 +30,7 @@ async def seed_other_project() -> None:
         await connection.execute(
             """
             INSERT INTO ai_document_chunks (
-                chunk_id, project_id, project_file_id, original_name, sequence, page_number,
+                chunk_id, project_id, source_id, source_name, sequence, page_number,
                 section_title, char_start, char_end, token_count, content, embedding,
                 embedding_model
             ) VALUES (
@@ -39,7 +39,7 @@ async def seed_other_project() -> None:
             )
             ON CONFLICT (chunk_id) DO UPDATE SET
                 project_id = EXCLUDED.project_id,
-                project_file_id = EXCLUDED.project_file_id,
+                source_id = EXCLUDED.source_id,
                 content = EXCLUDED.content,
                 embedding = EXCLUDED.embedding,
                 embedding_model = EXCLUDED.embedding_model
@@ -78,8 +78,8 @@ def call_analysis() -> tuple[dict, float]:
         "projectId": PROJECT_ID,
         "documents": [
             {
-                "projectFileId": SOURCE_ID,
-                "originalName": "synthetic-full-pipeline.txt",
+                "sourceId": SOURCE_ID,
+                "sourceName": "synthetic-full-pipeline.txt",
                 "mimeType": "text/plain",
                 "pages": [{"pageNumber": 1, "text": SOURCE_TEXT}],
             }
@@ -118,7 +118,7 @@ async def verify_pgvector() -> dict:
                 MAX(vector_dims(embedding)) AS max_dimension,
                 ARRAY_AGG(DISTINCT embedding_model) AS models
             FROM ai_document_chunks
-            WHERE project_id = $1::uuid AND project_file_id = $2::uuid
+            WHERE project_id = $1::uuid AND source_id = $2::uuid
             """,
             PROJECT_ID,
             SOURCE_ID,
@@ -126,7 +126,7 @@ async def verify_pgvector() -> dict:
         decoy_count = await connection.fetchval(
             """
             SELECT COUNT(*) FROM ai_document_chunks
-            WHERE project_id = $1::uuid AND project_file_id = $2::uuid
+            WHERE project_id = $1::uuid AND source_id = $2::uuid
             """,
             OTHER_PROJECT_ID,
             OTHER_SOURCE_ID,
@@ -169,7 +169,7 @@ def verify_response(body: dict) -> dict:
                 raise RuntimeError("Gemini forged a user-owned provenance state")
             for evidence in claim.get("evidences", []):
                 evidence_count += 1
-                if evidence.get("projectFileId") != SOURCE_ID:
+                if evidence.get("sourceId") != SOURCE_ID:
                     raise RuntimeError("evidence leaked from another project or source")
                 if evidence.get("excerpt") not in SOURCE_TEXT:
                     raise RuntimeError("evidence excerpt does not match the source text")

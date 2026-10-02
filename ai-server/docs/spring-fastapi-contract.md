@@ -2,7 +2,45 @@
 
 이 문서는 Spring 서버가 LogFolio FastAPI AI 서버를 호출할 때 사용하는 내부 계약입니다. 사용자 인증과 프로젝트 접근 권한은 Spring이 먼저 확인하며, FastAPI는 브라우저에서 직접 호출하지 않습니다.
 
-## Endpoint
+## 1. Source 자동 전처리·인덱싱
+
+Spring은 Project File 또는 Quick Log 저장이 끝나면 아래 API를 호출합니다. 이 API는 LLM 분석을 실행하지 않고 Source를 검색 가능한 상태로만 만듭니다.
+
+```text
+POST /api/v1/sources/index
+Content-Type: application/json
+X-Internal-API-Key: <shared-secret>
+```
+
+```json
+{
+  "projectId": "20000000-0000-0000-0000-000000000001",
+  "sources": [
+    {
+      "sourceId": "30000000-0000-0000-0000-000000000001",
+      "sourceType": "PROJECT_FILE",
+      "sourceName": "project-report.pdf",
+      "mimeType": "application/pdf",
+      "pages": [{"pageNumber": 1, "text": "프로젝트 팀은 인터뷰를 진행했다."}]
+    },
+    {
+      "sourceId": "30000000-0000-0000-0000-000000000002",
+      "sourceType": "QUICK_LOG",
+      "sourceName": "30초 기록",
+      "pages": [{"text": "내가 인터뷰 질문지를 작성했다."}]
+    }
+  ]
+}
+```
+
+- `sourceType`: `PROJECT_FILE` 또는 `QUICK_LOG`
+- 요청당 Source는 최대 20개
+- 각 Source는 독립 처리하며 일부가 실패해도 성공한 Source는 `INDEXED`로 유지
+- 같은 `projectId + sourceId`를 다시 보내면 기존 Chunk를 교체하므로 중복 저장하지 않음
+
+응답의 각 `items[].status`는 `INDEXED` 또는 `FAILED`입니다. Spring은 이 값을 Source의 처리 상태에 반영합니다.
+
+## 2. 프로젝트 AI 분석
 
 ```text
 POST /api/v1/analyses
@@ -18,19 +56,20 @@ X-Internal-API-Key: <shared-secret>
 {
   "analysisRunId": "10000000-0000-0000-0000-000000000001",
   "projectId": "20000000-0000-0000-0000-000000000001",
-  "documents": [
+  "sourceIds": [
+    "30000000-0000-0000-0000-000000000001",
+    "30000000-0000-0000-0000-000000000002"
+  ],
+  "existingExperiences": [
     {
-      "projectFileId": "30000000-0000-0000-0000-000000000001",
-      "originalName": "project-report.pdf",
-      "mimeType": "application/pdf",
-      "pages": [
-        {
-          "pageNumber": 1,
-          "text": "프로젝트 팀은 사용자 인터뷰를 진행했다."
-        }
-      ]
+      "experienceId": "60000000-0000-0000-0000-000000000001",
+      "title": "사용자 인터뷰 설계",
+      "summary": "인터뷰 질문지를 설계한 경험",
+      "claims": [{"sectionType": "ACTION", "content": "질문지를 작성했다."}],
+      "evidenceIds": []
     }
-  ]
+  ],
+  "corrections": []
 }
 ```
 
@@ -38,10 +77,13 @@ X-Internal-API-Key: <shared-secret>
 
 - 모든 ID는 UUID 문자열
 - JSON 필드는 camelCase
-- 파일은 1개 이상, 최대 3개
-- Spring이 S3 원본을 보관하고 텍스트를 추출
+- `sourceIds`는 이번 Analysis Run에 새로 반영할 `INDEXED` Source이며 최대 50개
+- `existingExperiences`에는 현재 프로젝트의 기존 Experience 요약·Claim·Evidence ID를 전달
+- `corrections`에는 사용자가 이전에 수정하거나 거절한 내용을 전달
+- Spring이 S3 원본을 보관하고 파일 텍스트를 추출
 - 동일 분석 작업의 재시도에는 같은 `analysisRunId` 사용
 - `projectId`의 접근 권한과 삭제 상태를 Spring에서 확인한 뒤 호출
+- 이전 `documents` 직접 전달 방식은 하위 호환용이며 신규 연동에서는 사용하지 않음
 
 ## Success response
 
@@ -53,6 +95,9 @@ X-Internal-API-Key: <shared-secret>
   "candidates": [
     {
       "candidateId": "40000000-0000-0000-0000-000000000001",
+      "resultType": "EXISTING_UPDATE",
+      "targetExperienceId": "60000000-0000-0000-0000-000000000001",
+      "conflict": false,
       "title": "인증 기능 구현 경험",
       "summary": "JWT 인증 기능을 구현한 경험입니다.",
       "claims": []
@@ -66,10 +111,17 @@ X-Internal-API-Key: <shared-secret>
       "question": "인증 기능을 적용한 후 어떤 변화가 있었나요?",
       "suggestedAnswers": []
     }
-  ]
+  ],
+  "resultTypes": ["EXISTING_UPDATE", "NEEDS_CONTEXT"],
+  "noUpdateReason": null
 }
 ```
 
+- `resultType`: `EXISTING_UPDATE` 또는 `NEW_EXPERIENCE`
+- 질문이 있으면 응답의 `resultTypes`에 `NEEDS_CONTEXT` 포함
+- 후보와 질문이 모두 없으면 `NO_UPDATE`이며 `noUpdateReason`으로 이유 전달
+- `EXISTING_UPDATE`는 요청에 포함된 기존 Experience의 `targetExperienceId` 필수
+- 기존 사용자 확정값과 충돌하면 `conflict=true`; FastAPI가 자동 덮어쓰지 않음
 - 경험 후보는 최대 3개
 - 보완 질문은 최대 2개
 - `questions[].candidateId`는 응답에 포함된 경험 후보를 가리킴

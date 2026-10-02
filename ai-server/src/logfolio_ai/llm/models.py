@@ -4,13 +4,16 @@ from uuid import UUID
 from pydantic import Field
 
 from logfolio_ai.models.base import ContractModel
+from logfolio_ai.models.analysis import ExistingExperience, UserCorrection
+from logfolio_ai.models.enums import SourceType
 from logfolio_ai.rag.models import AnalysisPurpose
 
 
 class GroundedChunk(ContractModel):
     chunk_id: UUID
-    project_file_id: UUID
-    original_name: str
+    source_id: UUID
+    source_type: SourceType = SourceType.PROJECT_FILE
+    source_name: str
     page_number: Optional[int] = Field(default=None, ge=1)
     section_title: Optional[str] = None
     text: str = Field(min_length=1)
@@ -22,3 +25,8 @@ class GroundedAnalysisInput(ContractModel):
     analysis_run_id: UUID
     project_id: UUID
     chunks: List[GroundedChunk] = Field(default_factory=list, max_length=25)
+    existing_experiences: List[ExistingExperience] = Field(
+        default_factory=list,
+        max_length=100,
+    )
+    corrections: List[UserCorrection] = Field(default_factory=list, max_length=100)

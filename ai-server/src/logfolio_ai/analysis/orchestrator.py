@@ -39,8 +39,9 @@ class AnalysisOrchestrator:
                 if existing is None:
                     chunk = GroundedChunk(
                         chunk_id=result.chunk_id,
-                        project_file_id=result.project_file_id,
-                        original_name=result.original_name,
+                        source_id=result.source_id,
+                        source_type=result.source_type,
+                        source_name=result.source_name,
                         page_number=result.page_number,
                         section_title=result.section_title,
                         text=result.text,
@@ -74,7 +75,11 @@ class AnalysisOrchestrator:
             for claim in candidate.claims:
                 for evidence in claim.evidences:
                     source = chunks.get(evidence.chunk_id)
-                    if source is None or source.project_file_id != evidence.project_file_id:
+                    if (
+                        source is None
+                        or source.source_id != evidence.source_id
+                        or source.source_type != evidence.source_type
+                    ):
                         raise AppError(
                             code="UNGROUNDED_EVIDENCE",
                             message="AI가 검색되지 않은 근거를 반환했습니다.",
@@ -98,15 +103,24 @@ class AnalysisOrchestrator:
 
     async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
         started_at = time.perf_counter()
-        await self._rag_service.index_documents(request.project_id, request.documents)
+        if request.documents:
+            await self._rag_service.index_documents(request.project_id, request.documents)
         indexed_at = time.perf_counter()
-        contexts = await self._rag_service.retrieve_analysis_context(request.project_id)
+        source_ids = request.source_ids or [
+            document.source_id for document in request.documents
+        ]
+        contexts = await self._rag_service.retrieve_analysis_context(
+            request.project_id,
+            source_ids=source_ids,
+        )
         retrieved_at = time.perf_counter()
         grounded_chunks = self._build_grounded_chunks(contexts)
         grounded_input = GroundedAnalysisInput(
             analysis_run_id=request.analysis_run_id,
             project_id=request.project_id,
             chunks=grounded_chunks,
+            existing_experiences=request.existing_experiences,
+            corrections=request.corrections,
         )
         logger.info(
             "Analysis grounding prepared: index=%.3fs retrieve=%.3fs chunks=%d",
@@ -116,6 +130,19 @@ class AnalysisOrchestrator:
         )
         response = await self._llm_provider.analyze_grounded(grounded_input)
         generated_at = time.perf_counter()
+        existing_ids = {
+            experience.experience_id for experience in request.existing_experiences
+        }
+        for candidate in response.candidates:
+            if (
+                candidate.target_experience_id is not None
+                and candidate.target_experience_id not in existing_ids
+            ):
+                raise AppError(
+                    code="INVALID_TARGET_EXPERIENCE",
+                    message="AI가 요청에 없는 기존 경험을 보강 대상으로 반환했습니다.",
+                    status_code=502,
+                )
         self._validate_evidence(response, grounded_chunks)
         validated = self._policy_validator.validate(response)
         completed_at = time.perf_counter()

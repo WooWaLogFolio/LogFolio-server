@@ -4,9 +4,10 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from logfolio_ai.analysis.dependencies import get_analysis_orchestrator
+from logfolio_ai.analysis.dependencies import get_analysis_orchestrator, get_rag_service
 from logfolio_ai.core.config import Settings, get_settings
 from logfolio_ai.main import app, prepare_runtime
+from logfolio_ai.models import SourceIndexItem, SourceIndexResponse
 
 client = TestClient(app)
 
@@ -17,8 +18,8 @@ def valid_analysis_payload() -> dict:
         "projectId": str(uuid4()),
         "documents": [
             {
-                "projectFileId": str(uuid4()),
-                "originalName": "project.pdf",
+                "sourceId": str(uuid4()),
+                "sourceName": "project.pdf",
                 "mimeType": "application/pdf",
                 "pages": [
                     {
@@ -208,3 +209,54 @@ def test_analysis_timeout_uses_shared_error_shape() -> None:
         "message": "AI 분석 제한 시간을 초과했습니다.",
         "details": [],
     }
+
+
+def test_source_index_endpoint_accepts_project_file_and_quick_log() -> None:
+    class RecordingRagService:
+        async def index_sources(self, project_id, sources):
+            source_list = list(sources)
+            return SourceIndexResponse(
+                project_id=project_id,
+                indexed_count=2,
+                failed_count=0,
+                items=[
+                    SourceIndexItem(
+                        source_id=source.source_id,
+                        source_type=source.source_type,
+                        status="INDEXED",
+                        chunk_count=1,
+                    )
+                    for source in source_list
+                ],
+            )
+
+    project_id = uuid4()
+    payload = {
+        "projectId": str(project_id),
+        "sources": [
+            {
+                "sourceId": str(uuid4()),
+                "sourceType": "PROJECT_FILE",
+                "sourceName": "기획서.pdf",
+                "pages": [{"pageNumber": 1, "text": "서비스 기획 자료"}],
+            },
+            {
+                "sourceId": str(uuid4()),
+                "sourceType": "QUICK_LOG",
+                "sourceName": "30초 기록",
+                "pages": [{"text": "회의에서 검색 범위를 결정했다."}],
+            },
+        ],
+    }
+    app.dependency_overrides[get_rag_service] = lambda: RecordingRagService()
+    try:
+        response = client.post("/api/v1/sources/index", json=payload)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["indexedCount"] == 2
+    assert [item["sourceType"] for item in response.json()["items"]] == [
+        "PROJECT_FILE",
+        "QUICK_LOG",
+    ]

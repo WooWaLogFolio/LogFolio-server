@@ -17,7 +17,7 @@ from logfolio_ai.policy import AIPolicyValidator
 
 def evidence(excerpt: str) -> Evidence:
     return Evidence(
-        project_file_id=uuid4(),
+        source_id=uuid4(),
         chunk_id=uuid4(),
         page_number=1,
         excerpt=excerpt,

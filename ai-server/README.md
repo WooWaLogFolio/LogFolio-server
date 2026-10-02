@@ -1,6 +1,6 @@
 # LogFolio AI Server
 
-LogFolio AI Server는 사용자가 업로드한 프로젝트 자료에서 경험을 발견하고, 그 근거를 함께 제시하는 AI 분석 서버입니다.
+LogFolio AI Server는 사용자가 프로젝트에 쌓은 파일과 Quick Log에서 경험을 발견하고, 기존 경험과 비교해 근거와 함께 제안하는 AI 분석 서버입니다.
 
 단순히 자연스러운 포트폴리오 문장을 생성하는 것이 아니라, 문서에 실제로 존재하는 내용과 사용자가 직접 기여한 내용을 구분합니다. AI가 만든 결과는 초안으로 제공되며 사용자의 검토를 거친 뒤에만 최종 경험카드로 저장됩니다.
 
@@ -58,24 +58,24 @@ FastAPI는 사용자 파일의 원본 저장이나 로그인 처리를 담당하
 
 ## How an analysis works
 
-### 1. Receive extracted text
+### 1. Index a Source automatically
 
-Spring이 파일 원본을 저장하고 텍스트를 추출한 뒤, 프로젝트 및 파일 식별자와 함께 FastAPI에 전달합니다.
+Spring이 Project File 또는 Quick Log를 저장하면 텍스트와 Source 식별자를 `/api/v1/sources/index`로 전달합니다. FastAPI는 이때 Chunking과 Embedding을 수행하지만 LLM 분석은 실행하지 않습니다. 일부 Source가 실패해도 성공한 Source는 검색 가능한 상태로 유지합니다.
 
-분석 요청은 `analysisRunId`로 추적합니다. 한 번의 요청에서는 최대 3개 파일을 처리합니다.
+사용자가 `AI 분석하기`를 선택하면 Spring이 별도의 `/api/v1/analyses` 요청을 보냅니다. 분석 요청은 `analysisRunId`로 추적하며, 새 Source ID와 현재 프로젝트의 기존 Experience 요약·Claim·Evidence 메타데이터를 함께 전달합니다. 이미 인덱싱한 Source는 다시 전처리하지 않습니다.
 
 ### 2. Build searchable document chunks
 
 FastAPI는 긴 문서를 섹션, 문단, 문장 경계를 고려해 작은 Chunk로 나눕니다. 각 Chunk에는 원문을 다시 확인할 수 있도록 다음 정보를 유지합니다.
 
 - 프로젝트 ID
-- 파일 ID
+- Source ID와 Source Type (`PROJECT_FILE` 또는 `QUICK_LOG`)
 - Chunk ID와 문서 내 순서
 - 페이지 또는 원문 위치
 - 문서 및 섹션 제목
 - 원문 텍스트
 
-초기 구현은 페이지 경계를 넘어서 Chunk를 합치지 않으며, 기본 크기 700단위와 Overlap 100단위로 시작합니다. 현재 단위 계산은 모델별 토크나이저가 아닌 가벼운 결정적 추정 방식이므로 실제 검색 품질 평가에 따라 조정합니다. 같은 파일 ID와 같은 원문에는 동일한 Chunk ID를 생성하여 재시도 시 중복을 줄입니다.
+초기 구현은 페이지 경계를 넘어서 Chunk를 합치지 않으며, 기본 크기 700단위와 Overlap 100단위로 시작합니다. 현재 단위 계산은 모델별 토크나이저가 아닌 가벼운 결정적 추정 방식이므로 실제 검색 품질 평가에 따라 조정합니다. 같은 Source ID·Type과 같은 원문에는 동일한 Chunk ID를 생성하여 재시도 시 중복을 줄입니다.
 
 ### 3. Create embeddings
 
@@ -114,6 +114,7 @@ MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터�
 - Claim을 뒷받침하는 Evidence
 - 최대 3개의 경험 후보
 - 최대 2개의 보완 질문
+- 기존 경험 보강, 새 경험, 확인 필요, 반영 없음의 분석 결과
 
 외부 LLM은 Provider 인터페이스 뒤에 분리하여 공급자나 모델이 변경되더라도 분석 흐름 전체를 다시 작성하지 않도록 설계합니다.
 
@@ -251,7 +252,7 @@ MVP는 정확한 근거 추적과 사용자 검토 흐름을 우선합니다.
 
 ## Development status
 
-현재 Spring–FastAPI 요청·응답 모델, 공통 오류 응답, LLM Provider, Chunking, Embedding, pgvector 저장·검색, RAG 분석, AI Policy 검증과 고정 평가 데이터셋이 구현되어 있습니다. Docker Compose 환경에서는 PostgreSQL 17과 pgvector를 포함한 분석 API의 Smoke Test를 실행할 수 있습니다.
+현재 Spring–FastAPI 요청·응답 모델, Project File·Quick Log 통합 Source 인덱싱, 기존 Experience 비교 입력, 네 가지 분석 결과, 공통 오류 응답, LLM Provider, Chunking, Embedding, pgvector 저장·검색, RAG 분석, AI Policy 검증과 고정 평가 데이터셋이 구현되어 있습니다. Review 상태 저장과 승인 후 Experience 반영은 Spring이 담당합니다. Docker Compose 환경에서는 PostgreSQL 17과 pgvector를 포함한 분석 API의 Smoke Test를 실행할 수 있습니다.
 
 Fake Provider 검증은 외부 API 비용 없이 서버 간 계약과 처리 흐름을 확인하기 위한 것입니다. 실제 검색·생성 품질은 E5와 Gemini를 켠 별도의 비식별 평가 환경에서 검증해야 합니다.
 
@@ -321,7 +322,7 @@ LOGFOLIO_AI_MAX_GROUNDED_CHUNKS=15
 
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.
 
-Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`에 있습니다. 이 SQL은 pgvector 확장을 활성화하므로 개발·운영 DB에 적용하기 전에 Spring 담당자와 실행 주체 및 백업 정책을 확인해야 합니다. 저장소에 추가된 것만으로 실제 DB에는 자동 적용되지 않습니다.
+Vector Store 스키마는 `migrations/001_create_ai_document_chunks.sql`부터 순서대로 적용합니다. `003_support_unified_sources.sql`은 파일 전용 컬럼을 통합 Source 컬럼으로 바꾸고 Quick Log를 지원합니다. SQL은 pgvector 확장을 활성화하므로 개발·운영 DB에 적용하기 전에 Spring 담당자와 실행 주체 및 백업 정책을 확인해야 합니다. 저장소에 추가된 것만으로 실제 DB에는 자동 적용되지 않습니다.
 
 ## Docker integration environment
 

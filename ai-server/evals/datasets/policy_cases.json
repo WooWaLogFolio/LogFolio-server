@@ -23,7 +23,7 @@
               "evidenceType": "DIRECT",
               "evidences": [
                 {
-                  "projectFileId": "40000000-0000-0000-0000-000000000001",
+                  "sourceId": "40000000-0000-0000-0000-000000000001",
                   "chunkId": "50000000-0000-0000-0000-000000000001",
                   "pageNumber": 1,
                   "excerpt": "프로젝트 팀은 사용자 인터뷰를 5회 진행했다."
@@ -123,7 +123,7 @@
               "evidenceType": "DIRECT",
               "evidences": [
                 {
-                  "projectFileId": "40000000-0000-0000-0000-000000000003",
+                  "sourceId": "40000000-0000-0000-0000-000000000003",
                   "chunkId": "50000000-0000-0000-0000-000000000003",
                   "pageNumber": 2,
                   "excerpt": "저는 JWT 인증 API 구현을 담당했습니다."
@@ -176,7 +176,7 @@
               "evidenceType": "DIRECT",
               "evidences": [
                 {
-                  "projectFileId": "40000000-0000-0000-0000-000000000004",
+                  "sourceId": "40000000-0000-0000-0000-000000000004",
                   "chunkId": "50000000-0000-0000-0000-000000000004",
                   "pageNumber": 1,
                   "excerpt": "프로젝트 팀은 기능 우선순위를 정했다."
@@ -228,7 +228,7 @@
               "evidenceType": "DIRECT",
               "evidences": [
                 {
-                  "projectFileId": "40000000-0000-0000-0000-000000000005",
+                  "sourceId": "40000000-0000-0000-0000-000000000005",
                   "chunkId": "50000000-0000-0000-0000-000000000005",
                   "pageNumber": 1,
                   "excerpt": "프로젝트는 아이디어톤 본선에 진출했다."
@@ -403,7 +403,7 @@
           "verificationStatus": "VERIFIED",
           "evidenceType": "DIRECT",
           "evidences": [{
-            "projectFileId": "40000000-0000-0000-0000-000000000009",
+            "sourceId": "40000000-0000-0000-0000-000000000009",
             "chunkId": "50000000-0000-0000-0000-000000000009",
             "pageNumber": 1,
             "excerpt": "팀은 배포 전략을 논의했다."
@@ -447,7 +447,7 @@
           "verificationStatus": "VERIFIED",
           "evidenceType": "DIRECT",
           "evidences": [{
-            "projectFileId": "40000000-0000-0000-0000-000000000010",
+            "sourceId": "40000000-0000-0000-0000-000000000010",
             "chunkId": "50000000-0000-0000-0000-000000000010",
             "pageNumber": 1,
             "excerpt": "프로젝트 팀은 회고를 진행했다."
@@ -491,7 +491,7 @@
           "verificationStatus": "VERIFIED",
           "evidenceType": "INDIRECT",
           "evidences": [{
-            "projectFileId": "40000000-0000-0000-0000-000000000011",
+            "sourceId": "40000000-0000-0000-0000-000000000011",
             "chunkId": "50000000-0000-0000-0000-000000000011",
             "pageNumber": 1,
             "excerpt": "팀은 로그인 화면을 세 단계로 줄였다."
@@ -535,7 +535,7 @@
           "verificationStatus": "VERIFIED",
           "evidenceType": "DIRECT",
           "evidences": [{
-            "projectFileId": "40000000-0000-0000-0000-000000000012",
+            "sourceId": "40000000-0000-0000-0000-000000000012",
             "chunkId": "50000000-0000-0000-0000-000000000012",
             "pageNumber": 1,
             "excerpt": "JWT 인증 API를 구현했다."
@@ -579,7 +579,7 @@
           "verificationStatus": "VERIFIED",
           "evidenceType": "DIRECT",
           "evidences": [{
-            "projectFileId": "40000000-0000-0000-0000-000000000013",
+            "sourceId": "40000000-0000-0000-0000-000000000013",
             "chunkId": "50000000-0000-0000-0000-000000000013",
             "pageNumber": 1,
             "excerpt": "내가 API 오류 응답 형식을 설계했다."

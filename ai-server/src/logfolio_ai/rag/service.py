@@ -1,11 +1,15 @@
 import asyncio
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Sequence
 from uuid import UUID
 
 from logfolio_ai.chunking import chunk_documents
 from logfolio_ai.core.errors import AppError
 from logfolio_ai.embedding import EmbeddingProvider
-from logfolio_ai.models import DocumentSource
+from logfolio_ai.models import (
+    DocumentSource,
+    SourceIndexItem,
+    SourceIndexResponse,
+)
 from logfolio_ai.rag.models import AnalysisPurpose, IndexingResult, RetrievalContext
 from logfolio_ai.vector_store import VectorSearchResult, VectorStore
 
@@ -55,7 +59,7 @@ class RagService:
             )
             await self._vector_store.replace_source_chunks(
                 project_id,
-                document.project_file_id,
+                document.source_id,
                 chunks,
                 embeddings,
                 embedding_model=self._embedding_model,
@@ -68,12 +72,47 @@ class RagService:
             embedding_model=self._embedding_model,
         )
 
+    async def index_sources(
+        self,
+        project_id: UUID,
+        sources: Iterable[DocumentSource],
+    ) -> SourceIndexResponse:
+        items: List[SourceIndexItem] = []
+        for source in sources:
+            try:
+                result = await self.index_documents(project_id, [source])
+                items.append(
+                    SourceIndexItem(
+                        source_id=source.source_id,
+                        source_type=source.source_type,
+                        status="INDEXED",
+                        chunk_count=result.chunk_count,
+                    )
+                )
+            except Exception as exc:
+                error_code = getattr(exc, "code", "SOURCE_INDEXING_ERROR")
+                items.append(
+                    SourceIndexItem(
+                        source_id=source.source_id,
+                        source_type=source.source_type,
+                        status="FAILED",
+                        error_code=error_code,
+                    )
+                )
+        return SourceIndexResponse(
+            project_id=project_id,
+            indexed_count=sum(item.status == "INDEXED" for item in items),
+            failed_count=sum(item.status == "FAILED" for item in items),
+            items=items,
+        )
+
     async def retrieve(
         self,
         project_id: UUID,
         query: str,
         *,
         top_k: Optional[int] = None,
+        source_ids: Optional[Sequence[UUID]] = None,
     ) -> List[VectorSearchResult]:
         normalized_query = query.strip()
         if not normalized_query:
@@ -83,11 +122,14 @@ class RagService:
             project_id,
             query_embedding,
             top_k=top_k or self._top_k,
+            source_ids=source_ids,
         )
 
     async def retrieve_analysis_context(
         self,
         project_id: UUID,
+        *,
+        source_ids: Optional[Sequence[UUID]] = None,
     ) -> List[RetrievalContext]:
         purposes = list(DEFAULT_ANALYSIS_QUERIES)
         queries = [DEFAULT_ANALYSIS_QUERIES[purpose] for purpose in purposes]
@@ -108,6 +150,7 @@ class RagService:
                 project_id,
                 query_embedding,
                 top_k=self._top_k,
+                source_ids=source_ids,
             )
             return RetrievalContext(purpose=purpose, query=query, chunks=chunks)
 
