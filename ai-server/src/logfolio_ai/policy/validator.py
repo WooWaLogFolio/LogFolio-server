@@ -4,6 +4,7 @@ from uuid import UUID
 from logfolio_ai.models import (
     AnalysisResponse,
     Claim,
+    ConflictDetail,
     GapQuestion,
     InformationNeedType,
     PolicyViolationType,
@@ -223,6 +224,64 @@ class AIPolicyValidator:
                 return True
         return False
 
+    def _protect_user_edits(
+        self,
+        candidate,
+        claims: Sequence[Claim],
+        conflicts: Sequence[ConflictDetail],
+        corrections: Sequence[UserCorrection],
+    ) -> List[ConflictDetail]:
+        if candidate.target_experience_id is None:
+            return list(conflicts)
+
+        latest_by_section = {}
+        for correction in corrections:
+            if (
+                correction.decision == "EDITED"
+                and correction.experience_id == candidate.target_experience_id
+                and correction.section_type
+                and correction.corrected_content
+            ):
+                latest_by_section[correction.section_type.upper()] = correction
+
+        protected = list(conflicts)
+        existing_pairs = {
+            (
+                conflict.section_type.upper(),
+                self._normalize_claim_content(conflict.existing_content),
+                self._normalize_claim_content(conflict.proposed_content),
+            )
+            for conflict in protected
+        }
+        for claim in claims:
+            correction = latest_by_section.get(claim.section_type.upper())
+            if correction is None:
+                continue
+            if self._normalize_claim_content(
+                claim.content
+            ) == self._normalize_claim_content(correction.corrected_content):
+                continue
+            pair = (
+                claim.section_type.upper(),
+                self._normalize_claim_content(correction.corrected_content),
+                self._normalize_claim_content(claim.content),
+            )
+            if pair in existing_pairs:
+                continue
+            protected.append(
+                ConflictDetail(
+                    section_type=claim.section_type,
+                    existing_content=correction.corrected_content,
+                    proposed_content=claim.content,
+                    reason=(
+                        "사용자가 수정해 확정한 값과 새 AI 제안이 다르므로 "
+                        "자동으로 덮어쓰지 않고 확인이 필요합니다."
+                    ),
+                )
+            )
+            existing_pairs.add(pair)
+        return protected
+
     def validate(
         self,
         response: AnalysisResponse,
@@ -264,6 +323,12 @@ class AIPolicyValidator:
                 )
                 in valid_claim_pairs
             ]
+            conflicts = self._protect_user_edits(
+                candidate,
+                claims,
+                conflicts,
+                corrections,
+            )
             all_claims.extend(claims)
             validated_candidates.append(
                 candidate.model_copy(

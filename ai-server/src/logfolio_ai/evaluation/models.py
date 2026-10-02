@@ -33,6 +33,7 @@ class EvaluationExpectation(ContractModel):
     question_targets: Optional[List[str]] = None
     information_need: Optional[InformationNeedType] = None
     result_types: Optional[List[AnalysisResultType]] = None
+    conflict_candidate_indices: Optional[List[int]] = None
 
 
 class EvaluationCase(ContractModel):

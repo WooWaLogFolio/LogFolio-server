@@ -793,5 +793,63 @@
       "questionTargets": [],
       "resultTypes": ["NO_UPDATE"]
     }
+  },
+  {
+    "caseId": "protect-user-edited-value-with-conflict",
+    "category": "user-edited",
+    "description": "사용자가 수정한 값과 다른 AI 제안은 자동 덮어쓰기 대신 Conflict Review로 보낸다.",
+    "sourceText": "새 자료에는 인터뷰 진행까지 담당했다고 적혀 있다.",
+    "corrections": [
+      {
+        "experienceId": "50000000-0000-0000-0000-000000000019",
+        "sectionType": "ACTION",
+        "originalContent": "사용자 인터뷰를 진행했다.",
+        "correctedContent": "인터뷰 질문지 작성만 담당했다.",
+        "decision": "EDITED"
+      }
+    ],
+    "rawResponse": {
+      "analysisRunId": "10000000-0000-0000-0000-000000000019",
+      "projectId": "20000000-0000-0000-0000-000000000019",
+      "summary": "새 자료를 기존 경험에 보강한 초안",
+      "candidates": [
+        {
+          "candidateId": "40000000-0000-0000-0000-000000000019",
+          "resultType": "EXISTING_UPDATE",
+          "targetExperienceId": "50000000-0000-0000-0000-000000000019",
+          "conflict": false,
+          "conflicts": [],
+          "title": "사용자 인터뷰",
+          "summary": "인터뷰 역할에 대한 새 제안",
+          "claims": [
+            {
+              "sectionType": "ACTION",
+              "content": "사용자 인터뷰 진행까지 담당했다.",
+              "subjectType": "UNKNOWN",
+              "provenanceType": "SOURCE_EXTRACTED",
+              "verificationStatus": "VERIFIED",
+              "evidenceType": "DIRECT",
+              "evidences": [
+                {
+                  "sourceId": "71000000-0000-0000-0000-000000000019",
+                  "chunkId": "81000000-0000-0000-0000-000000000019",
+                  "pageNumber": 1,
+                  "excerpt": "새 자료에는 인터뷰 진행까지 담당했다고 적혀 있다."
+                }
+              ],
+              "policyViolations": [],
+              "requiresUserConfirmation": false
+            }
+          ]
+        }
+      ],
+      "questions": []
+    },
+    "expected": {
+      "claims": [],
+      "questionTargets": [],
+      "resultTypes": ["EXISTING_UPDATE"],
+      "conflictCandidateIndices": [0]
+    }
   }
 ]

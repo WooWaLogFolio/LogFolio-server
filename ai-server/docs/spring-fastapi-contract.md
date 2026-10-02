@@ -185,6 +185,16 @@ X-Internal-API-Key: <shared-secret>
 
 Spring은 Review에서 거절이 발생할 때 해당 스냅샷을 저장해야 합니다. Source ID만 같고 새로운 Chunk가 생긴 경우도 새 Evidence로 판단하려면 `evidenceChunkIds` 보존이 필요합니다.
 
+사용자 수정값 보호 규칙:
+
+- `EDITED` correction에는 `experienceId`, `sectionType`, `originalContent`, `correctedContent`를 전달
+- 같은 Experience와 Section에 `correctedContent`와 다른 AI Claim이 제안되면 FastAPI가 `conflict=true`로 강제 전환
+- `conflicts[].existingContent`에는 사용자 수정값, `proposedContent`에는 새 AI Claim을 넣음
+- 사용자 수정값과 새 Claim이 같으면 Conflict를 만들지 않음
+- 다른 Experience의 수정값은 현재 Candidate에 적용하지 않음
+- 동일 Experience·Section의 수정 이력이 여러 개라면 요청 배열에서 마지막 `EDITED` 항목을 최신값으로 사용
+- Spring은 Conflict Review 전 기존 Experience를 변경하지 않고 사용자의 최종 선택 이후에만 반영
+
 분석 순서:
 
 ```text
