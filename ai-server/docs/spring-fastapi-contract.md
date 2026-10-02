@@ -176,18 +176,49 @@ Spring 재호출 규칙:
       "suggestedAnswers": []
     }
   ],
+  "informationNeed": "USER_ANSWER",
+  "informationNeedReason": null,
   "resultTypes": ["EXISTING_UPDATE", "NEEDS_CONTEXT"],
   "noUpdateReason": null
 }
 ```
 
 - `resultType`: `EXISTING_UPDATE` 또는 `NEW_EXPERIENCE`
-- 질문이 있으면 응답의 `resultTypes`에 `NEEDS_CONTEXT` 포함
-- 후보와 질문이 모두 없으면 `NO_UPDATE`이며 `noUpdateReason`으로 이유 전달
+- 질문이 있으면 `informationNeed=USER_ANSWER`, `resultTypes`에 `NEEDS_CONTEXT` 포함
+- 후보·질문이 없더라도 `informationNeed=ADDITIONAL_SOURCE`이면 자료 보완이 필요한 상태이며 `NO_UPDATE`가 아님
+- `informationNeed`도 없고 후보·질문·경고가 모두 없을 때만 `NO_UPDATE`
 - `EXISTING_UPDATE`는 요청에 포함된 기존 Experience의 `targetExperienceId` 필수
 - 기존 사용자 확정값과 충돌하면 `conflict=true`; FastAPI가 자동 덮어쓰지 않음
 - 경험 후보는 최대 3개
 - 보완 질문은 최대 2개
+
+### 정보 부족 분류
+
+`NEEDS_CONTEXT`는 다음 두 흐름으로 구분합니다.
+
+| informationNeed | 판단 | Spring UX |
+| --- | --- | --- |
+| `USER_ANSWER` | 의미 있는 경험 단서가 있고 질문 1~2개로 보완 가능 | 반환된 `questions`에 답변 받기 |
+| `ADDITIONAL_SOURCE` | 자료가 너무 모호하여 질문 1~2개로 경험 특정 불가 | `30초 기록 남기기`, `자료 추가하기` 안내 |
+
+추가 자료가 필요한 응답 예시:
+
+```json
+{
+  "analysisRunId": "10000000-0000-0000-0000-000000000001",
+  "projectId": "20000000-0000-0000-0000-000000000001",
+  "summary": "아직 경험으로 정리하기에는 정보가 부족합니다.",
+  "candidates": [],
+  "questions": [],
+  "sourceWarnings": [],
+  "informationNeed": "ADDITIONAL_SOURCE",
+  "informationNeedReason": "구체적인 행동이나 중요한 결정을 확인할 수 있는 기록이 필요합니다.",
+  "resultTypes": ["NEEDS_CONTEXT"],
+  "noUpdateReason": null
+}
+```
+
+이 경우 Spring은 기존 Source를 `INDEXED`로 유지하고 별도의 보류 상태로 바꾸지 않습니다. 새 Quick Log 또는 Project File이 추가되면 다음 Analysis Run에서 기존 Source와 함께 다시 사용합니다.
 - `questions[].candidateId`는 응답에 포함된 경험 후보를 가리킴
 - 근거가 부족해 경험 후보 자체를 만들 수 없는 질문은 `candidateId`가 `null`일 수 있음
 - 결과는 AI 초안이며 바로 경험 DB에 확정 저장하지 않음

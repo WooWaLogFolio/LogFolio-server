@@ -4,6 +4,7 @@ from logfolio_ai.models import (
     AnalysisResponse,
     Claim,
     GapQuestion,
+    InformationNeedType,
     PolicyViolationType,
     ProvenanceType,
     SubjectType,
@@ -139,6 +140,12 @@ class AIPolicyValidator:
             validated_candidates.append(candidate.model_copy(update={"claims": claims}))
 
         questions = self._filter_questions(response, all_claims)
-        return response.model_copy(
-            update={"candidates": validated_candidates, "questions": questions}
-        )
+        payload = response.model_dump()
+        payload.update({"candidates": validated_candidates, "questions": questions})
+        if (
+            not questions
+            and payload.get("information_need") == InformationNeedType.USER_ANSWER
+        ):
+            payload["information_need"] = None
+            payload["information_need_reason"] = None
+        return AnalysisResponse.model_validate(payload)

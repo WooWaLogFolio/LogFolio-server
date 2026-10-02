@@ -13,7 +13,7 @@ from logfolio_ai.llm.fake import FakeLLMProvider
 from logfolio_ai.llm.gemini import GeminiLLMProvider
 from logfolio_ai.llm.models import GroundedAnalysisInput, GroundedChunk
 from logfolio_ai.llm.prompt import SYSTEM_POLICY
-from logfolio_ai.models import AnalysisResponse
+from logfolio_ai.models import AnalysisResponse, AnalysisResultType, InformationNeedType
 from logfolio_ai.rag import AnalysisPurpose
 
 
@@ -99,6 +99,34 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert call["config"].response_json_schema == AnalysisResponse.model_json_schema(
         by_alias=True
     )
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_accepts_additional_source_outcome() -> None:
+    request = grounded_request()
+    response_text = json.dumps(
+        {
+            "analysisRunId": str(uuid4()),
+            "projectId": str(uuid4()),
+            "summary": "경험을 특정하기에는 자료가 부족합니다.",
+            "candidates": [],
+            "questions": [],
+            "informationNeed": "ADDITIONAL_SOURCE",
+            "informationNeedReason": "구체적인 행동이나 결정 기록이 필요합니다.",
+        }
+    )
+    generate_content = AsyncMock(return_value=SimpleNamespace(text=response_text))
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+
+    result = await GeminiLLMProvider(
+        "test-key", "test-model", 30, client=client
+    ).analyze_grounded(request)
+
+    assert result.information_need == InformationNeedType.ADDITIONAL_SOURCE
+    assert result.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+    assert result.questions == []
 
 
 @pytest.mark.asyncio

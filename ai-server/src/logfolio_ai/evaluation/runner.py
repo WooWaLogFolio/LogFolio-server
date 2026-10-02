@@ -74,6 +74,23 @@ def evaluate_cases(cases: Iterable[EvaluationCase]) -> EvaluationReport:
                     f"question targets: expected {case.expected.question_targets}, got {actual_targets}"
                 )
 
+        if (
+            case.expected.information_need is not None
+            and output.information_need != case.expected.information_need
+        ):
+            messages.append(
+                "information need: expected "
+                f"{case.expected.information_need}, got {output.information_need}"
+            )
+
+        if (
+            case.expected.result_types is not None
+            and output.result_types != case.expected.result_types
+        ):
+            messages.append(
+                f"result types: expected {case.expected.result_types}, got {output.result_types}"
+            )
+
         failures.extend(
             EvaluationFailure(case_id=case.case_id, message=message)
             for message in messages
