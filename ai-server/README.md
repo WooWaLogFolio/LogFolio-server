@@ -129,6 +129,8 @@ MVP는 Top K 5와 정확 Cosine 검색으로 시작합니다. HNSW는 데이터�
 - `fake`: API 키와 비용 없이 고정된 응답을 반환합니다. 로컬 개발과 Spring 연동 테스트의 기본값입니다.
 - `gemini`: Google Gemini API에서 JSON Schema 기반 Structured Output을 생성합니다. 실제 AI 품질 검증과 배포 환경에서 사용합니다.
 
+Gemini Timeout, 일시적 Provider 오류, Structured Output 검증 실패는 FastAPI 내부에서 한 번만 다시 시도합니다. 인증·요청 오류와 같은 비일시적 4xx는 반복 호출하지 않습니다. 전체 30초 제한 안에 두 번의 시도가 가능하도록 개별 LLM 시도 제한은 기본 14초입니다.
+
 환경별 운영 원칙은 다음과 같습니다.
 
 - 로컬 및 자동 테스트: `fake`를 사용합니다.
@@ -214,7 +216,8 @@ Spring과 FastAPI는 다음 공통 규칙을 사용합니다.
 - 경험 후보: 최대 3개
 - 보완 질문: 최대 2개
 - FastAPI 응답 제한: 30초
-- Spring 자동 재시도: 최대 1회
+- Source 인덱싱 재시도: Spring에서 최대 1회
+- Gemini 분석 재시도: FastAPI 내부에서 최대 1회
 - AI 결과 저장: 사용자 검토 후 확정
 
 ERD에 존재하는 필드와 상태값은 Spring의 정의를 따릅니다. ERD에 없는 AI 전용 판단값은 FastAPI 계약에서 정의하고 양쪽 서버가 동일한 문자열을 사용합니다.
@@ -312,7 +315,7 @@ Gemini를 사용할 때만 로컬 `.env` 또는 배포 환경의 Secret에 다�
 LOGFOLIO_AI_LLM_PROVIDER=gemini
 LOGFOLIO_AI_GEMINI_API_KEY=your-api-key
 LOGFOLIO_AI_GEMINI_MODEL=gemini-3.5-flash
-LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=30
+LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=14
 LOGFOLIO_AI_CHUNK_SIZE_TOKENS=700
 LOGFOLIO_AI_CHUNK_OVERLAP_TOKENS=100
 LOGFOLIO_AI_EMBEDDING_PROVIDER=fake

@@ -114,6 +114,7 @@ async def test_gemini_provider_maps_timeout_to_app_error() -> None:
 
     assert error.value.code == "LLM_TIMEOUT"
     assert error.value.status_code == 504
+    assert generate_content.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -128,3 +129,63 @@ async def test_gemini_provider_rejects_invalid_structured_output() -> None:
         await provider.analyze_grounded(grounded_request())
 
     assert error.value.code == "LLM_INVALID_RESPONSE"
+    assert generate_content.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_retries_invalid_output_and_accepts_second_response() -> None:
+    request = grounded_request()
+    valid_response = json.dumps(
+        {
+            "analysisRunId": str(uuid4()),
+            "projectId": str(uuid4()),
+            "summary": "재시도 후 정상 응답",
+            "candidates": [],
+            "questions": [],
+        }
+    )
+    generate_content = AsyncMock(
+        side_effect=[
+            SimpleNamespace(text="not-json"),
+            SimpleNamespace(text=valid_response),
+        ]
+    )
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+
+    result = await GeminiLLMProvider(
+        "test-key", "test-model", 14, client=client
+    ).analyze_grounded(request)
+
+    assert result.summary == "재시도 후 정상 응답"
+    assert generate_content.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_does_not_retry_non_transient_4xx() -> None:
+    class InvalidRequestError(Exception):
+        status_code = 400
+
+    generate_content = AsyncMock(side_effect=InvalidRequestError("invalid key"))
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider("test-key", "test-model", 14, client=client)
+
+    with pytest.raises(AppError) as error:
+        await provider.analyze_grounded(grounded_request())
+
+    assert error.value.code == "LLM_REQUEST_ERROR"
+    assert generate_content.await_count == 1
+
+
+def test_gemini_timeout_budget_allows_two_attempts() -> None:
+    settings = Settings(
+        llm_provider="gemini",
+        gemini_api_key="test-key",
+        llm_timeout_seconds=14,
+        analysis_timeout_seconds=30,
+    )
+
+    assert settings.llm_timeout_seconds * 2 < settings.analysis_timeout_seconds
