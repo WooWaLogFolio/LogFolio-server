@@ -1,0 +1,38 @@
+{
+  "caseId": "MERGE_01",
+  "title": "여러 Source를 하나의 Experience로 병합",
+  "category": "MERGE",
+  "difficulty": "MEDIUM",
+  "description": "같은 문제 해결 흐름의 두 Source를 중복 Experience로 만들지 않는지 평가",
+  "input": {
+    "analysisRunId": "10000000-0000-0000-0000-000000000005",
+    "projectId": "20000000-0000-0000-0000-000000000001",
+    "chunks": [
+      {
+        "chunkId": "30000000-0000-0000-0000-000000000005",
+        "sourceId": "40000000-0000-0000-0000-000000000005",
+        "sourceType": "QUICK_LOG",
+        "sourceName": "오류 기록",
+        "text": "나는 로그인 만료 시 갱신 요청이 동시에 여러 번 호출되는 문제를 발견했다.",
+        "distance": 0.08,
+        "purposes": ["PROJECT_OVERVIEW", "USER_CONTRIBUTION"]
+      },
+      {
+        "chunkId": "30000000-0000-0000-0000-000000000006",
+        "sourceId": "40000000-0000-0000-0000-000000000006",
+        "sourceType": "QUICK_LOG",
+        "sourceName": "해결 기록",
+        "text": "나는 갱신 요청을 하나로 합치는 동기화 로직을 적용해 중복 호출을 막았다.",
+        "distance": 0.09,
+        "purposes": ["USER_CONTRIBUTION", "OUTCOME"]
+      }
+    ]
+  },
+  "expected": {
+    "resultType": "NEW_EXPERIENCE",
+    "expectedExperienceCount": 1,
+    "requiresQuestion": false,
+    "forbiddenPhrases": []
+  },
+  "humanRubric": ["문제와 해결을 한 Experience로 구성한다", "같은 경험을 두 개로 중복 생성하지 않는다"]
+}

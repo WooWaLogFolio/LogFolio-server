@@ -1,0 +1,29 @@
+{
+  "caseId": "CONTEXT_01",
+  "title": "개인 맥락 확인 필요",
+  "category": "NEEDS_CONTEXT",
+  "difficulty": "MEDIUM",
+  "description": "경험 단서는 있으나 사용자의 기여가 Source에 없는 경우",
+  "input": {
+    "analysisRunId": "10000000-0000-0000-0000-000000000003",
+    "projectId": "20000000-0000-0000-0000-000000000001",
+    "chunks": [{
+      "chunkId": "30000000-0000-0000-0000-000000000003",
+      "sourceId": "40000000-0000-0000-0000-000000000003",
+      "sourceType": "PROJECT_FILE",
+      "sourceName": "프로젝트 결과 보고서",
+      "pageNumber": 4,
+      "text": "프로젝트 팀은 사용자 인터뷰 결과를 네 가지 유형으로 분류하고 기능 우선순위를 다시 정했다.",
+      "distance": 0.08,
+      "purposes": ["USER_CONTRIBUTION", "DECISION_REASON"]
+    }]
+  },
+  "expected": {
+    "resultType": "NEEDS_CONTEXT",
+    "expectedExperienceCount": 1,
+    "requiresQuestion": true,
+    "questionIntents": ["CONTRIBUTION"],
+    "forbiddenPhrases": ["사용자가 인터뷰 결과를 분류했다"]
+  },
+  "humanRubric": ["팀 활동을 사용자 행동으로 확정하지 않는다", "짧은 개인 기여 질문을 만든다"]
+}

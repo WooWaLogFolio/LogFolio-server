@@ -77,7 +77,17 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
             "questions": [],
         }
     )
-    generate_content = AsyncMock(return_value=SimpleNamespace(text=response_text))
+    generate_content = AsyncMock(
+        return_value=SimpleNamespace(
+            text=response_text,
+            usage_metadata=SimpleNamespace(
+                prompt_token_count=120,
+                cached_content_token_count=20,
+                candidates_token_count=30,
+                thoughts_token_count=4,
+            ),
+        )
+    )
     client = SimpleNamespace(
         aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
     )
@@ -95,6 +105,13 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert result.summary == "프로젝트 자료를 분석했습니다."
     assert result.input_source_ids == []
     assert result.referenced_source_ids == []
+    assert provider.last_call_metrics.provider == "gemini"
+    assert provider.last_call_metrics.model == "test-model"
+    assert provider.last_call_metrics.input_tokens == 120
+    assert provider.last_call_metrics.cached_input_tokens == 20
+    assert provider.last_call_metrics.output_tokens == 30
+    assert provider.last_call_metrics.reasoning_tokens == 4
+    assert provider.last_call_metrics.retry_count == 0
     call = generate_content.await_args.kwargs
     assert call["model"] == "test-model"
     assert "팀은 인터뷰를 진행했다." in call["contents"]
@@ -187,12 +204,13 @@ async def test_gemini_provider_retries_invalid_output_and_accepts_second_respons
         aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
     )
 
-    result = await GeminiLLMProvider(
-        "test-key", "test-model", 14, client=client
-    ).analyze_grounded(request)
+    provider = GeminiLLMProvider("test-key", "test-model", 14, client=client)
+
+    result = await provider.analyze_grounded(request)
 
     assert result.summary == "재시도 후 정상 응답"
     assert generate_content.await_count == 2
+    assert provider.last_call_metrics.retry_count == 1
 
 
 @pytest.mark.asyncio

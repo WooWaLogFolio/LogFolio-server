@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import time
+from contextvars import ContextVar
 from typing import Any, Optional
 
 from pydantic import ValidationError
 
 from logfolio_ai.core.errors import AppError
-from logfolio_ai.llm.models import GroundedAnalysisInput
+from logfolio_ai.llm.models import GroundedAnalysisInput, LLMCallMetrics
 from logfolio_ai.llm.prompt import SYSTEM_POLICY, build_grounded_analysis_prompt
 from logfolio_ai.models import AnalysisResponse
 
@@ -32,18 +34,42 @@ class GeminiLLMProvider:
         self._model = model
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
+        self._last_call_metrics: ContextVar[Optional[LLMCallMetrics]] = ContextVar(
+            "gemini_llm_call_metrics",
+            default=None,
+        )
+
+    @property
+    def last_call_metrics(self) -> Optional[LLMCallMetrics]:
+        return self._last_call_metrics.get()
 
     async def analyze_grounded(
         self, request: GroundedAnalysisInput
     ) -> AnalysisResponse:
         prompt = build_grounded_analysis_prompt(request)
+        started = time.perf_counter()
         for attempt in range(1, self._max_attempts + 1):
             try:
-                return await self._generate(
+                result, usage = await self._generate(
                     prompt,
                     request.analysis_run_id,
                     request.project_id,
                 )
+                self._last_call_metrics.set(LLMCallMetrics(
+                    provider="gemini",
+                    model=self._model,
+                    input_tokens=self._usage_value(usage, "prompt_token_count"),
+                    cached_input_tokens=self._usage_value(
+                        usage, "cached_content_token_count"
+                    ),
+                    output_tokens=self._usage_value(usage, "candidates_token_count"),
+                    reasoning_tokens=self._usage_value(usage, "thoughts_token_count"),
+                    latency_ms=max(
+                        0, round((time.perf_counter() - started) * 1000)
+                    ),
+                    retry_count=attempt - 1,
+                ))
+                return result
             except AppError as exc:
                 if exc.code not in _RETRYABLE_CODES or attempt >= self._max_attempts:
                     raise
@@ -55,12 +81,17 @@ class GeminiLLMProvider:
                 )
         raise RuntimeError("unreachable")
 
+    @staticmethod
+    def _usage_value(usage: Any, field: str) -> Optional[int]:
+        value = getattr(usage, field, None) if usage is not None else None
+        return int(value) if isinstance(value, (int, float)) and value >= 0 else None
+
     async def _generate(
         self,
         prompt: str,
         analysis_run_id: Any,
         project_id: Any,
-    ) -> AnalysisResponse:
+    ) -> tuple[AnalysisResponse, Any]:
         from google.genai import types
 
         try:
@@ -120,7 +151,7 @@ class GeminiLLMProvider:
             ) from exc
 
         # Tracking identifiers are server-owned and must never be trusted to the model.
-        return result.model_copy(
+        normalized = result.model_copy(
             update={
                 "analysis_run_id": analysis_run_id,
                 "project_id": project_id,
@@ -128,3 +159,4 @@ class GeminiLLMProvider:
                 "referenced_source_ids": [],
             }
         )
+        return normalized, getattr(response, "usage_metadata", None)
