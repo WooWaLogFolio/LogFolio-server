@@ -33,3 +33,12 @@ class VectorStore(Protocol):
         chunk_ids: Sequence[UUID],
     ) -> List[DocumentChunk]:
         """Load exact evidence chunks within one authorized project."""
+
+    async def get_source_chunks(
+        self,
+        project_id: UUID,
+        source_ids: Sequence[UUID],
+        *,
+        limit: int,
+    ) -> List[DocumentChunk]:
+        """Load new Source chunks when semantic retrieval returns no results."""

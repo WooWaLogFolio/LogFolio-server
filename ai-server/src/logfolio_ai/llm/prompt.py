@@ -16,6 +16,9 @@ Compare new Source chunks with existingExperiences and corrections. Classify eac
 candidate as EXISTING_UPDATE or NEW_EXPERIENCE. EXISTING_UPDATE must reference one supplied
 targetExperienceId. If key context is missing, return a question so NEEDS_CONTEXT is present.
 Chunks with relatedExperienceIds are original Evidence loaded only after semantic matching.
+Chunks with retrievalFallback=true are the new Source originals loaded because semantic
+retrieval returned zero results. Analyze those chunks as new Source evidence, but do not
+force them into an existing Experience or add unsupported facts.
 Use EXISTING_UPDATE only when the target Experience ID appears in relatedExperienceIds;
 otherwise do not force the mapping and choose NEW_EXPERIENCE or NEEDS_CONTEXT.
 If there is no meaningful update, return no candidates or questions and explain noUpdateReason.

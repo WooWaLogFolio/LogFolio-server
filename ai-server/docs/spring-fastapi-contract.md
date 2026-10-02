@@ -201,6 +201,14 @@ Evidence 부분 실패는 HTTP 오류로 전체 분석을 중단하지 않습니
 - 제외된 Candidate를 가리키던 질문은 `candidateId=null`로 유지하여 사용자 확인 가능
 - 정상 Candidate와 질문이 모두 없으면 `NO_UPDATE`와 사유 반환
 
+Retrieval 결과가 0건인 경우:
+
+- 기존 Experience에 강제로 연결하지 않음
+- 요청된 `projectId + sourceIds` 범위의 새 Source Chunk 자체를 추가 조회
+- 새 Source Chunk가 있으면 `retrievalFallback=true`로 LLM에 전달하여 `NEW_EXPERIENCE / NEEDS_CONTEXT / NO_UPDATE` 판단
+- 새 Source Chunk도 없으면 LLM을 호출하지 않고 `NO_UPDATE` 반환
+- Source가 아직 `INDEXED`되지 않았거나 텍스트가 없는 경우를 `noUpdateReason`으로 전달
+
 ## Timeout
 
 - FastAPI 전체 분석 제한: 30초

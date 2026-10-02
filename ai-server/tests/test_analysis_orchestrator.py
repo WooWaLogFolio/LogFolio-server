@@ -36,9 +36,11 @@ class RecordingRagService:
         self,
         contexts: List[RetrievalContext],
         existing_contexts: Optional[List[ExistingExperienceContext]] = None,
+        source_chunks: Optional[List[DocumentChunk]] = None,
     ) -> None:
         self.contexts = contexts
         self.existing_contexts = existing_contexts or []
+        self.source_chunks = source_chunks or []
         self.indexed_project_id: Optional[UUID] = None
         self.indexed_documents: List[DocumentSource] = []
 
@@ -67,6 +69,16 @@ class RecordingRagService:
     ) -> List[ExistingExperienceContext]:
         del project_id, source_ids, existing_experiences
         return self.existing_contexts
+
+    async def retrieve_source_chunks(
+        self,
+        project_id: UUID,
+        source_ids: List[UUID],
+        *,
+        limit: int,
+    ) -> List[DocumentChunk]:
+        del project_id, source_ids
+        return self.source_chunks[:limit]
 
 
 class RecordingLLMProvider:
@@ -357,6 +369,17 @@ async def test_orchestrator_adds_selected_existing_evidence_before_final_analysi
         token_count=4,
         text="기존 JWT 인증 구현 근거",
     )
+    new_source = analysis_request.documents[0]
+    new_chunk = DocumentChunk(
+        chunk_id=uuid4(),
+        source_id=new_source.source_id,
+        source_name=new_source.source_name,
+        sequence=0,
+        char_start=0,
+        char_end=13,
+        token_count=4,
+        text="새 JWT 인증 개선 근거",
+    )
     response = AnalysisResponse(
         analysis_run_id=analysis_request.analysis_run_id,
         project_id=analysis_request.project_id,
@@ -380,6 +403,7 @@ async def test_orchestrator_adds_selected_existing_evidence_before_final_analysi
                 chunks=[old_chunk],
             )
         ],
+        [new_chunk],
     )
     llm = RecordingLLMProvider(response)
 
@@ -389,3 +413,43 @@ async def test_orchestrator_adds_selected_existing_evidence_before_final_analysi
     assert llm.grounded_input is not None
     assert llm.grounded_input.chunks[0].chunk_id == old_chunk_id
     assert llm.grounded_input.chunks[0].related_experience_ids == [experience_id]
+
+
+@pytest.mark.asyncio
+async def test_empty_semantic_retrieval_uses_new_source_chunks_without_forced_mapping() -> None:
+    analysis_request = request()
+    source = analysis_request.documents[0]
+    fallback_chunk = DocumentChunk(
+        chunk_id=uuid4(),
+        source_id=source.source_id,
+        source_name=source.source_name,
+        sequence=0,
+        char_start=0,
+        char_end=14,
+        token_count=4,
+        text="새 Source 자체 근거",
+    )
+    rag = RecordingRagService([], source_chunks=[fallback_chunk])
+    llm = RecordingLLMProvider(empty_response(analysis_request))
+
+    await AnalysisOrchestrator(rag, llm).analyze(analysis_request)
+
+    assert llm.grounded_input is not None
+    assert llm.grounded_input.chunks[0].chunk_id == fallback_chunk.chunk_id
+    assert llm.grounded_input.chunks[0].retrieval_fallback is True
+    assert llm.grounded_input.chunks[0].related_experience_ids == []
+
+
+@pytest.mark.asyncio
+async def test_no_indexed_source_chunks_returns_no_update_without_llm_call() -> None:
+    analysis_request = request()
+    rag = RecordingRagService([])
+    llm = RecordingLLMProvider(empty_response(analysis_request))
+
+    response = await AnalysisOrchestrator(rag, llm).analyze(analysis_request)
+
+    assert response.result_types == [AnalysisResultType.NO_UPDATE]
+    assert response.candidates == []
+    assert response.questions == []
+    assert "인덱싱" in response.no_update_reason
+    assert llm.grounded_input is None

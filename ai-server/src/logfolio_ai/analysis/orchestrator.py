@@ -173,6 +173,23 @@ class AnalysisOrchestrator:
         )
         return merged[: self._max_grounded_chunks]
 
+    @staticmethod
+    def _build_source_fallback_chunks(source_chunks) -> List[GroundedChunk]:
+        return [
+            GroundedChunk(
+                chunk_id=chunk.chunk_id,
+                source_id=chunk.source_id,
+                source_type=chunk.source_type,
+                source_name=chunk.source_name,
+                page_number=chunk.page_number,
+                section_title=chunk.section_title,
+                text=chunk.text,
+                distance=0.0,
+                retrieval_fallback=True,
+            )
+            for chunk in source_chunks
+        ]
+
     async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
         started_at = time.perf_counter()
         if request.documents:
@@ -187,6 +204,29 @@ class AnalysisOrchestrator:
         )
         retrieved_at = time.perf_counter()
         grounded_chunks = self._build_grounded_chunks(contexts)
+        if not grounded_chunks:
+            source_chunks = await self._rag_service.retrieve_source_chunks(
+                request.project_id,
+                source_ids,
+                limit=self._max_grounded_chunks,
+            )
+            grounded_chunks = self._build_source_fallback_chunks(source_chunks)
+            if not grounded_chunks:
+                logger.info(
+                    "Analysis stopped without retrieval evidence: project_id=%s sources=%d",
+                    request.project_id,
+                    len(source_ids),
+                )
+                return AnalysisResponse(
+                    analysis_run_id=request.analysis_run_id,
+                    project_id=request.project_id,
+                    summary="검색 가능한 새 Source 근거가 없습니다.",
+                    candidates=[],
+                    questions=[],
+                    no_update_reason=(
+                        "요청한 Source가 아직 인덱싱되지 않았거나 검색 가능한 텍스트가 없습니다."
+                    ),
+                )
         existing_contexts = await self._rag_service.retrieve_related_experience_context(
             request.project_id,
             source_ids,

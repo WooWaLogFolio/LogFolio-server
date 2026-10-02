@@ -42,6 +42,7 @@ class RecordingVectorStore:
         self.results: List[VectorSearchResult] = []
         self.chunks: List[DocumentChunk] = []
         self.get_chunk_calls: List[dict] = []
+        self.get_source_chunk_calls: List[dict] = []
 
     async def replace_source_chunks(
         self,
@@ -90,6 +91,23 @@ class RecordingVectorStore:
         )
         requested = set(chunk_ids)
         return [chunk for chunk in self.chunks if chunk.chunk_id in requested]
+
+    async def get_source_chunks(
+        self,
+        project_id: UUID,
+        source_ids: Sequence[UUID],
+        *,
+        limit: int,
+    ) -> List[DocumentChunk]:
+        self.get_source_chunk_calls.append(
+            {
+                "project_id": project_id,
+                "source_ids": list(source_ids),
+                "limit": limit,
+            }
+        )
+        requested = set(source_ids)
+        return [chunk for chunk in self.chunks if chunk.source_id in requested][:limit]
 
 
 def source(text: str = "JWT 인증 API를 구현했다.") -> DocumentSource:
@@ -236,3 +254,35 @@ async def test_related_experience_is_selected_before_exact_evidence_is_loaded() 
     assert contexts[0].chunks[0].chunk_id == evidence_chunk_id
     assert store.search_calls[0]["source_ids"] == [new_source_id]
     assert store.get_chunk_calls[0]["chunk_ids"] == [evidence_chunk_id]
+
+
+@pytest.mark.asyncio
+async def test_source_chunk_fallback_stays_within_requested_project_and_sources() -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    service = rag_service(embedding, store)
+    project_id = uuid4()
+    source_id = uuid4()
+    store.chunks = [
+        DocumentChunk(
+            chunk_id=uuid4(),
+            source_id=source_id,
+            source_name="source.pdf",
+            sequence=0,
+            char_start=0,
+            char_end=10,
+            token_count=3,
+            text="새 Source 원문",
+        )
+    ]
+
+    chunks = await service.retrieve_source_chunks(
+        project_id,
+        [source_id],
+        limit=15,
+    )
+
+    assert chunks == store.chunks
+    assert store.get_source_chunk_calls == [
+        {"project_id": project_id, "source_ids": [source_id], "limit": 15}
+    ]

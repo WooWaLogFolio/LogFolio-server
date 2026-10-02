@@ -187,6 +187,41 @@ async def test_get_chunks_requires_project_and_exact_chunk_ids() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_source_chunks_is_scoped_to_project_and_source_ids() -> None:
+    pool = FakePool()
+    store = PgVectorStore(pool, vector_dimension=3)
+    project_id = uuid4()
+    result_chunk = chunk()
+    pool.search_rows = [
+        {
+            "chunk_id": result_chunk.chunk_id,
+            "source_id": result_chunk.source_id,
+            "source_type": "PROJECT_FILE",
+            "source_name": result_chunk.source_name,
+            "sequence": result_chunk.sequence,
+            "page_number": result_chunk.page_number,
+            "section_title": result_chunk.section_title,
+            "char_start": result_chunk.char_start,
+            "char_end": result_chunk.char_end,
+            "token_count": result_chunk.token_count,
+            "content": result_chunk.text,
+        }
+    ]
+
+    results = await store.get_source_chunks(
+        project_id,
+        [result_chunk.source_id],
+        limit=15,
+    )
+
+    sql, args = pool.fetch_calls[0]
+    assert "project_id = $1" in sql
+    assert "source_id = ANY($2::uuid[])" in sql
+    assert args == (project_id, [result_chunk.source_id], 15)
+    assert results == [result_chunk]
+
+
+@pytest.mark.asyncio
 async def test_non_finite_embedding_is_rejected() -> None:
     pool = FakePool()
     store = PgVectorStore(pool, vector_dimension=3)
