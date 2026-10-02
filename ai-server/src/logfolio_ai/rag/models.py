@@ -1,8 +1,10 @@
 from enum import Enum
 from typing import List
+from uuid import UUID
 
 from pydantic import Field
 
+from logfolio_ai.chunking import DocumentChunk
 from logfolio_ai.models.base import ContractModel
 from logfolio_ai.vector_store import VectorSearchResult
 
@@ -25,3 +27,9 @@ class RetrievalContext(ContractModel):
     purpose: AnalysisPurpose
     query: str
     chunks: List[VectorSearchResult] = Field(default_factory=list)
+
+
+class ExistingExperienceContext(ContractModel):
+    experience_id: UUID
+    relevance_distance: float = Field(ge=0)
+    chunks: List[DocumentChunk] = Field(default_factory=list)

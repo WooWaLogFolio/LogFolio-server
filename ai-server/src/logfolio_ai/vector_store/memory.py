@@ -100,6 +100,25 @@ class MemoryVectorStore:
         async with self._lock:
             self._sources.pop((project_id, source_id), None)
 
+    async def get_chunks(
+        self,
+        project_id: UUID,
+        chunk_ids: Sequence[UUID],
+    ) -> List[DocumentChunk]:
+        requested = set(chunk_ids)
+        if not requested:
+            return []
+        async with self._lock:
+            chunks = [
+                chunk
+                for (stored_project_id, _), items in self._sources.items()
+                if stored_project_id == project_id
+                for chunk, _ in items
+                if chunk.chunk_id in requested
+            ]
+        chunks.sort(key=lambda chunk: str(chunk.chunk_id))
+        return chunks
+
     async def delete_project(self, project_id: UUID) -> None:
         async with self._lock:
             keys = [key for key in self._sources if key[0] == project_id]

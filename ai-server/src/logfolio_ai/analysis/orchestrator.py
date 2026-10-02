@@ -7,7 +7,12 @@ from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm import GroundedAnalysisInput, GroundedChunk, LLMProvider
 from logfolio_ai.models import AnalysisRequest, AnalysisResponse
 from logfolio_ai.policy import AIPolicyValidator
-from logfolio_ai.rag import AnalysisPurpose, RagService, RetrievalContext
+from logfolio_ai.rag import (
+    AnalysisPurpose,
+    ExistingExperienceContext,
+    RagService,
+    RetrievalContext,
+)
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -101,6 +106,44 @@ class AnalysisOrchestrator:
                             status_code=502,
                         )
 
+    def _add_existing_evidence(
+        self,
+        grounded_chunks: List[GroundedChunk],
+        contexts: List[ExistingExperienceContext],
+    ) -> List[GroundedChunk]:
+        by_chunk_id = {chunk.chunk_id: chunk for chunk in grounded_chunks}
+        for context in contexts:
+            for chunk in context.chunks:
+                existing = by_chunk_id.get(chunk.chunk_id)
+                if existing is None:
+                    by_chunk_id[chunk.chunk_id] = GroundedChunk(
+                        chunk_id=chunk.chunk_id,
+                        source_id=chunk.source_id,
+                        source_type=chunk.source_type,
+                        source_name=chunk.source_name,
+                        page_number=chunk.page_number,
+                        section_title=chunk.section_title,
+                        text=chunk.text,
+                        distance=context.relevance_distance,
+                        related_experience_ids=[context.experience_id],
+                    )
+                    continue
+                related_ids = list(existing.related_experience_ids)
+                if context.experience_id not in related_ids:
+                    related_ids.append(context.experience_id)
+                by_chunk_id[chunk.chunk_id] = existing.model_copy(
+                    update={"related_experience_ids": related_ids}
+                )
+        merged = list(by_chunk_id.values())
+        merged.sort(
+            key=lambda chunk: (
+                0 if chunk.related_experience_ids else 1,
+                chunk.distance,
+                str(chunk.chunk_id),
+            )
+        )
+        return merged[: self._max_grounded_chunks]
+
     async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
         started_at = time.perf_counter()
         if request.documents:
@@ -115,6 +158,15 @@ class AnalysisOrchestrator:
         )
         retrieved_at = time.perf_counter()
         grounded_chunks = self._build_grounded_chunks(contexts)
+        existing_contexts = await self._rag_service.retrieve_related_experience_context(
+            request.project_id,
+            source_ids,
+            request.existing_experiences,
+        )
+        grounded_chunks = self._add_existing_evidence(
+            grounded_chunks,
+            existing_contexts,
+        )
         grounded_input = GroundedAnalysisInput(
             analysis_run_id=request.analysis_run_id,
             project_id=request.project_id,
@@ -133,6 +185,9 @@ class AnalysisOrchestrator:
         existing_ids = {
             experience.experience_id for experience in request.existing_experiences
         }
+        related_existing_ids = {
+            context.experience_id for context in existing_contexts
+        }
         for candidate in response.candidates:
             if (
                 candidate.target_experience_id is not None
@@ -141,6 +196,15 @@ class AnalysisOrchestrator:
                 raise AppError(
                     code="INVALID_TARGET_EXPERIENCE",
                     message="AI가 요청에 없는 기존 경험을 보강 대상으로 반환했습니다.",
+                    status_code=502,
+                )
+            if (
+                candidate.target_experience_id is not None
+                and candidate.target_experience_id not in related_existing_ids
+            ):
+                raise AppError(
+                    code="UNRELATED_TARGET_EXPERIENCE",
+                    message="AI가 관련 근거가 조회되지 않은 경험을 보강 대상으로 반환했습니다.",
                     status_code=502,
                 )
         self._validate_evidence(response, grounded_chunks)

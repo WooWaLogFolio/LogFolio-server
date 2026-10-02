@@ -64,6 +64,8 @@ Spring이 Project File 또는 Quick Log를 저장하면 텍스트와 Source 식�
 
 사용자가 `AI 분석하기`를 선택하면 Spring이 별도의 `/api/v1/analyses` 요청을 보냅니다. 분석 요청은 `analysisRunId`로 추적하며, 새 Source ID와 현재 프로젝트의 기존 Experience 요약·Claim·Evidence 메타데이터를 함께 전달합니다. 이미 인덱싱한 Source는 다시 전처리하지 않습니다.
 
+FastAPI는 새 Source와 기존 Experience의 제목·요약·Claim을 먼저 의미 비교합니다. 관련성이 확인된 Experience만 기존 Evidence의 정확한 Chunk를 추가 조회하고, 새 Source와 기존 원문을 함께 LLM에 전달합니다. 관련성 기준을 통과하지 못한 Experience는 보강 대상으로 강제 연결하지 않습니다.
+
 ### 2. Build searchable document chunks
 
 FastAPI는 긴 문서를 섹션, 문단, 문장 경계를 고려해 작은 Chunk로 나눕니다. 각 Chunk에는 원문을 다시 확인할 수 있도록 다음 정보를 유지합니다.
@@ -318,6 +320,8 @@ LOGFOLIO_AI_DATABASE_URL=postgresql://postgres:password@localhost:5432/logfolio
 LOGFOLIO_AI_VECTOR_DIMENSION=768
 LOGFOLIO_AI_RETRIEVAL_TOP_K=5
 LOGFOLIO_AI_MAX_GROUNDED_CHUNKS=15
+LOGFOLIO_AI_EXISTING_EXPERIENCE_MATCH_DISTANCE=0.4
+LOGFOLIO_AI_MAX_RELATED_EXPERIENCES=3
 ```
 
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.

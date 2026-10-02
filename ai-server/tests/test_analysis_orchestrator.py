@@ -4,28 +4,42 @@ from uuid import UUID, uuid4
 import pytest
 
 from logfolio_ai.analysis import AnalysisOrchestrator
+from logfolio_ai.chunking import DocumentChunk
 from logfolio_ai.core.errors import AppError
 from logfolio_ai.llm import GroundedAnalysisInput
 from logfolio_ai.models import (
     AnalysisRequest,
     AnalysisResponse,
+    AnalysisResultType,
     Claim,
     DocumentPage,
     DocumentSource,
     Evidence,
     EvidenceType,
     ExperienceCandidate,
+    ExistingEvidence,
+    ExistingExperience,
     ProvenanceType,
     SubjectType,
     VerificationStatus,
 )
-from logfolio_ai.rag import AnalysisPurpose, IndexingResult, RetrievalContext
+from logfolio_ai.rag import (
+    AnalysisPurpose,
+    ExistingExperienceContext,
+    IndexingResult,
+    RetrievalContext,
+)
 from logfolio_ai.vector_store import VectorSearchResult
 
 
 class RecordingRagService:
-    def __init__(self, contexts: List[RetrievalContext]) -> None:
+    def __init__(
+        self,
+        contexts: List[RetrievalContext],
+        existing_contexts: Optional[List[ExistingExperienceContext]] = None,
+    ) -> None:
         self.contexts = contexts
+        self.existing_contexts = existing_contexts or []
         self.indexed_project_id: Optional[UUID] = None
         self.indexed_documents: List[DocumentSource] = []
 
@@ -45,6 +59,15 @@ class RecordingRagService:
     ) -> List[RetrievalContext]:
         assert project_id == self.indexed_project_id
         return self.contexts
+
+    async def retrieve_related_experience_context(
+        self,
+        project_id: UUID,
+        source_ids: List[UUID],
+        existing_experiences,
+    ) -> List[ExistingExperienceContext]:
+        del project_id, source_ids, existing_experiences
+        return self.existing_contexts
 
 
 class RecordingLLMProvider:
@@ -239,3 +262,66 @@ async def test_orchestrator_rejects_evidence_not_in_retrieved_chunks() -> None:
         await orchestrator.analyze(analysis_request)
 
     assert error.value.code == "UNGROUNDED_EVIDENCE"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_adds_selected_existing_evidence_before_final_analysis() -> None:
+    analysis_request = request()
+    experience_id = uuid4()
+    old_source_id = uuid4()
+    old_chunk_id = uuid4()
+    analysis_request.existing_experiences = [
+        ExistingExperience(
+            experience_id=experience_id,
+            title="기존 인증 경험",
+            evidences=[
+                ExistingEvidence(
+                    evidence_id=uuid4(),
+                    source_id=old_source_id,
+                    chunk_id=old_chunk_id,
+                )
+            ],
+        )
+    ]
+    old_chunk = DocumentChunk(
+        chunk_id=old_chunk_id,
+        source_id=old_source_id,
+        source_name="old.pdf",
+        sequence=0,
+        char_start=0,
+        char_end=14,
+        token_count=4,
+        text="기존 JWT 인증 구현 근거",
+    )
+    response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="기존 경험을 보강합니다.",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                result_type=AnalysisResultType.EXISTING_UPDATE,
+                target_experience_id=experience_id,
+                title="기존 인증 경험 보강",
+                summary="새 근거를 추가합니다.",
+            )
+        ],
+    )
+    rag = RecordingRagService(
+        [],
+        [
+            ExistingExperienceContext(
+                experience_id=experience_id,
+                relevance_distance=0.2,
+                chunks=[old_chunk],
+            )
+        ],
+    )
+    llm = RecordingLLMProvider(response)
+
+    result = await AnalysisOrchestrator(rag, llm).analyze(analysis_request)
+
+    assert result.candidates[0].target_experience_id == experience_id
+    assert llm.grounded_input is not None
+    assert llm.grounded_input.chunks[0].chunk_id == old_chunk_id
+    assert llm.grounded_input.chunks[0].related_experience_ids == [experience_id]

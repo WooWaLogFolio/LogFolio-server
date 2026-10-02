@@ -10,6 +10,8 @@ services:
     volumes:
       - logfolio-postgres:/var/lib/postgresql/data
       - ../migrations/001_create_ai_document_chunks.sql:/docker-entrypoint-initdb.d/001_create_ai_document_chunks.sql:ro
+      - ../migrations/002_align_chunk_columns_with_project_files.sql:/docker-entrypoint-initdb.d/002_align_chunk_columns_with_project_files.sql:ro
+      - ../migrations/003_support_unified_sources.sql:/docker-entrypoint-initdb.d/003_support_unified_sources.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s

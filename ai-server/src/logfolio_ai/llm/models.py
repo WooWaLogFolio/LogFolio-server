@@ -18,7 +18,8 @@ class GroundedChunk(ContractModel):
     section_title: Optional[str] = None
     text: str = Field(min_length=1)
     distance: float = Field(ge=0)
-    purposes: List[AnalysisPurpose] = Field(min_length=1)
+    purposes: List[AnalysisPurpose] = Field(default_factory=list)
+    related_experience_ids: List[UUID] = Field(default_factory=list)
 
 
 class GroundedAnalysisInput(ContractModel):
