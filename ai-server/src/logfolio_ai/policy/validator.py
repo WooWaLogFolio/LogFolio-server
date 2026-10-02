@@ -10,6 +10,7 @@ from logfolio_ai.models import (
     ProvenanceType,
     SubjectType,
     UserAnswer,
+    UserCorrection,
     VerificationStatus,
 )
 from logfolio_ai.models.enums import EvidenceType
@@ -173,26 +174,121 @@ class AIPolicyValidator:
             kept.append(question)
         return kept[:2]
 
+    @staticmethod
+    def _normalize_claim_content(value: str) -> str:
+        return " ".join(value.lower().split())
+
+    def _matches_rejected_evidence(
+        self,
+        claim: Claim,
+        correction: UserCorrection,
+    ) -> bool:
+        claim_chunk_ids = {evidence.chunk_id for evidence in claim.evidences}
+        rejected_chunk_ids = set(correction.evidence_chunk_ids)
+        if rejected_chunk_ids:
+            return bool(claim_chunk_ids) and claim_chunk_ids.issubset(
+                rejected_chunk_ids
+            )
+
+        claim_source_ids = {evidence.source_id for evidence in claim.evidences}
+        rejected_source_ids = set(correction.evidence_source_ids)
+        if rejected_source_ids:
+            return bool(claim_source_ids) and claim_source_ids.issubset(
+                rejected_source_ids
+            )
+        return not claim_chunk_ids and not claim_source_ids
+
+    def _is_rejected_claim(
+        self,
+        claim: Claim,
+        candidate,
+        corrections: Sequence[UserCorrection],
+    ) -> bool:
+        for correction in corrections:
+            if correction.decision != "REJECTED" or not correction.original_content:
+                continue
+            if correction.section_type and (
+                correction.section_type.upper() != claim.section_type.upper()
+            ):
+                continue
+            if correction.experience_id is not None and (
+                candidate.target_experience_id != correction.experience_id
+            ):
+                continue
+            if self._normalize_claim_content(
+                correction.original_content
+            ) != self._normalize_claim_content(claim.content):
+                continue
+            if self._matches_rejected_evidence(claim, correction):
+                return True
+        return False
+
     def validate(
         self,
         response: AnalysisResponse,
         *,
         user_answers: Sequence[UserAnswer] = (),
+        corrections: Sequence[UserCorrection] = (),
     ) -> AnalysisResponse:
         answers_by_id = {answer.answer_id: answer for answer in user_answers}
         validated_candidates = []
         all_claims: List[Claim] = []
+        removed_candidate_ids = set()
         for candidate in response.candidates:
-            claims = [
-                self.validate_claim(claim, answers_by_id)
-                for claim in candidate.claims
+            claims = []
+            for claim in candidate.claims:
+                validated_claim = self.validate_claim(claim, answers_by_id)
+                if self._is_rejected_claim(
+                    validated_claim,
+                    candidate,
+                    corrections,
+                ):
+                    continue
+                claims.append(validated_claim)
+            if candidate.claims and not claims:
+                removed_candidate_ids.add(candidate.candidate_id)
+                continue
+            valid_claim_pairs = {
+                (
+                    claim.section_type.upper(),
+                    self._normalize_claim_content(claim.content),
+                )
+                for claim in claims
+            }
+            conflicts = [
+                conflict
+                for conflict in candidate.conflicts
+                if (
+                    conflict.section_type.upper(),
+                    self._normalize_claim_content(conflict.proposed_content),
+                )
+                in valid_claim_pairs
             ]
             all_claims.extend(claims)
-            validated_candidates.append(candidate.model_copy(update={"claims": claims}))
+            validated_candidates.append(
+                candidate.model_copy(
+                    update={
+                        "claims": claims,
+                        "conflict": bool(conflicts),
+                        "conflicts": conflicts,
+                    }
+                )
+            )
 
         questions = self._filter_questions(response, all_claims, user_answers)
+        questions = [
+            question.model_copy(update={"candidate_id": None})
+            if question.candidate_id in removed_candidate_ids
+            else question
+            for question in questions
+        ]
         payload = response.model_dump()
         payload.update({"candidates": validated_candidates, "questions": questions})
+        if not validated_candidates and not questions:
+            payload["no_update_reason"] = (
+                response.no_update_reason
+                or "사용자가 동일한 근거로 이미 거절한 제안입니다."
+            )
         if (
             not questions
             and payload.get("information_need") == InformationNeedType.USER_ANSWER
