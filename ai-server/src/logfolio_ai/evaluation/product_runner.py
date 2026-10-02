@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import csv
 import json
+import math
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -10,6 +11,9 @@ from logfolio_ai.core.config import Settings
 from logfolio_ai.evaluation.product_models import (
     CRITICAL_POLICY_VIOLATIONS,
     AutomaticEvaluation,
+    AcceptanceGate,
+    AcceptanceGateStatus,
+    AcceptanceSummary,
     CostEstimate,
     ProductEvalCase,
     ProductEvalReport,
@@ -23,6 +27,158 @@ from logfolio_ai.policy import AIPolicyValidator
 
 EVALS_ROOT = Path(__file__).resolve().parents[3] / "evals"
 DEFAULT_DATASET = EVALS_ROOT / "datasets" / "product_core_v1.json"
+
+
+def _rate(values: List[bool]) -> Optional[float]:
+    return sum(values) / len(values) if values else None
+
+
+def _percentile(values: List[int], percentile: float) -> Optional[float]:
+    if not values:
+        return None
+    ordered = sorted(values)
+    index = max(0, math.ceil(percentile * len(ordered)) - 1)
+    return float(ordered[index])
+
+
+def build_acceptance_summary(runs: List[ProductEvalRun]) -> AcceptanceSummary:
+    """Apply the v1 automated acceptance gates without inventing unavailable data."""
+    successful = [
+        run for run in runs
+        if run.success and run.automatic_evaluation is not None
+    ]
+
+    def accuracy_gate(name: str, categories: set, threshold: float) -> AcceptanceGate:
+        selected = [
+            run.automatic_evaluation.passed
+            for run in successful
+            if run.category.upper() in categories
+        ]
+        actual = _rate(selected)
+        if actual is None:
+            return AcceptanceGate(
+                name=name,
+                status=AcceptanceGateStatus.NOT_EVALUATED,
+                threshold=threshold,
+                unit="ratio",
+                reason="No matching evaluation cases were executed.",
+            )
+        return AcceptanceGate(
+            name=name,
+            status=(
+                AcceptanceGateStatus.PASS
+                if actual >= threshold
+                else AcceptanceGateStatus.FAIL
+            ),
+            actual=actual,
+            threshold=threshold,
+            unit="ratio",
+        )
+
+    critical_count = sum(
+        bool(run.automatic_evaluation.critical_policy_violation)
+        for run in successful
+    )
+    invalid_schema_count = sum(
+        run.error_type in {"ValidationError", "JSONDecodeError"} for run in runs
+    )
+    p95_latency = _percentile([run.usage.latency_ms for run in runs], 0.95)
+    retry_excess_count = sum(run.usage.retry_count > 1 for run in runs)
+    question_rate = _rate([
+        run.automatic_evaluation.question_requirement_match
+        for run in successful
+    ])
+
+    gates = [
+        accuracy_gate(
+            "existing_new_accuracy",
+            {"NEW_EXPERIENCE", "EXISTING_UPDATE"},
+            0.90,
+        ),
+        accuracy_gate("merge_split_accuracy", {"MERGE", "SPLIT"}, 0.90),
+        AcceptanceGate(
+            name="execution_success",
+            status=(
+                AcceptanceGateStatus.PASS
+                if runs and all(run.success for run in runs)
+                else AcceptanceGateStatus.FAIL
+            ),
+            actual=_rate([run.success for run in runs]) or 0,
+            threshold=1,
+            unit="ratio",
+            reason=("No runs were executed." if not runs else None),
+        ),
+        AcceptanceGate(
+            name="question_need_accuracy",
+            status=(
+                AcceptanceGateStatus.NOT_EVALUATED if question_rate is None
+                else AcceptanceGateStatus.PASS if question_rate >= 0.90
+                else AcceptanceGateStatus.FAIL
+            ),
+            actual=question_rate,
+            threshold=0.90,
+            unit="ratio",
+            reason=("No successful evaluation runs." if question_rate is None else None),
+        ),
+        AcceptanceGate(
+            name="critical_policy_errors",
+            status=(AcceptanceGateStatus.PASS if critical_count == 0 else AcceptanceGateStatus.FAIL),
+            actual=float(critical_count),
+            threshold=0,
+            unit="count",
+        ),
+        AcceptanceGate(
+            name="invalid_schema_errors",
+            status=(AcceptanceGateStatus.PASS if invalid_schema_count == 0 else AcceptanceGateStatus.FAIL),
+            actual=float(invalid_schema_count),
+            threshold=0,
+            unit="count",
+        ),
+        AcceptanceGate(
+            name="p95_latency",
+            status=(
+                AcceptanceGateStatus.NOT_EVALUATED if p95_latency is None
+                else AcceptanceGateStatus.PASS if p95_latency <= 25_000
+                else AcceptanceGateStatus.FAIL
+            ),
+            actual=p95_latency,
+            threshold=25_000,
+            unit="ms",
+            reason=("No runs were executed." if p95_latency is None else None),
+        ),
+        AcceptanceGate(
+            name="retry_limit",
+            status=(AcceptanceGateStatus.PASS if retry_excess_count == 0 else AcceptanceGateStatus.FAIL),
+            actual=float(retry_excess_count),
+            threshold=0,
+            unit="runs_over_one_retry",
+        ),
+        AcceptanceGate(
+            name="cost_per_accepted_experience",
+            status=AcceptanceGateStatus.NOT_EVALUATED,
+            threshold=50,
+            unit="KRW",
+            reason="Requires Spring review acceptance data.",
+        ),
+        AcceptanceGate(
+            name="human_quality_score",
+            status=AcceptanceGateStatus.NOT_EVALUATED,
+            threshold=4,
+            unit="score_out_of_5",
+            reason="Requires human rubric scores.",
+        ),
+    ]
+    evaluated = [gate for gate in gates if gate.status != AcceptanceGateStatus.NOT_EVALUATED]
+    passed = sum(gate.status == AcceptanceGateStatus.PASS for gate in evaluated)
+    failed = sum(gate.status == AcceptanceGateStatus.FAIL for gate in evaluated)
+    return AcceptanceSummary(
+        accepted=bool(evaluated) and failed == 0 and len(evaluated) == len(gates),
+        evaluated_gate_count=len(evaluated),
+        passed_gate_count=passed,
+        failed_gate_count=failed,
+        not_evaluated_gate_count=len(gates) - len(evaluated),
+        gates=gates,
+    )
 
 
 def load_product_cases(
@@ -214,6 +370,7 @@ async def run_product_eval(
                 runs.append(
                     ProductEvalRun(
                         case_id=case.case_id,
+                        category=case.category,
                         run_number=run_number,
                         provider=provider_name,
                         model=model,
@@ -228,6 +385,7 @@ async def run_product_eval(
                 runs.append(
                     ProductEvalRun(
                         case_id=case.case_id,
+                        category=case.category,
                         run_number=run_number,
                         provider=provider_name,
                         model=model,
@@ -259,6 +417,7 @@ async def run_product_eval(
         pass_rate=passed / len(runs) if runs else 0,
         total_estimated_cost_usd=sum(usd_values) if usd_values else None,
         total_estimated_cost_krw=sum(krw_values) if krw_values else None,
+        acceptance=build_acceptance_summary(runs),
         runs=runs,
     )
 
@@ -266,7 +425,7 @@ async def run_product_eval(
 def export_csv(report: ProductEvalReport, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = [
-        "caseId", "runNumber", "provider", "model", "success", "passed",
+        "caseId", "category", "runNumber", "provider", "model", "success", "passed",
         "latencyMs", "retryCount", "inputTokens", "cachedInputTokens",
         "outputTokens", "reasoningTokens", "estimatedCostUsd",
         "estimatedCostKrw", "errorType",
@@ -277,6 +436,7 @@ def export_csv(report: ProductEvalReport, path: Path) -> None:
         for run in report.runs:
             writer.writerow({
                 "caseId": run.case_id,
+                "category": run.category,
                 "runNumber": run.run_number,
                 "provider": run.provider,
                 "model": run.model,

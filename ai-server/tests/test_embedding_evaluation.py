@@ -1,11 +1,18 @@
 import pytest
 
-from logfolio_ai.evaluation.embedding_runner import CASES, cosine_similarity
+from logfolio_ai.evaluation.embedding_runner import cosine_similarity, load_retrieval_cases
 
 
-def test_embedding_evaluation_cases_keep_expected_passage_first() -> None:
-    assert CASES
-    assert all(case.expected_passage not in case.distractors for case in CASES)
+def test_embedding_evaluation_cases_reference_known_chunks() -> None:
+    _, _, cases = load_retrieval_cases()
+
+    assert cases
+    assert all(
+        set(case.expected_chunk_ids).issubset(
+            {candidate.chunk_id for candidate in case.candidates}
+        )
+        for case in cases
+    )
 
 
 def test_cosine_similarity_compares_vector_direction() -> None:

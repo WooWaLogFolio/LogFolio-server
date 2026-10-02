@@ -5,6 +5,7 @@ import pytest
 
 from logfolio_ai.evaluation.product_models import ProductEvalCase
 from logfolio_ai.evaluation.product_runner import (
+    build_acceptance_summary,
     estimate_cost,
     evaluate_product_output,
     export_csv,
@@ -13,6 +14,11 @@ from logfolio_ai.evaluation.product_runner import (
 )
 from logfolio_ai.llm import LLMCallMetrics
 from logfolio_ai.models import AnalysisResponse, ExperienceCandidate
+from logfolio_ai.evaluation.product_models import (
+    AutomaticEvaluation,
+    CostEstimate,
+    ProductEvalRun,
+)
 
 
 def matching_new_experience(case: ProductEvalCase) -> AnalysisResponse:
@@ -174,3 +180,59 @@ async def test_runner_repeats_hard_cases_three_times_and_exports_csv(tmp_path: P
 
     assert report.total_runs == 3
     assert output.read_text(encoding="utf-8").count("ATTRIBUTION_01") == 3
+
+
+def _passing_run(category: str, *, latency_ms: int = 10, retry_count: int = 0):
+    evaluation = AutomaticEvaluation(
+        result_type_match=True,
+        target_experience_match=True,
+        experience_count_match=True,
+        question_requirement_match=True,
+        question_intent_match=True,
+        information_need_match=True,
+        conflict_match=True,
+        critical_policy_violation=False,
+        forbidden_output=False,
+        passed=True,
+    )
+    return ProductEvalRun(
+        case_id=f"{category}_01",
+        category=category,
+        run_number=1,
+        provider="scripted",
+        model="test",
+        success=True,
+        automatic_evaluation=evaluation,
+        usage=LLMCallMetrics(
+            provider="scripted",
+            model="test",
+            latency_ms=latency_ms,
+            retry_count=retry_count,
+        ),
+        cost=CostEstimate(),
+    )
+
+
+def test_acceptance_summary_applies_automated_gates() -> None:
+    summary = build_acceptance_summary([
+        _passing_run("NEW_EXPERIENCE"),
+        _passing_run("EXISTING_UPDATE"),
+        _passing_run("MERGE"),
+        _passing_run("SPLIT"),
+    ])
+
+    assert summary.accepted is False
+    assert summary.failed_gate_count == 0
+    assert summary.not_evaluated_gate_count == 2
+
+
+def test_acceptance_summary_fails_latency_and_retry_gates() -> None:
+    summary = build_acceptance_summary([
+        _passing_run("NEW_EXPERIENCE", latency_ms=25_001, retry_count=2),
+        _passing_run("MERGE"),
+    ])
+    statuses = {gate.name: gate.status for gate in summary.gates}
+
+    assert summary.accepted is False
+    assert statuses["p95_latency"] == "FAIL"
+    assert statuses["retry_limit"] == "FAIL"
