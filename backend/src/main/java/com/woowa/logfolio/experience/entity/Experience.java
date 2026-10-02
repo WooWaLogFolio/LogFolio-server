@@ -49,11 +49,28 @@ public class Experience {
         this.context = context; this.contribution = contribution; this.decisionReason = decisionReason;
         this.action = action; this.result = result; this.learning = learning; this.status = status;
     }
+    public void augmentFrom(ExperienceCandidate source) {
+        if (source.getTitle() != null && !source.getTitle().isBlank()) this.title = source.getTitle();
+        if (source.getSummary() != null) this.summary = source.getSummary();
+        applyNonNullDraft(source.getDraftContent());
+        this.status = "REVIEW_REQUIRED";
+        this.version++;
+    }
+    public void confirm() { this.status = "SAVED"; this.version++; }
     private void applyDraft(Map<String, Object> draft) {
         if (draft == null) return;
         this.context = text(draft.get("context")); this.contribution = text(draft.get("contribution"));
         this.decisionReason = text(draft.get("decisionReason")); this.action = text(draft.get("action"));
         this.result = text(draft.get("result")); this.learning = text(draft.get("learning"));
+    }
+    private void applyNonNullDraft(Map<String, Object> draft) {
+        if (draft == null) return;
+        if (draft.get("context") != null) this.context = text(draft.get("context"));
+        if (draft.get("contribution") != null) this.contribution = text(draft.get("contribution"));
+        if (draft.get("decisionReason") != null) this.decisionReason = text(draft.get("decisionReason"));
+        if (draft.get("action") != null) this.action = text(draft.get("action"));
+        if (draft.get("result") != null) this.result = text(draft.get("result"));
+        if (draft.get("learning") != null) this.learning = text(draft.get("learning"));
     }
     private String text(Object value) { return value == null ? null : String.valueOf(value); }
     public void delete() { deletedAt = LocalDateTime.now(); }

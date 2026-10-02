@@ -55,6 +55,13 @@ public class ExperienceService {
     @Transactional
     public void delete(UUID userId, UUID id) { findOwned(userId, id).delete(); }
 
+    @Transactional
+    public ExperienceResponse confirm(UUID userId, UUID id) {
+        Experience experience = findOwned(userId, id);
+        experience.confirm();
+        return response(experience);
+    }
+
     public List<EvidenceResponse> evidence(UUID userId, UUID experienceId) {
         findOwned(userId, experienceId);
         return evidenceRepository.findAllForExperience(experienceId, userId).stream().map(EvidenceResponse::from).toList();

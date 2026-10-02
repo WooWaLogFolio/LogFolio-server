@@ -62,6 +62,13 @@ public class ExperienceController {
         service.delete(principal.getUserId(), id);
     }
 
+    @PostMapping("/experiences/{id}/confirm")
+    @Operation(summary = "경험 카드 최종 확정", description = "사용자 검토가 끝난 경험을 SAVED 상태로 변경합니다.")
+    public ExperienceService.ExperienceResponse confirm(@AuthenticationPrincipal LogfolioOAuth2User principal,
+                                                         @PathVariable UUID id) {
+        return service.confirm(principal.getUserId(), id);
+    }
+
     @GetMapping("/experiences/{id}/evidence")
     @Operation(summary = "경험 카드 근거 목록")
     public List<ExperienceService.EvidenceResponse> evidence(@AuthenticationPrincipal LogfolioOAuth2User principal,

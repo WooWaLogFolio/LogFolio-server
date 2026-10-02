@@ -139,6 +139,10 @@ CREATE TABLE `experience_candidates` (
     `id` CHAR(36) NOT NULL,
     `analysis_run_id` CHAR(36) NOT NULL,
     `merged_into_id` CHAR(36) NULL,
+    `candidate_type` VARCHAR(30) NOT NULL DEFAULT 'NEW',
+    `target_experience_id` CHAR(36) NULL,
+    `match_confidence` DECIMAL(5,4) NULL,
+    `match_reason` TEXT NULL,
     `title` VARCHAR(255) NOT NULL,
     `summary` TEXT NULL,
     `draft_content` JSON NULL,
@@ -310,6 +314,10 @@ ALTER TABLE `experience_candidates`
 ALTER TABLE `experience_candidates`
     ADD CONSTRAINT `FK_EXPERIENCE_CANDIDATES_MERGED_INTO`
     FOREIGN KEY (`merged_into_id`) REFERENCES `experience_candidates` (`id`);
+
+ALTER TABLE `experience_candidates`
+    ADD CONSTRAINT `FK_EXPERIENCE_CANDIDATES_TARGET_EXPERIENCE`
+    FOREIGN KEY (`target_experience_id`) REFERENCES `experiences` (`id`);
 
 ALTER TABLE `experiences`
     ADD CONSTRAINT `FK_EXPERIENCES_PROJECT`

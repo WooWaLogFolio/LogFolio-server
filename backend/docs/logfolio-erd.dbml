@@ -141,6 +141,10 @@ Table experience_candidates {
   id uuid [pk]
   analysis_run_id uuid [not null, ref: > analysis_runs.id]
   merged_into_id uuid [ref: > experience_candidates.id]
+  candidate_type varchar(30) [not null, default: 'NEW', note: 'NEW 또는 ENHANCE_EXISTING']
+  target_experience_id uuid [ref: > experiences.id, note: '기존 경험 보강 대상']
+  match_confidence decimal(5,4)
+  match_reason text
   title varchar(255) [not null]
   summary text
   draft_content jsonb
