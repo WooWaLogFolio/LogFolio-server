@@ -65,6 +65,7 @@ def evaluate_cases(cases: Iterable[EvaluationCase]) -> EvaluationReport:
         output = validator.validate(
             case.raw_response,
             user_answers=case.user_answers,
+            corrections=case.corrections,
         )
         messages: List[str] = []
         for expected_claim in case.expected.claims:

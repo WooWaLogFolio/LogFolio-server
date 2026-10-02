@@ -102,6 +102,8 @@ class UserCorrection(ContractModel):
     original_content: Optional[str] = None
     corrected_content: Optional[str] = None
     decision: str = Field(pattern="^(EDITED|REJECTED)$")
+    evidence_source_ids: List[UUID] = Field(default_factory=list, max_length=100)
+    evidence_chunk_ids: List[UUID] = Field(default_factory=list, max_length=100)
 
 
 class UserAnswer(ContractModel):

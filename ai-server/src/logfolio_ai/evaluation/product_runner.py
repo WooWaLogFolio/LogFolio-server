@@ -180,7 +180,11 @@ async def run_product_eval(
             started = time.perf_counter()
             try:
                 raw_output = await provider.analyze_grounded(case.input)
-                output = validator.validate(raw_output, user_answers=case.input.answers)
+                output = validator.validate(
+                    raw_output,
+                    user_answers=case.input.answers,
+                    corrections=case.input.corrections,
+                )
                 evaluation = evaluate_product_output(case, output)
                 measured = getattr(provider, "last_call_metrics", None)
                 metrics = measured or LLMCallMetrics(

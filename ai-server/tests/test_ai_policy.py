@@ -13,6 +13,7 @@ from logfolio_ai.models import (
     SubjectType,
     VerificationStatus,
     UserAnswer,
+    UserCorrection,
 )
 from logfolio_ai.policy import AIPolicyValidator
 
@@ -258,3 +259,60 @@ def test_stored_answer_removes_repeated_question_without_generated_claim() -> No
 
     assert result.questions == []
     assert result.information_need is None
+
+
+def test_rejected_claim_with_same_evidence_is_not_proposed_again() -> None:
+    rejected_claim = claim()
+    correction = UserCorrection(
+        section_type=rejected_claim.section_type,
+        original_content=rejected_claim.content,
+        decision="REJECTED",
+        evidence_source_ids=[rejected_claim.evidences[0].source_id],
+        evidence_chunk_ids=[rejected_claim.evidences[0].chunk_id],
+    )
+
+    result = AIPolicyValidator().validate(
+        response([rejected_claim]),
+        corrections=[correction],
+    )
+
+    assert result.candidates == []
+    assert result.result_types == [AnalysisResultType.NO_UPDATE]
+    assert "이미 거절" in result.no_update_reason
+
+
+def test_rejected_claim_can_be_reconsidered_with_new_evidence() -> None:
+    old_evidence = evidence("프로젝트 팀은 사용자 인터뷰를 진행했다.")
+    new_evidence = evidence("추가 인터뷰 기록에서 같은 활동이 다시 확인됐다.")
+    proposed = claim(evidences=[old_evidence, new_evidence])
+    correction = UserCorrection(
+        section_type=proposed.section_type,
+        original_content=proposed.content,
+        decision="REJECTED",
+        evidence_source_ids=[old_evidence.source_id],
+        evidence_chunk_ids=[old_evidence.chunk_id],
+    )
+
+    result = AIPolicyValidator().validate(
+        response([proposed]),
+        corrections=[correction],
+    )
+
+    assert len(result.candidates) == 1
+    assert len(result.candidates[0].claims) == 1
+
+
+def test_rejection_without_evidence_snapshot_does_not_block_evidenced_claim() -> None:
+    proposed = claim()
+    correction = UserCorrection(
+        section_type=proposed.section_type,
+        original_content=proposed.content,
+        decision="REJECTED",
+    )
+
+    result = AIPolicyValidator().validate(
+        response([proposed]),
+        corrections=[correction],
+    )
+
+    assert len(result.candidates) == 1

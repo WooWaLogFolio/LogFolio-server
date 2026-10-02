@@ -419,6 +419,7 @@ class AnalysisOrchestrator:
         validated = self._policy_validator.validate(
             grounded_response,
             user_answers=request.answers,
+            corrections=request.corrections,
         )
         metrics = getattr(self._llm_provider, "last_call_metrics", None)
         ai_usage = (

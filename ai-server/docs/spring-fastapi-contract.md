@@ -158,6 +158,9 @@ X-Internal-API-Key: <shared-secret>
 - `existingExperiences`에는 현재 프로젝트의 기존 Experience 요약·Claim·Evidence ID를 전달
 - `evidences`의 `sourceId + chunkId`는 관련 Experience가 선택됐을 때 FastAPI가 기존 Evidence 원문을 정확히 다시 조회하는 키
 - `corrections`에는 사용자가 이전에 수정하거나 거절한 내용을 전달
+- `REJECTED` correction은 당시 Claim의 `sectionType`, `originalContent`, `evidenceSourceIds`, `evidenceChunkIds`를 함께 전달
+- FastAPI는 문장·섹션·근거가 모두 동일한 거절 Claim을 제거하며, 새로운 Source 또는 Chunk가 추가된 경우에는 재검토를 허용
+- 기존 Experience에서 거절한 내용이면 `experienceId`도 전달하여 다른 Experience의 같은 문장을 잘못 차단하지 않음
 - `answers`에는 Spring의 `gap_answers`에 실제 저장된 사용자 답변만 전달
 - 최초 답변은 `USER_INPUT`, 사용자가 답변을 직접 수정한 경우는 `USER_EDITED`
 - `USER_CONFIRMED`는 AI 초안을 사용자가 승인한 뒤 Spring이 만드는 상태이므로 답변 입력에 사용하지 않음
@@ -165,6 +168,22 @@ X-Internal-API-Key: <shared-secret>
 - 동일 분석 작업의 재시도에는 같은 `analysisRunId` 사용
 - `projectId`의 접근 권한과 삭제 상태를 Spring에서 확인한 뒤 호출
 - 이전 `documents` 직접 전달 방식은 하위 호환용이며 신규 연동에서는 사용하지 않음
+
+거절 기록 예시:
+
+```json
+{
+  "experienceId": "60000000-0000-0000-0000-000000000001",
+  "sectionType": "ACTION",
+  "originalContent": "사용자 인터뷰를 진행했다.",
+  "correctedContent": null,
+  "decision": "REJECTED",
+  "evidenceSourceIds": ["30000000-0000-0000-0000-000000000001"],
+  "evidenceChunkIds": ["80000000-0000-0000-0000-000000000001"]
+}
+```
+
+Spring은 Review에서 거절이 발생할 때 해당 스냅샷을 저장해야 합니다. Source ID만 같고 새로운 Chunk가 생긴 경우도 새 Evidence로 판단하려면 `evidenceChunkIds` 보존이 필요합니다.
 
 분석 순서:
 
