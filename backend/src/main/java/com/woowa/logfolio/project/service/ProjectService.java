@@ -25,17 +25,19 @@ public class ProjectService {
     private final UserService userService;
 
     @Transactional
-    public ProjectResponse create(ProjectCreateRequest request) {
-        User user = userService.findActiveUser(request.userId());
+    public ProjectResponse create(UUID userId, ProjectCreateRequest request) {
+        validateDates(request.startedAt(), request.endedAt());
+        User user = userService.findActiveUser(userId);
         Project project = new Project(
                 user, request.name(), request.status(), request.activityType(),
-                request.userRole(), request.startedAt(), request.endedAt()
+                request.userRole(), request.teamSize(), request.tags(),
+                request.startedAt(), request.endedAt(), request.description()
         );
         return ProjectResponse.from(projectRepository.save(project));
     }
 
-    public ProjectResponse get(UUID id) {
-        return ProjectResponse.from(findActiveProject(id));
+    public ProjectResponse get(UUID userId, UUID id) {
+        return ProjectResponse.from(findOwnedProject(userId, id));
     }
 
     public List<ProjectResponse> getByUser(UUID userId) {
@@ -45,22 +47,29 @@ public class ProjectService {
     }
 
     @Transactional
-    public ProjectResponse update(UUID id, ProjectUpdateRequest request) {
-        Project project = findActiveProject(id);
+    public ProjectResponse update(UUID userId, UUID id, ProjectUpdateRequest request) {
+        validateDates(request.startedAt(), request.endedAt());
+        Project project = findOwnedProject(userId, id);
         project.update(
                 request.name(), request.status(), request.activityType(), request.userRole(),
-                request.startedAt(), request.endedAt()
+                request.teamSize(), request.tags(), request.startedAt(), request.endedAt(), request.description()
         );
         return ProjectResponse.from(project);
     }
 
     @Transactional
-    public void delete(UUID id) {
-        findActiveProject(id).delete();
+    public void delete(UUID userId, UUID id) {
+        findOwnedProject(userId, id).delete();
     }
 
-    private Project findActiveProject(UUID id) {
-        return projectRepository.findByIdAndDeletedAtIsNull(id)
+    public Project findOwnedProject(UUID userId, UUID id) {
+        return projectRepository.findByIdAndUserIdAndDeletedAtIsNull(id, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다."));
+    }
+
+    private void validateDates(java.time.LocalDate startedAt, java.time.LocalDate endedAt) {
+        if (startedAt != null && endedAt != null && endedAt.isBefore(startedAt)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료일은 시작일보다 빠를 수 없습니다.");
+        }
     }
 }

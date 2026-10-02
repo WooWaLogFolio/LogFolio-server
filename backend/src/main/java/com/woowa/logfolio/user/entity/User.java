@@ -19,17 +19,14 @@ public class User {
     @Id
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(name = "password_hash")
-    private String passwordHash;
-
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private UserStatus status;
 
     @Column(name = "onboarding_completed_at")
@@ -47,11 +44,10 @@ public class User {
     protected User() {
     }
 
-    public User(String email, String name, String passwordHash) {
+    public User(String email, String name) {
         this.id = UUID.randomUUID();
         this.email = email;
         this.name = name;
-        this.passwordHash = passwordHash;
         this.status = UserStatus.ACTIVE;
     }
 
@@ -67,10 +63,17 @@ public class User {
         updatedAt = LocalDateTime.now();
     }
 
-    public void update(String name, UserStatus status, LocalDateTime onboardingCompletedAt) {
+    public void update(String name, LocalDateTime onboardingCompletedAt) {
         this.name = name;
-        this.status = status;
         this.onboardingCompletedAt = onboardingCompletedAt;
+    }
+
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    public void completeOnboarding() {
+        this.onboardingCompletedAt = LocalDateTime.now();
     }
 
     public void withdraw() {
@@ -81,7 +84,6 @@ public class User {
     public UUID getId() { return id; }
     public String getEmail() { return email; }
     public String getName() { return name; }
-    public String getPasswordHash() { return passwordHash; }
     public UserStatus getStatus() { return status; }
     public LocalDateTime getOnboardingCompletedAt() { return onboardingCompletedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
