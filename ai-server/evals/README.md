@@ -110,4 +110,23 @@ python -m logfolio_ai.evaluation.embedding_runner \
 
 이 명령은 외부 LLM API를 호출하지 않지만 로컬 E5 모델을 사용합니다.
 
+## Pipeline Eval
+
+`pipeline_core_v1`은 Scripted Retrieval과 Scripted Provider 출력을 실제
+`AnalysisOrchestrator`에 넣어 전체 검증 순서를 확인합니다.
+
+- 정상 Claim과 Evidence 통과
+- 원문에 없는 Evidence와 Candidate 제거
+- TEAM 활동을 USER 기여로 귀속한 결과의 Policy 교정
+- Retrieval 근거가 없을 때 LLM을 호출하지 않고 `NO_UPDATE` 반환
+
+```bash
+python -m logfolio_ai.evaluation.pipeline_runner \
+  --dataset evals/datasets/pipeline_core_v1.json \
+  --output-json evals/results/pipeline.json
+```
+
+이 평가는 외부 LLM API와 운영 DB를 호출하지 않습니다. 실제 Chunking, E5 및
+pgvector 자체 품질은 Retrieval Eval과 각각의 통합 테스트에서 별도로 검증합니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.
