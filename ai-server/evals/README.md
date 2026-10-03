@@ -215,4 +215,22 @@ python -m logfolio_ai.evaluation.source_lifecycle_runner \
 
 합성 Source와 메모리 저장소만 사용하므로 외부 API와 운영 DB를 호출하지 않습니다.
 
+## Project Mismatch Eval
+
+`project_mismatch_v1`은 현재 프로젝트와 관련성이 낮아 보이는 Source의 사용자 확인
+흐름을 실제 `AnalysisOrchestrator`, `RagService`, `MemoryVectorStore` 조합으로 검증합니다.
+
+- 의심 Source는 삭제·제외하지 않고 `NEEDS_CONTEXT` 경고 반환
+- 사용자 확인 전에는 LLM 호출 중단
+- `confirmedSourceIds`로 포함을 확인하면 경고를 반복하지 않고 분석
+- 관련 Source는 불필요한 경고 없이 분석
+
+```bash
+python -m logfolio_ai.evaluation.project_mismatch_runner \
+  --dataset evals/datasets/project_mismatch_v1.json \
+  --output-json evals/results/project-mismatch.json
+```
+
+합성 Source와 Scripted Provider만 사용하므로 외부 API와 운영 DB를 호출하지 않습니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.

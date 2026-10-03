@@ -335,6 +335,15 @@ python -m logfolio_ai.evaluation.source_lifecycle_runner \
   --output-json evals/results/source-lifecycle.json
 ```
 
+현재 프로젝트와 관련성이 낮아 보이는 Source는 자동 삭제·이동·제외하지 않고
+사용자 확인을 기다립니다. 사용자가 포함을 확인한 Source는 같은 경고를 반복하지 않고
+정상 분석하며, 이 흐름은 다음 오프라인 평가로 확인합니다.
+
+```bash
+python -m logfolio_ai.evaluation.project_mismatch_runner \
+  --output-json evals/results/project-mismatch.json
+```
+
 현재 평가 데이터는 팀 활동의 개인 귀속, 근거 없는 성과, 명시된 개인 기여, 사용자 확인 상태 위조와 불필요한 질문을 포함합니다. 실제 Gemini 품질과 RAG 검색 정확도 평가는 운영 데이터가 아닌 별도의 비식별 검증 자료로 확장해야 합니다.
 
 실제 Provider의 제품 판단은 버전 관리되는 Product Gold Case로 별도 평가합니다. 결과에는 Result Type, 대상 Experience, Candidate 수, 질문 필요 여부, Critical Policy 위반과 함께 Token, Latency, Retry, 버전이 명시된 가격표 기반 추정 비용이 기록됩니다.
