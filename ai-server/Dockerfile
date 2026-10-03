@@ -27,6 +27,9 @@ RUN if [ "$INSTALL_EMBEDDING" = "true" ]; then \
         python -m pip install .; \
     fi
 
+# Evaluation profiles run versioned fixtures from inside the image.
+COPY --chown=logfolio:logfolio evals ./evals
+
 USER logfolio
 
 EXPOSE 8000

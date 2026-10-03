@@ -98,8 +98,13 @@ Spring Review 승인 데이터가 필요한 `승인된 경험당 비용`과 사�
 
 `retrieval_core_v1`은 새 Source, 사용자 기여, 판단 근거, 기존 Experience 근거,
 기존 Index 재사용 검색을 평가하는 버전형 데이터셋입니다. 결과에는 `Recall@K`,
-무관 Chunk 비율, 다른 Project Chunk 혼입 건수가 포함됩니다. Project 필터는 유사도
-순위 계산 전에 적용합니다.
+첫 정답 순위, MRR(Mean Reciprocal Rank), 무관 Chunk 비율, 다른 Project Chunk 혼입
+건수가 포함됩니다. Project 필터는 유사도 순위 계산 전에 적용합니다.
+
+2026-10-03 로컬 CPU 기준 `intfloat/multilingual-e5-base` 초기 Baseline은
+Recall@1 0.80, Recall@3 1.00, Cross-project 혼입 0건이었습니다. 개인 기여 Case에서는
+팀 활동 Chunk가 1위, 사용자 직접 기록이 2위였으므로 Embedding 순위만으로 개인 기여를
+확정하지 않고 Evidence·AI Policy 검증을 계속 적용해야 합니다.
 
 ```bash
 python -m logfolio_ai.evaluation.embedding_runner \
