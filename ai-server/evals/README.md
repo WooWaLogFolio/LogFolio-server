@@ -178,4 +178,23 @@ python -m logfolio_ai.evaluation.human_runner \
 또는 Critical Error가 하나라도 있으면 Fail입니다. 미입력 항목이 있으면
 `INCOMPLETE`이며 최종 합격 처리하지 않습니다.
 
+## Resilience Eval
+
+`resilience_core_v1`은 예외 및 실패 처리 정책의 자동 검증 가능한 핵심 동작을
+실제 Provider·RAG 코드 경로로 확인합니다.
+
+- 잘못된 첫 JSON 응답 후 1회 재시도 성공
+- Timeout 발생 시 1회만 재시도하고 `LLM_TIMEOUT` 반환
+- 재시도 대상이 아닌 4xx 요청 오류는 즉시 중단
+- 잘못된 구조화 응답이 반복되면 `LLM_INVALID_RESPONSE` 반환
+- Source 하나가 실패해도 나머지 Source 인덱싱 결과 보존
+
+```bash
+python -m logfolio_ai.evaluation.resilience_runner \
+  --dataset evals/datasets/resilience_core_v1.json \
+  --output-json evals/results/resilience.json
+```
+
+Scripted Client와 합성 Source만 사용하므로 외부 API와 운영 DB를 호출하지 않습니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.
