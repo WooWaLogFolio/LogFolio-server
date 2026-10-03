@@ -22,6 +22,8 @@ def test_retrieval_metrics_measure_recall_and_noise() -> None:
     assert result.recall_at_k == 1
     assert result.irrelevant_chunk_ratio == 0.5
     assert result.cross_project_count == 0
+    assert result.first_relevant_rank == 1
+    assert result.reciprocal_rank == 1
     assert result.passed is True
 
 
@@ -38,4 +40,6 @@ def test_retrieval_metrics_fail_when_gold_evidence_is_missing() -> None:
     result = evaluate_retrieved_chunks(cases[0], ["interview"])
 
     assert result.recall_at_k == 0
+    assert result.first_relevant_rank is None
+    assert result.reciprocal_rank == 0
     assert result.passed is False

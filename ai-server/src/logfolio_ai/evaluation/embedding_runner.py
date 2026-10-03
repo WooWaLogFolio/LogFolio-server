@@ -38,6 +38,8 @@ class RetrievalCaseResult(ContractModel):
     recall_at_k: float = Field(ge=0, le=1)
     irrelevant_chunk_ratio: float = Field(ge=0, le=1)
     cross_project_count: int = Field(ge=0)
+    first_relevant_rank: Optional[int] = Field(default=None, ge=1)
+    reciprocal_rank: float = Field(ge=0, le=1)
     passed: bool
 
 
@@ -51,6 +53,7 @@ class RetrievalEvalReport(ContractModel):
     vectors_normalized: bool
     mean_recall_at_k: float = Field(ge=0, le=1)
     mean_irrelevant_chunk_ratio: float = Field(ge=0, le=1)
+    mean_reciprocal_rank: float = Field(ge=0, le=1)
     cross_project_count: int = Field(ge=0)
     success: bool
     cases: List[RetrievalCaseResult]
@@ -88,6 +91,10 @@ def evaluate_retrieved_chunks(
     irrelevant_ratio = (
         (len(retrieved) - relevant_count) / len(retrieved) if retrieved else 0.0
     )
+    first_relevant_rank = next(
+        (index for index, chunk_id in enumerate(retrieved, start=1) if chunk_id in expected),
+        None,
+    )
     return RetrievalCaseResult(
         case_id=case.case_id,
         category=case.category,
@@ -95,6 +102,8 @@ def evaluate_retrieved_chunks(
         recall_at_k=recall,
         irrelevant_chunk_ratio=irrelevant_ratio,
         cross_project_count=cross_project_count,
+        first_relevant_rank=first_relevant_rank,
+        reciprocal_rank=(1 / first_relevant_rank if first_relevant_rank else 0),
         passed=recall == 1.0 and cross_project_count == 0,
     )
 
@@ -151,6 +160,10 @@ async def evaluate(
         sum(item.irrelevant_chunk_ratio for item in results) / len(results)
         if results else 0
     )
+    mean_reciprocal_rank = (
+        sum(item.reciprocal_rank for item in results) / len(results)
+        if results else 0
+    )
     cross_project_count = sum(item.cross_project_count for item in results)
     return RetrievalEvalReport(
         dataset=dataset_name,
@@ -162,6 +175,7 @@ async def evaluate(
         vectors_normalized=vectors_normalized,
         mean_recall_at_k=mean_recall,
         mean_irrelevant_chunk_ratio=mean_irrelevant,
+        mean_reciprocal_rank=mean_reciprocal_rank,
         cross_project_count=cross_project_count,
         success=(
             bool(results)
