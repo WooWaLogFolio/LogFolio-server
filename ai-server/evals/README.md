@@ -151,4 +151,31 @@ python -m logfolio_ai.evaluation.comparison_runner \
 필요한 측정값이 남아 있으면 `READY_FOR_HUMAN_REVIEW`로 표시합니다. 필요한 값이 없는
 모델을 임의로 최종 `PASS` 처리하지 않습니다.
 
+## Human Eval
+
+Human Eval은 사용자 기능이나 Spring API가 아니라 실제 모델 결과의 콘텐츠 품질을
+사람이 확인하는 내부 평가 절차입니다. 정확성, 구체성, 핵심성, 개인성, 구조성,
+비중복성, 재사용성, 과장 방지를 각각 1~5점으로 기록합니다.
+
+Product Eval 결과에서 입력 템플릿을 생성합니다.
+
+```bash
+python -m logfolio_ai.evaluation.human_runner \
+  --product-report evals/results/gemini.json \
+  --template-output evals/results/gemini-human-input.json
+```
+
+사람이 점수와 `criticalError`를 입력한 후 집계합니다.
+
+```bash
+python -m logfolio_ai.evaluation.human_runner \
+  --input evals/results/gemini-human-input.json \
+  --output-json evals/results/gemini-human-report.json \
+  --output-csv evals/results/gemini-human-report.csv
+```
+
+모든 항목이 입력되어야 완료로 인정합니다. 평균 4.0 미만, 정확성·개인성 3점 미만,
+또는 Critical Error가 하나라도 있으면 Fail입니다. 미입력 항목이 있으면
+`INCOMPLETE`이며 최종 합격 처리하지 않습니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.
