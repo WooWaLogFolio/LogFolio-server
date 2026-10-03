@@ -1,0 +1,10 @@
+{
+  "caseId": "QUICK_FILE_CONFLICT_01", "title": "Quick Log와 파일 내용 충돌", "category": "SOURCE_CONFLICT", "difficulty": "HARD",
+  "description": "사용자 기록과 팀 문서의 수치가 다를 때 하나를 임의로 확정하지 않는지 평가",
+  "input": {"analysisRunId": "10000000-0000-0000-0000-000000000018", "projectId": "20000000-0000-0000-0000-000000000001", "chunks": [
+    {"chunkId": "30000000-0000-0000-0000-000000000020", "sourceId": "40000000-0000-0000-0000-000000000020", "sourceType": "QUICK_LOG", "sourceName": "내 회고", "text": "나는 온보딩 단계를 다섯 개에서 세 개로 줄였다.", "distance": 0.05, "purposes": ["USER_CONTRIBUTION", "OUTCOME"]},
+    {"chunkId": "30000000-0000-0000-0000-000000000021", "sourceId": "40000000-0000-0000-0000-000000000021", "sourceType": "PROJECT_FILE", "sourceName": "최종 보고서", "pageNumber": 5, "text": "온보딩은 다섯 단계에서 네 단계로 변경되었다.", "distance": 0.05, "purposes": ["OUTCOME"]}
+  ]},
+  "expected": {"resultType": "NEEDS_CONTEXT", "expectedExperienceCount": 1, "requiresQuestion": true, "questionIntents": ["OUTCOME"], "forbiddenPhrases": ["세 단계로 확정", "네 단계로 확정"]},
+  "humanRubric": ["충돌하는 수치를 임의 선택하지 않는다", "사용자 확인 질문으로 보낸다"]
+}

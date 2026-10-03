@@ -54,7 +54,23 @@ def test_product_dataset_contains_core_and_security_gold_cases() -> None:
         "REJECTED_VALUE_01",
         "PRIVACY_01",
         "PROMPT_INJECTION_01",
+        "USER_EDITED_01",
+        "MIXED_SOURCE_01",
+        "AMBIGUOUS_MAPPING_01",
+        "ANSWERED_CONTEXT_01",
+        "EVIDENCE_GROUNDING_01",
+        "QUICK_FILE_CONFLICT_01",
+        "REJECTED_NEW_EVIDENCE_01",
+        "INSUFFICIENT_MIXED_01",
     ]
+
+
+def test_product_dataset_has_unique_case_and_analysis_ids() -> None:
+    cases = load_product_cases()
+
+    assert len(cases) == 20
+    assert len({case.case_id for case in cases}) == len(cases)
+    assert len({case.input.analysis_run_id for case in cases}) == len(cases)
 
 
 def test_product_evaluator_compares_product_decisions() -> None:
@@ -110,6 +126,25 @@ def test_product_evaluator_detects_missing_conflict() -> None:
     assert result.passed is False
     assert result.conflict_match is False
     assert "conflict expected=True actual=False" in result.failures
+
+
+def test_product_evaluator_checks_claim_keywords_and_evidence_ids() -> None:
+    case = load_product_cases(case_id="NEW_01")[0]
+    case = case.model_copy(update={
+        "expected": case.expected.model_copy(update={
+            "expected_claim_keywords": ["동기화"],
+            "forbidden_claim_keywords": ["인터뷰"],
+            "required_evidence_chunk_ids": [
+                "30000000-0000-0000-0000-000000000001"
+            ],
+        })
+    })
+
+    result = evaluate_product_output(case, matching_new_experience(case))
+
+    assert result.passed is False
+    assert result.expected_claims_match is False
+    assert result.required_evidence_match is False
 
 
 def test_cost_estimate_uses_versioned_pricing() -> None:

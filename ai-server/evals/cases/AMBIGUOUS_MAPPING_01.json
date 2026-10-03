@@ -1,0 +1,10 @@
+{
+  "caseId": "AMBIGUOUS_MAPPING_01", "title": "기존 경험 매핑 모호", "category": "AMBIGUOUS_MAPPING", "difficulty": "HARD",
+  "description": "새 Source가 비슷한 두 기존 Experience 중 어디에 속하는지 불명확할 때 강제 병합하지 않는지 평가",
+  "input": {"analysisRunId": "10000000-0000-0000-0000-000000000015", "projectId": "20000000-0000-0000-0000-000000000001", "chunks": [{"chunkId": "30000000-0000-0000-0000-000000000016", "sourceId": "40000000-0000-0000-0000-000000000016", "sourceType": "QUICK_LOG", "sourceName": "회고", "text": "나는 로그인 흐름을 개선했다.", "distance": 0.16, "purposes": ["USER_CONTRIBUTION"]}], "existingExperiences": [
+    {"experienceId": "50000000-0000-0000-0000-000000000014", "title": "로그인 보안 개선", "claims": [{"sectionType": "ACTION", "content": "토큰 인증을 개선했다."}]},
+    {"experienceId": "50000000-0000-0000-0000-000000000015", "title": "로그인 UX 개선", "claims": [{"sectionType": "ACTION", "content": "로그인 화면 흐름을 개선했다."}]}
+  ]},
+  "expected": {"resultType": "NEEDS_CONTEXT", "expectedExperienceCount": 0, "requiresQuestion": true, "questionIntents": ["MAPPING"], "forbiddenPhrases": []},
+  "humanRubric": ["임의의 기존 Experience에 합치지 않는다", "어떤 개선인지 한 번만 확인한다"]
+}

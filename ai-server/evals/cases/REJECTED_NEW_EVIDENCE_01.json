@@ -1,0 +1,7 @@
+{
+  "caseId": "REJECTED_NEW_EVIDENCE_01", "title": "거절 Claim의 새 근거", "category": "REJECTED_NEW_EVIDENCE", "difficulty": "HARD",
+  "description": "기존 거절 근거와 다른 사용자 직접 기록이 추가되면 새 근거로 재검토하는지 평가",
+  "input": {"analysisRunId": "10000000-0000-0000-0000-000000000019", "projectId": "20000000-0000-0000-0000-000000000001", "chunks": [{"chunkId": "30000000-0000-0000-0000-000000000022", "sourceId": "40000000-0000-0000-0000-000000000022", "sourceType": "QUICK_LOG", "sourceName": "개인 회고", "text": "나는 인터뷰 진행자 역할을 맡아 다섯 명의 인터뷰를 진행했다.", "distance": 0.03, "purposes": ["USER_CONTRIBUTION"]}], "corrections": [{"sectionType": "ACTION", "originalContent": "사용자 인터뷰를 진행했다.", "decision": "REJECTED", "evidenceSourceIds": ["40000000-0000-0000-0000-000000000012"], "evidenceChunkIds": ["30000000-0000-0000-0000-000000000012"]}]},
+  "expected": {"resultType": "NEW_EXPERIENCE", "expectedExperienceCount": 1, "requiresQuestion": false, "expectedClaimKeywords": ["인터뷰"], "requiredEvidenceChunkIds": ["30000000-0000-0000-0000-000000000022"], "forbiddenPhrases": []},
+  "humanRubric": ["기존 거절을 무조건 영구 차단하지 않는다", "새 Evidence가 있을 때만 재검토한다"]
+}

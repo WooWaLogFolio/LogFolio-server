@@ -21,6 +21,9 @@ class ProductEvalExpectation(ContractModel):
     question_intents: List[str] = Field(default_factory=list, max_length=2)
     information_need: Optional[InformationNeedType] = None
     conflict: Optional[bool] = None
+    expected_claim_keywords: List[str] = Field(default_factory=list)
+    forbidden_claim_keywords: List[str] = Field(default_factory=list)
+    required_evidence_chunk_ids: List[str] = Field(default_factory=list)
     forbidden_phrases: List[str] = Field(default_factory=list)
 
 
@@ -43,6 +46,9 @@ class AutomaticEvaluation(ContractModel):
     question_intent_match: bool
     information_need_match: bool
     conflict_match: bool
+    expected_claims_match: bool = True
+    forbidden_claims_absent: bool = True
+    required_evidence_match: bool = True
     schema_valid: bool = True
     critical_policy_violation: bool
     forbidden_output: bool
