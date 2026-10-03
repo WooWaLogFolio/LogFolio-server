@@ -129,4 +129,21 @@ python -m logfolio_ai.evaluation.pipeline_runner \
 이 평가는 외부 LLM API와 운영 DB를 호출하지 않습니다. 실제 Chunking, E5 및
 pgvector 자체 품질은 Retrieval Eval과 각각의 통합 테스트에서 별도로 검증합니다.
 
+## Model Comparison Report
+
+둘 이상의 Product Eval JSON 결과를 한 표로 비교합니다. Pass Rate, P50/P95,
+Timeout/Retry/Schema 실패율, Critical Policy 오류와 예상 비용을 집계합니다.
+
+```bash
+python -m logfolio_ai.evaluation.comparison_runner \
+  evals/results/model-a.json evals/results/model-b.json \
+  --output-json evals/results/comparison.json \
+  --output-csv evals/results/comparison.csv \
+  --output-markdown evals/results/comparison.md
+```
+
+자동 Gate가 실패하면 `FAIL`, 자동 Gate는 통과했지만 Human Eval 또는 승인당 비용처럼
+필요한 측정값이 남아 있으면 `READY_FOR_HUMAN_REVIEW`로 표시합니다. 필요한 값이 없는
+모델을 임의로 최종 `PASS` 처리하지 않습니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.
