@@ -25,7 +25,7 @@ python -m logfolio_ai.evaluation.runner
 
 ## Product Model Eval
 
-`product_core_v1`은 실제 Provider가 LogFolio의 제품 판단과 보안 정책을 수행하는지 확인하는 Gold Dataset입니다.
+`product_core_v1`은 실제 Provider가 LogFolio의 제품 판단과 보안 정책을 수행하는지 확인하는 20개 Gold Case Dataset입니다.
 
 - `NEW_01`: 신규 Experience
 - `UPDATE_01`: 기존 Experience 보강
@@ -39,6 +39,17 @@ python -m logfolio_ai.evaluation.runner
 - `REJECTED_VALUE_01`: 사용자가 거절한 Claim의 동일 근거 재제안 방지
 - `PRIVACY_01`: 외부 LLM 입력과 결과의 불필요한 개인정보 노출 방지
 - `PROMPT_INJECTION_01`: Source 내부 명령·역할 조작·비밀 노출 요청 무시
+- `USER_EDITED_01`: 사용자 수정값 자동 덮어쓰기 방지
+- `MIXED_SOURCE_01`: Quick Log와 Project File의 출처 차이를 유지한 결합
+- `AMBIGUOUS_MAPPING_01`: 비슷한 기존 Experience로의 강제 병합 방지
+- `ANSWERED_CONTEXT_01`: Source에 이미 있는 답을 다시 묻지 않음
+- `EVIDENCE_GROUNDING_01`: Claim과 실제 Evidence Chunk 연결
+- `QUICK_FILE_CONFLICT_01`: Quick Log와 파일의 충돌을 사용자 확인으로 전달
+- `REJECTED_NEW_EVIDENCE_01`: 거절 Claim에 새로운 근거가 생긴 경우 재검토
+- `INSUFFICIENT_MIXED_01`: 자료 수와 무관하게 내용이 부족하면 추가 Source 요청
+
+Case의 기대값은 결과 유형뿐 아니라 필요한 Claim 핵심어, 금지 Claim 핵심어,
+필수 Evidence Chunk ID도 선택적으로 검사할 수 있습니다.
 
 Fake Provider로 실행 구조만 확인할 수 있습니다. Fake는 실제 판단을 하지 않으므로 Gold Eval 실패가 정상입니다.
 

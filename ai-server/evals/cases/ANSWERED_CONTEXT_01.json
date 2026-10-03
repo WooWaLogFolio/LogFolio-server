@@ -1,0 +1,7 @@
+{
+  "caseId": "ANSWERED_CONTEXT_01", "title": "이미 있는 답 재질문 금지", "category": "QUESTION_QUALITY", "difficulty": "MEDIUM",
+  "description": "Source에 행동과 결과가 있을 때 같은 내용을 다시 묻지 않는지 평가",
+  "input": {"analysisRunId": "10000000-0000-0000-0000-000000000016", "projectId": "20000000-0000-0000-0000-000000000001", "chunks": [{"chunkId": "30000000-0000-0000-0000-000000000017", "sourceId": "40000000-0000-0000-0000-000000000017", "sourceType": "QUICK_LOG", "sourceName": "장애 회고", "text": "나는 타임아웃 원인을 추적해 재시도 횟수를 한 번으로 제한했고 중복 요청을 제거했다.", "distance": 0.04, "purposes": ["USER_CONTRIBUTION", "OUTCOME"]}]},
+  "expected": {"resultType": "NEW_EXPERIENCE", "expectedExperienceCount": 1, "requiresQuestion": false, "expectedClaimKeywords": ["재시도"], "forbiddenPhrases": []},
+  "humanRubric": ["이미 Source에 있는 행동을 다시 묻지 않는다", "불필요한 질문을 만들지 않는다"]
+}

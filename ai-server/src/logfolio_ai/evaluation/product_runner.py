@@ -270,6 +270,44 @@ def evaluate_product_output(
             f"conflict expected={expected.conflict} actual={actual_conflict}"
         )
 
+    claim_text = " ".join(
+        claim.content.lower()
+        for candidate in output.candidates
+        for claim in candidate.claims
+    )
+    missing_claim_keywords = [
+        keyword
+        for keyword in expected.expected_claim_keywords
+        if keyword.lower() not in claim_text
+    ]
+    expected_claims_match = not missing_claim_keywords
+    if not expected_claims_match:
+        failures.append(f"missingClaimKeywords={missing_claim_keywords}")
+
+    matched_forbidden_claims = [
+        keyword
+        for keyword in expected.forbidden_claim_keywords
+        if keyword.lower() in claim_text
+    ]
+    forbidden_claims_absent = not matched_forbidden_claims
+    if not forbidden_claims_absent:
+        failures.append(f"forbiddenClaimKeywords={matched_forbidden_claims}")
+
+    actual_evidence_chunk_ids = {
+        str(evidence.chunk_id)
+        for candidate in output.candidates
+        for claim in candidate.claims
+        for evidence in claim.evidences
+    }
+    missing_evidence_ids = [
+        chunk_id
+        for chunk_id in expected.required_evidence_chunk_ids
+        if chunk_id not in actual_evidence_chunk_ids
+    ]
+    required_evidence_match = not missing_evidence_ids
+    if not required_evidence_match:
+        failures.append(f"missingEvidenceChunkIds={missing_evidence_ids}")
+
     violations = {
         violation
         for candidate in output.candidates
@@ -299,6 +337,9 @@ def evaluate_product_output(
         question_intent_match=question_intent_match,
         information_need_match=information_need_match,
         conflict_match=conflict_match,
+        expected_claims_match=expected_claims_match,
+        forbidden_claims_absent=forbidden_claims_absent,
+        required_evidence_match=required_evidence_match,
         critical_policy_violation=critical_policy_violation,
         forbidden_output=forbidden_output,
         passed=not failures,

@@ -12,6 +12,14 @@
     "cases/NO_UPDATE_01.json",
     "cases/REJECTED_VALUE_01.json",
     "cases/PRIVACY_01.json",
-    "cases/PROMPT_INJECTION_01.json"
+    "cases/PROMPT_INJECTION_01.json",
+    "cases/USER_EDITED_01.json",
+    "cases/MIXED_SOURCE_01.json",
+    "cases/AMBIGUOUS_MAPPING_01.json",
+    "cases/ANSWERED_CONTEXT_01.json",
+    "cases/EVIDENCE_GROUNDING_01.json",
+    "cases/QUICK_FILE_CONFLICT_01.json",
+    "cases/REJECTED_NEW_EVIDENCE_01.json",
+    "cases/INSUFFICIENT_MIXED_01.json"
   ]
 }
