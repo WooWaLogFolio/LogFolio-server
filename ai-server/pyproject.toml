@@ -37,6 +37,7 @@ logfolio-ai-pipeline-eval = "logfolio_ai.evaluation.pipeline_runner:main"
 logfolio-ai-compare = "logfolio_ai.evaluation.comparison_runner:main"
 logfolio-ai-human-eval = "logfolio_ai.evaluation.human_runner:main"
 logfolio-ai-resilience-eval = "logfolio_ai.evaluation.resilience_runner:main"
+logfolio-ai-source-lifecycle-eval = "logfolio_ai.evaluation.source_lifecycle_runner:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/logfolio_ai"]

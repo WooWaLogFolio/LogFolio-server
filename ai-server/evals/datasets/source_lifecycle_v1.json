@@ -1,0 +1,25 @@
+{
+  "name": "source_lifecycle_v1",
+  "cases": [
+    {
+      "caseId": "EXACT_DUPLICATE_IN_PROJECT",
+      "scenario": "EXACT_DUPLICATE",
+      "expectedOutcome": "DUPLICATE_BLOCKED"
+    },
+    {
+      "caseId": "SAME_CONTENT_DIFFERENT_PROJECT",
+      "scenario": "PROJECT_ISOLATION",
+      "expectedOutcome": "BOTH_INDEXED"
+    },
+    {
+      "caseId": "DELETED_SOURCE_NOT_RETRIEVED",
+      "scenario": "DELETE_EXCLUDES_RETRIEVAL",
+      "expectedOutcome": "NOT_RETRIEVED"
+    },
+    {
+      "caseId": "DELETED_SOURCE_CAN_BE_REUPLOADED",
+      "scenario": "DELETE_RELEASES_CONTENT_HASH",
+      "expectedOutcome": "REUPLOAD_INDEXED"
+    }
+  ]
+}
