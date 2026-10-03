@@ -197,4 +197,22 @@ python -m logfolio_ai.evaluation.resilience_runner \
 
 Scripted Client와 합성 Source만 사용하므로 외부 API와 운영 DB를 호출하지 않습니다.
 
+## Source Lifecycle Eval
+
+`source_lifecycle_v1`은 Source 중복·삭제 정책을 실제 `RagService`와
+`MemoryVectorStore` 조합으로 검증합니다.
+
+- 같은 Project의 내용이 완전히 동일한 Source는 `DUPLICATE`
+- 동일 내용도 Project가 다르면 각각 `INDEXED`
+- 삭제된 Source는 Retrieval 결과에서 제외
+- 삭제된 Source의 Content Hash도 제거되어 같은 자료 재등록 가능
+
+```bash
+python -m logfolio_ai.evaluation.source_lifecycle_runner \
+  --dataset evals/datasets/source_lifecycle_v1.json \
+  --output-json evals/results/source-lifecycle.json
+```
+
+합성 Source와 메모리 저장소만 사용하므로 외부 API와 운영 DB를 호출하지 않습니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.

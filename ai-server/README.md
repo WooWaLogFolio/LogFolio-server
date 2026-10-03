@@ -326,6 +326,15 @@ python -m logfolio_ai.evaluation.resilience_runner \
 
 이 평가는 API 키, 외부 LLM, 운영 DB가 필요하지 않으며 비용이 발생하지 않습니다.
 
+Source 중복·삭제 정책은 실제 `RagService`와 메모리 Vector Store를 사용해 별도로
+검증합니다. 같은 프로젝트의 동일 자료는 중복 저장하지 않고, 프로젝트가 다르면
+서로 격리하며, 삭제한 Source는 검색과 중복 판별에서 모두 제거되어야 합니다.
+
+```bash
+python -m logfolio_ai.evaluation.source_lifecycle_runner \
+  --output-json evals/results/source-lifecycle.json
+```
+
 현재 평가 데이터는 팀 활동의 개인 귀속, 근거 없는 성과, 명시된 개인 기여, 사용자 확인 상태 위조와 불필요한 질문을 포함합니다. 실제 Gemini 품질과 RAG 검색 정확도 평가는 운영 데이터가 아닌 별도의 비식별 검증 자료로 확장해야 합니다.
 
 실제 Provider의 제품 판단은 버전 관리되는 Product Gold Case로 별도 평가합니다. 결과에는 Result Type, 대상 Experience, Candidate 수, 질문 필요 여부, Critical Policy 위반과 함께 Token, Latency, Retry, 버전이 명시된 가격표 기반 추정 비용이 기록됩니다.
