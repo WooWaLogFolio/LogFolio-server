@@ -127,6 +127,8 @@ python -m logfolio_ai.evaluation.embedding_runner \
 - 질문으로 보완 가능한 정보 부족은 `USER_ANSWER`와 질문 1~2개 반환
 - 자료 자체가 부족하면 Candidate·질문 없이 `ADDITIONAL_SOURCE` 반환
 - 이미 사용자 답변이 있는 Section은 같은 질문을 반복하지 않음
+- 기존 확정값과 새 Source가 충돌하면 `EXISTING_UPDATE` Conflict로 전달
+- LLM이 놓친 `USER_EDITED` 값 충돌도 Policy Validator가 Conflict로 보호
 
 ```bash
 python -m logfolio_ai.evaluation.pipeline_runner \

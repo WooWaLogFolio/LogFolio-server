@@ -189,6 +189,127 @@
         "resultTypes": ["NO_UPDATE"], "candidateCount": 0,
         "questionCount": 0, "llmCalled": true
       }
+    },
+    {
+      "caseId": "PIPELINE_EXISTING_CONFLICT_01",
+      "title": "기존 확정 내용과 새 Source 충돌",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000008",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000008",
+          "sourceName": "새 회고.txt",
+          "pages": [{"pageNumber": 1, "text": "나는 인터뷰 진행까지 담당했다."}]
+        }],
+        "existingExperiences": [{
+          "experienceId": "51000000-0000-0000-0000-000000000008",
+          "title": "사용자 인터뷰 경험",
+          "claims": [{"sectionType": "ACTION", "content": "인터뷰 질문지를 설계했다."}]
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000008",
+        "sourceId": "41000000-0000-0000-0000-000000000008",
+        "sourceName": "새 회고.txt", "pageNumber": 1,
+        "text": "나는 인터뷰 진행까지 담당했다.", "distance": 0.03
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000008",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "기존 확정 내용과 새 근거의 담당 범위가 다릅니다.",
+        "candidates": [{
+          "candidateId": "61000000-0000-0000-0000-000000000008",
+          "resultType": "EXISTING_UPDATE",
+          "targetExperienceId": "51000000-0000-0000-0000-000000000008",
+          "conflict": true,
+          "conflicts": [{
+            "sectionType": "ACTION",
+            "existingContent": "인터뷰 질문지를 설계했다.",
+            "proposedContent": "인터뷰 진행까지 담당했다.",
+            "reason": "기존에 확정한 담당 범위와 새 자료의 범위가 다릅니다."
+          }],
+          "title": "사용자 인터뷰 경험 충돌",
+          "summary": "사용자 확인이 필요합니다.",
+          "claims": [{
+            "sectionType": "ACTION", "content": "인터뷰 진행까지 담당했다.",
+            "subjectType": "USER", "provenanceType": "SOURCE_EXTRACTED",
+            "verificationStatus": "VERIFIED", "evidenceType": "DIRECT",
+            "evidences": [{
+              "sourceId": "41000000-0000-0000-0000-000000000008",
+              "chunkId": "31000000-0000-0000-0000-000000000008",
+              "pageNumber": 1, "excerpt": "나는 인터뷰 진행까지 담당했다."
+            }],
+            "requiresUserConfirmation": false
+          }]
+        }]
+      },
+      "expected": {
+        "resultTypes": ["EXISTING_UPDATE"], "candidateCount": 1,
+        "llmCalled": true, "conflictCount": 1,
+        "targetExperienceId": "51000000-0000-0000-0000-000000000008",
+        "conflictExistingContents": ["인터뷰 질문지를 설계했다."]
+      }
+    },
+    {
+      "caseId": "PIPELINE_USER_EDIT_PROTECTED_01",
+      "title": "LLM이 놓친 사용자 수정값 충돌을 Policy가 생성",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000009",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000009",
+          "sourceName": "추가 자료.txt",
+          "pages": [{"pageNumber": 1, "text": "나는 인터뷰 진행까지 담당했다."}]
+        }],
+        "existingExperiences": [{
+          "experienceId": "51000000-0000-0000-0000-000000000009",
+          "title": "사용자 인터뷰 경험",
+          "claims": [{"sectionType": "ACTION", "content": "인터뷰 업무에 참여했다."}]
+        }],
+        "corrections": [{
+          "experienceId": "51000000-0000-0000-0000-000000000009",
+          "sectionType": "ACTION",
+          "originalContent": "인터뷰 업무에 참여했다.",
+          "correctedContent": "인터뷰 질문지만 설계했다.",
+          "decision": "EDITED"
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000009",
+        "sourceId": "41000000-0000-0000-0000-000000000009",
+        "sourceName": "추가 자료.txt", "pageNumber": 1,
+        "text": "나는 인터뷰 진행까지 담당했다.", "distance": 0.03
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000009",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "기존 경험을 보강합니다.",
+        "candidates": [{
+          "candidateId": "61000000-0000-0000-0000-000000000009",
+          "resultType": "EXISTING_UPDATE",
+          "targetExperienceId": "51000000-0000-0000-0000-000000000009",
+          "conflict": false, "conflicts": [],
+          "title": "사용자 인터뷰 경험 보강",
+          "summary": "새 자료의 담당 범위를 추가합니다.",
+          "claims": [{
+            "sectionType": "ACTION", "content": "인터뷰 진행까지 담당했다.",
+            "subjectType": "USER", "provenanceType": "SOURCE_EXTRACTED",
+            "verificationStatus": "VERIFIED", "evidenceType": "DIRECT",
+            "evidences": [{
+              "sourceId": "41000000-0000-0000-0000-000000000009",
+              "chunkId": "31000000-0000-0000-0000-000000000009",
+              "pageNumber": 1, "excerpt": "나는 인터뷰 진행까지 담당했다."
+            }],
+            "requiresUserConfirmation": false
+          }]
+        }]
+      },
+      "expected": {
+        "resultTypes": ["EXISTING_UPDATE"], "candidateCount": 1,
+        "llmCalled": true, "conflictCount": 1,
+        "targetExperienceId": "51000000-0000-0000-0000-000000000009",
+        "conflictExistingContents": ["인터뷰 질문지만 설계했다."]
+      }
     }
   ]
 }
