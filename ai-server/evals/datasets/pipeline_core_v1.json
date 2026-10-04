@@ -81,6 +81,114 @@
       },
       "retrievedChunks": [],
       "expected": {"resultTypes": ["NO_UPDATE"], "candidateCount": 0, "llmCalled": false}
+    },
+    {
+      "caseId": "PIPELINE_USER_ANSWER_NEEDED_01",
+      "title": "한두 질문으로 보완 가능한 개인 맥락 부족",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000005",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000005",
+          "sourceName": "팀 회고.txt",
+          "pages": [{"pageNumber": 1, "text": "팀은 사용자 인터뷰 결과를 분류하고 기능 우선순위를 바꿨다."}]
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000005",
+        "sourceId": "41000000-0000-0000-0000-000000000005",
+        "sourceName": "팀 회고.txt", "pageNumber": 1,
+        "text": "팀은 사용자 인터뷰 결과를 분류하고 기능 우선순위를 바꿨다.", "distance": 0.06
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000005",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "개인의 구체적인 기여 확인이 필요합니다.",
+        "candidates": [],
+        "questions": [{
+          "questionId": "71000000-0000-0000-0000-000000000005",
+          "targetSection": "CONTRIBUTION",
+          "question": "이 과정에서 직접 담당한 부분은 무엇인가요?",
+          "suggestedAnswers": []
+        }]
+      },
+      "expected": {
+        "resultTypes": ["NEEDS_CONTEXT"], "candidateCount": 0,
+        "questionCount": 1, "informationNeed": "USER_ANSWER", "llmCalled": true
+      }
+    },
+    {
+      "caseId": "PIPELINE_ADDITIONAL_SOURCE_NEEDED_01",
+      "title": "질문만으로 보완할 수 없는 자료 부족",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000006",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000006",
+          "sourceName": "짧은 메모.txt",
+          "pages": [{"pageNumber": 1, "text": "회의함. 자료 정리함. 최종본 제출."}]
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000006",
+        "sourceId": "41000000-0000-0000-0000-000000000006",
+        "sourceName": "짧은 메모.txt", "pageNumber": 1,
+        "text": "회의함. 자료 정리함. 최종본 제출.", "distance": 0.15
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000006",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "경험을 특정하기에는 자료가 부족합니다.",
+        "candidates": [], "questions": [],
+        "informationNeed": "ADDITIONAL_SOURCE",
+        "informationNeedReason": "구체적인 행동이나 중요한 결정이 포함된 기록이 필요합니다."
+      },
+      "expected": {
+        "resultTypes": ["NEEDS_CONTEXT"], "candidateCount": 0,
+        "questionCount": 0, "informationNeed": "ADDITIONAL_SOURCE", "llmCalled": true
+      }
+    },
+    {
+      "caseId": "PIPELINE_ANSWERED_SECTION_NO_REPEAT_01",
+      "title": "이미 답변한 항목을 다시 질문하지 않음",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000007",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000007",
+          "sourceName": "업무 기록.txt",
+          "pages": [{"pageNumber": 1, "text": "사용자는 인증 오류를 조사했다."}]
+        }],
+        "answers": [{
+          "answerId": "81000000-0000-0000-0000-000000000007",
+          "questionId": "71000000-0000-0000-0000-000000000007",
+          "targetSection": "ACTION",
+          "answer": "JWT 갱신 로직의 동시성 문제를 직접 수정했다.",
+          "provenanceType": "USER_INPUT"
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000007",
+        "sourceId": "41000000-0000-0000-0000-000000000007",
+        "sourceName": "업무 기록.txt", "pageNumber": 1,
+        "text": "사용자는 인증 오류를 조사했다.", "distance": 0.05
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000007",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "이미 답변한 행동을 다시 질문했습니다.",
+        "candidates": [],
+        "questions": [{
+          "questionId": "71000000-0000-0000-0000-000000000008",
+          "targetSection": "ACTION",
+          "question": "직접 어떤 행동을 했나요?",
+          "suggestedAnswers": []
+        }]
+      },
+      "expected": {
+        "resultTypes": ["NO_UPDATE"], "candidateCount": 0,
+        "questionCount": 0, "llmCalled": true
+      }
     }
   ]
 }

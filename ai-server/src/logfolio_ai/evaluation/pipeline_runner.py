@@ -13,6 +13,7 @@ from logfolio_ai.models import (
     AnalysisRequest,
     AnalysisResponse,
     AnalysisResultType,
+    InformationNeedType,
     PolicyViolationType,
     SourceWarning,
     SubjectType,
@@ -35,6 +36,8 @@ class PipelineExpectation(ContractModel):
     result_types: List[AnalysisResultType]
     candidate_count: int = Field(ge=0, le=3)
     llm_called: bool
+    question_count: int = Field(default=0, ge=0, le=2)
+    information_need: Optional[InformationNeedType] = None
     subject_type: Optional[SubjectType] = None
     policy_violations: List[PolicyViolationType] = Field(default_factory=list)
 
@@ -54,6 +57,8 @@ class PipelineCaseResult(ContractModel):
     llm_called: bool
     actual_result_types: List[AnalysisResultType]
     candidate_count: int
+    question_count: int
+    information_need: Optional[InformationNeedType] = None
     failures: List[str] = Field(default_factory=list)
 
 
@@ -186,6 +191,17 @@ async def evaluate_pipeline_case(case: PipelineEvalCase) -> PipelineCaseResult:
         failures.append(
             f"llmCalled expected={case.expected.llm_called} actual={provider.called}"
         )
+    if len(response.questions) != case.expected.question_count:
+        failures.append(
+            f"questionCount expected={case.expected.question_count} "
+            f"actual={len(response.questions)}"
+        )
+    if response.information_need != case.expected.information_need:
+        failures.append(
+            "informationNeed "
+            f"expected={case.expected.information_need} "
+            f"actual={response.information_need}"
+        )
     claims = [claim for candidate in response.candidates for claim in candidate.claims]
     if case.expected.subject_type is not None and not any(
         claim.subject_type == case.expected.subject_type for claim in claims
@@ -207,6 +223,8 @@ async def evaluate_pipeline_case(case: PipelineEvalCase) -> PipelineCaseResult:
         llm_called=provider.called,
         actual_result_types=actual_result_types,
         candidate_count=len(response.candidates),
+        question_count=len(response.questions),
+        information_need=response.information_need,
         failures=failures,
     )
 
