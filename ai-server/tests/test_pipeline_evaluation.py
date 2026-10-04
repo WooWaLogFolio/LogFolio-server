@@ -16,11 +16,14 @@ def test_pipeline_dataset_contains_end_to_end_policy_cases() -> None:
         "PIPELINE_INVALID_EVIDENCE_01",
         "PIPELINE_ATTRIBUTION_01",
         "PIPELINE_EMPTY_RETRIEVAL_01",
+        "PIPELINE_USER_ANSWER_NEEDED_01",
+        "PIPELINE_ADDITIONAL_SOURCE_NEEDED_01",
+        "PIPELINE_ANSWERED_SECTION_NO_REPEAT_01",
     ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("case_index", [0, 1, 2, 3])
+@pytest.mark.parametrize("case_index", range(7))
 async def test_pipeline_cases_pass(case_index: int) -> None:
     _, cases = load_pipeline_cases()
 
@@ -35,7 +38,7 @@ async def test_pipeline_report_aggregates_case_results() -> None:
 
     report = await run_pipeline_eval(cases, name)
 
-    assert report.total == 4
-    assert report.passed == 4
+    assert report.total == 7
+    assert report.passed == 7
     assert report.failed == 0
     assert report.pass_rate == 1

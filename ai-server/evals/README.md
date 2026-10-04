@@ -124,6 +124,9 @@ python -m logfolio_ai.evaluation.embedding_runner \
 - 원문에 없는 Evidence와 Candidate 제거
 - TEAM 활동을 USER 기여로 귀속한 결과의 Policy 교정
 - Retrieval 근거가 없을 때 LLM을 호출하지 않고 `NO_UPDATE` 반환
+- 질문으로 보완 가능한 정보 부족은 `USER_ANSWER`와 질문 1~2개 반환
+- 자료 자체가 부족하면 Candidate·질문 없이 `ADDITIONAL_SOURCE` 반환
+- 이미 사용자 답변이 있는 Section은 같은 질문을 반복하지 않음
 
 ```bash
 python -m logfolio_ai.evaluation.pipeline_runner \
