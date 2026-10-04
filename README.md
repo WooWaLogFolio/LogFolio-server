@@ -29,6 +29,9 @@ Spring Boot는 인증, 권한, 파일 저장과 텍스트 추출, 서비스 데�
 
 AI 서버의 상세 설계는 [`ai-server/README.md`](ai-server/README.md)를 참고합니다.
 
+- 앞으로의 AI 모델·Spring·전체 연동 작업: [`ai-server/docs/ai-model-spring-e2e-roadmap.md`](ai-server/docs/ai-model-spring-e2e-roadmap.md)
+- 로컬·Docker·Gemini·Spring 테스트 명령: [`ai-server/docs/testing-runbook.md`](ai-server/docs/testing-runbook.md)
+
 ## Shared API contract
 
 - ID: UUID 문자열
