@@ -40,6 +40,7 @@ logfolio-ai-resilience-eval = "logfolio_ai.evaluation.resilience_runner:main"
 logfolio-ai-source-lifecycle-eval = "logfolio_ai.evaluation.source_lifecycle_runner:main"
 logfolio-ai-project-mismatch-eval = "logfolio_ai.evaluation.project_mismatch_runner:main"
 logfolio-ai-offline-check = "logfolio_ai.evaluation.offline_suite_runner:main"
+logfolio-ai-cost-guardrail = "logfolio_ai.evaluation.cost_guardrail_runner:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/logfolio_ai"]
