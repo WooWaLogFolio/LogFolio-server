@@ -238,4 +238,25 @@ python -m logfolio_ai.evaluation.project_mismatch_runner \
 
 합성 Source와 Scripted Provider만 사용하므로 외부 API와 운영 DB를 호출하지 않습니다.
 
+## Offline Quality Gate
+
+추가 모델 파일, 외부 API, 운영 DB 없이 실행 가능한 핵심 평가를 한 번에 확인합니다.
+
+```bash
+python -m logfolio_ai.evaluation.offline_suite_runner \
+  --output-json evals/results/offline-suite.json
+```
+
+포함 범위:
+
+- AI Policy 회귀 평가
+- 전체 Pipeline 평가
+- 장애·재시도·부분 실패 평가
+- Source 중복·삭제 생명주기 평가
+- 다른 프로젝트 자료 의심 및 사용자 확인 평가
+
+모든 평가가 통과해야 `accepted=true`와 종료 코드 `0`을 반환합니다. 로컬 E5 검색,
+실제 Gemini 제품 평가, Human Eval, Spring 통합은 실행 조건이 다르므로
+`deferredChecks`에 이유와 함께 남기며 통과한 것으로 가장하지 않습니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.
