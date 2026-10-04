@@ -3,6 +3,7 @@ import asyncio
 import json
 from pathlib import Path
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import Field
 
@@ -38,6 +39,9 @@ class PipelineExpectation(ContractModel):
     llm_called: bool
     question_count: int = Field(default=0, ge=0, le=2)
     information_need: Optional[InformationNeedType] = None
+    conflict_count: int = Field(default=0, ge=0)
+    target_experience_id: Optional[UUID] = None
+    conflict_existing_contents: List[str] = Field(default_factory=list)
     subject_type: Optional[SubjectType] = None
     policy_violations: List[PolicyViolationType] = Field(default_factory=list)
 
@@ -59,6 +63,7 @@ class PipelineCaseResult(ContractModel):
     candidate_count: int
     question_count: int
     information_need: Optional[InformationNeedType] = None
+    conflict_count: int = Field(ge=0)
     failures: List[str] = Field(default_factory=list)
 
 
@@ -123,8 +128,15 @@ class DatasetRagService:
     async def retrieve_related_experience_context(
         self, project_id, source_ids, existing_experiences
     ) -> List[ExistingExperienceContext]:
-        del project_id, source_ids, existing_experiences
-        return []
+        del project_id, source_ids
+        return [
+            ExistingExperienceContext(
+                experience_id=experience.experience_id,
+                relevance_distance=0.2,
+                chunks=[],
+            )
+            for experience in existing_experiences
+        ]
 
     async def retrieve_source_chunks(
         self, project_id, source_ids, *, limit: int
@@ -202,6 +214,35 @@ async def evaluate_pipeline_case(case: PipelineEvalCase) -> PipelineCaseResult:
             f"expected={case.expected.information_need} "
             f"actual={response.information_need}"
         )
+    conflict_candidates = [
+        candidate for candidate in response.candidates if candidate.conflict
+    ]
+    if len(conflict_candidates) != case.expected.conflict_count:
+        failures.append(
+            f"conflictCount expected={case.expected.conflict_count} "
+            f"actual={len(conflict_candidates)}"
+        )
+    if case.expected.target_experience_id is not None and not any(
+        candidate.target_experience_id == case.expected.target_experience_id
+        for candidate in response.candidates
+    ):
+        failures.append(
+            f"missingTargetExperienceId={case.expected.target_experience_id}"
+        )
+    actual_existing_contents = {
+        conflict.existing_content
+        for candidate in conflict_candidates
+        for conflict in candidate.conflicts
+    }
+    missing_existing_contents = [
+        content
+        for content in case.expected.conflict_existing_contents
+        if content not in actual_existing_contents
+    ]
+    if missing_existing_contents:
+        failures.append(
+            f"missingConflictExistingContents={missing_existing_contents}"
+        )
     claims = [claim for candidate in response.candidates for claim in candidate.claims]
     if case.expected.subject_type is not None and not any(
         claim.subject_type == case.expected.subject_type for claim in claims
@@ -225,6 +266,7 @@ async def evaluate_pipeline_case(case: PipelineEvalCase) -> PipelineCaseResult:
         candidate_count=len(response.candidates),
         question_count=len(response.questions),
         information_need=response.information_need,
+        conflict_count=len(conflict_candidates),
         failures=failures,
     )
 

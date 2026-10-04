@@ -348,6 +348,8 @@ python -m logfolio_ai.evaluation.project_mismatch_runner \
 
 전체 Pipeline Eval은 정보 부족을 `USER_ANSWER`와 `ADDITIONAL_SOURCE`로 구분하고,
 이미 답변한 Section의 질문을 제거하는 흐름도 함께 검증합니다.
+기존 Experience의 확정 Claim이나 `USER_EDITED` 값과 새 Source가 충돌하면 자동으로
+덮어쓰지 않고 `EXISTING_UPDATE` Conflict로 Review에 전달하는 흐름도 포함합니다.
 
 실제 Provider의 제품 판단은 버전 관리되는 Product Gold Case로 별도 평가합니다. 결과에는 Result Type, 대상 Experience, Candidate 수, 질문 필요 여부, Critical Policy 위반과 함께 Token, Latency, Retry, 버전이 명시된 가격표 기반 추정 비용이 기록됩니다.
 
