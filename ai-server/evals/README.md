@@ -259,4 +259,24 @@ python -m logfolio_ai.evaluation.offline_suite_runner \
 실제 Gemini 제품 평가, Human Eval, Spring 통합은 실행 조건이 다르므로
 `deferredChecks`에 이유와 함께 남기며 통과한 것으로 가장하지 않습니다.
 
+## Cost Guardrail Eval
+
+Spring이 `analysisRunId`, 사용자, AI 비용과 Review 승인 결과를 연결해 Export하면 월별
+비용 Hard Limit을 다음 명령으로 평가합니다.
+
+```bash
+python -m logfolio_ai.evaluation.cost_guardrail_runner \
+  evals/datasets/cost_guardrail_example.json \
+  --output-json evals/results/cost-guardrail.json
+```
+
+다음을 판정합니다.
+
+- Accepted Experience 1건당 50원 이하
+- 월 생성·보강 20건 이상 Heavy User의 AI 비용 3달러 이하
+- 베타 전체 월 비용 150달러 이하, 목표 100달러 이하
+- 같은 `analysisRunId`의 중복 비용 합산 금지
+
+예시 Dataset은 합성 비용 데이터이며 실제 운영 비용을 의미하지 않습니다.
+
 가격은 코드에 고정하지 않습니다. 공식 Provider 가격과 사용할 환율을 확인한 뒤 `pricing.example.json`을 복사하여 로컬 파일로 작성합니다. Token 정보가 없거나 가격표에 모델이 없으면 비용은 임의 계산하지 않고 `null`로 남깁니다. `evals/results/`는 모델 응답이 포함될 수 있어 Git에서 제외합니다.

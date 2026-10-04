@@ -357,6 +357,18 @@ python -m logfolio_ai.evaluation.offline_suite_runner \
 불일치 확인 평가가 포함됩니다. 로컬 E5, 실제 Gemini, Human Eval과 Spring 통합은
 필요한 환경이나 승인이 다르므로 결과의 `deferredChecks`에 별도로 표시됩니다.
 
+Spring의 Usage·Review 집계 Export가 준비되면 월별 비용 정책을 별도 평가합니다.
+
+```bash
+python -m logfolio_ai.evaluation.cost_guardrail_runner \
+  evals/datasets/cost_guardrail_example.json \
+  --output-json evals/results/cost-guardrail.json
+```
+
+전체 정책 반영 현황과 Spring·베타 단계의 남은 항목은
+[`docs/final-policy-implementation-status.md`](docs/final-policy-implementation-status.md)를
+참고합니다.
+
 현재 평가 데이터는 팀 활동의 개인 귀속, 근거 없는 성과, 명시된 개인 기여, 사용자 확인 상태 위조와 불필요한 질문을 포함합니다. 실제 Gemini 품질과 RAG 검색 정확도 평가는 운영 데이터가 아닌 별도의 비식별 검증 자료로 확장해야 합니다.
 
 전체 Pipeline Eval은 정보 부족을 `USER_ANSWER`와 `ADDITIONAL_SOURCE`로 구분하고,
