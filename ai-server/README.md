@@ -344,6 +344,19 @@ python -m logfolio_ai.evaluation.project_mismatch_runner \
   --output-json evals/results/project-mismatch.json
 ```
 
+외부 서비스와 추가 모델 의존성이 없는 핵심 평가 전체는 한 명령으로 실행합니다.
+하나라도 실패하면 명령이 종료 코드 `1`을 반환하므로 배포 전 품질 Gate로 사용할 수
+있습니다.
+
+```bash
+python -m logfolio_ai.evaluation.offline_suite_runner \
+  --output-json evals/results/offline-suite.json
+```
+
+이 통합 Gate에는 AI Policy, 전체 Pipeline, 장애 복구, Source 생명주기와 프로젝트
+불일치 확인 평가가 포함됩니다. 로컬 E5, 실제 Gemini, Human Eval과 Spring 통합은
+필요한 환경이나 승인이 다르므로 결과의 `deferredChecks`에 별도로 표시됩니다.
+
 현재 평가 데이터는 팀 활동의 개인 귀속, 근거 없는 성과, 명시된 개인 기여, 사용자 확인 상태 위조와 불필요한 질문을 포함합니다. 실제 Gemini 품질과 RAG 검색 정확도 평가는 운영 데이터가 아닌 별도의 비식별 검증 자료로 확장해야 합니다.
 
 전체 Pipeline Eval은 정보 부족을 `USER_ANSWER`와 `ADDITIONAL_SOURCE`로 구분하고,
