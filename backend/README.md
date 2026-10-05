@@ -13,8 +13,8 @@ NAVER_CLIENT_ID=...
 NAVER_CLIENT_SECRET=...
 KAKAO_CLIENT_ID=...
 KAKAO_CLIENT_SECRET=... # 카카오 보안 설정에서 Client Secret을 사용하지 않으면 생략 가능
-OAUTH2_SUCCESS_REDIRECT_URI=http://localhost:3000/oauth2/success
-OAUTH2_SIGNUP_REDIRECT_URI=http://localhost:3000/oauth2/complete-signup
+OAUTH2_SUCCESS_REDIRECT_URI=http://localhost:5173/oauth2/success
+OAUTH2_SIGNUP_REDIRECT_URI=http://localhost:5173/oauth2/complete-signup
 ```
 
 각 개발자 콘솔에 다음 Redirect URI를 등록합니다.
