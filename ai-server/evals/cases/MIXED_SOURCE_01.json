@@ -1,0 +1,10 @@
+{
+  "caseId": "MIXED_SOURCE_01", "title": "Quick Log와 파일 결합", "category": "MIXED_SOURCE", "difficulty": "MEDIUM",
+  "description": "팀 문서와 사용자 직접 기록을 구분하면서 하나의 경험으로 구성하는지 평가",
+  "input": {"analysisRunId": "10000000-0000-0000-0000-000000000014", "projectId": "20000000-0000-0000-0000-000000000001", "chunks": [
+    {"chunkId": "30000000-0000-0000-0000-000000000014", "sourceId": "40000000-0000-0000-0000-000000000014", "sourceType": "PROJECT_FILE", "sourceName": "성능 보고서", "pageNumber": 2, "text": "팀은 조회 지연 시간을 1.8초에서 0.7초로 개선했다.", "distance": 0.08, "purposes": ["OUTCOME"]},
+    {"chunkId": "30000000-0000-0000-0000-000000000015", "sourceId": "40000000-0000-0000-0000-000000000015", "sourceType": "QUICK_LOG", "sourceName": "성능 개선 회고", "text": "나는 느린 쿼리를 찾아 복합 인덱스를 추가했다.", "distance": 0.07, "purposes": ["USER_CONTRIBUTION", "DECISION_REASON"]}
+  ]},
+  "expected": {"resultType": "NEW_EXPERIENCE", "expectedExperienceCount": 1, "requiresQuestion": false, "expectedClaimKeywords": ["인덱스"], "requiredEvidenceChunkIds": ["30000000-0000-0000-0000-000000000015"], "forbiddenPhrases": []},
+  "humanRubric": ["사용자 행동은 Quick Log에 근거한다", "팀 결과를 사용자 개인 성과로 단정하지 않는다"]
+}

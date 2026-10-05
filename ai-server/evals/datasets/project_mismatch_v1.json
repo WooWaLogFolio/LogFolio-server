@@ -1,0 +1,20 @@
+{
+  "name": "project_mismatch_v1",
+  "cases": [
+    {
+      "caseId": "SUSPECTED_SOURCE_WAITS_FOR_USER",
+      "scenario": "SUSPECTED_SOURCE",
+      "expectedOutcome": "WAITING_FOR_CONFIRMATION"
+    },
+    {
+      "caseId": "CONFIRMED_SOURCE_IS_ANALYZED",
+      "scenario": "CONFIRMED_SOURCE",
+      "expectedOutcome": "ANALYZED_AFTER_CONFIRMATION"
+    },
+    {
+      "caseId": "RELATED_SOURCE_CONTINUES_ANALYSIS",
+      "scenario": "RELATED_SOURCE",
+      "expectedOutcome": "ANALYZED_WITHOUT_WARNING"
+    }
+  ]
+}

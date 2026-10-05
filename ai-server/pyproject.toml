@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "logfolio-ai"
+version = "0.1.0"
+description = "Evidence-grounded AI analysis server for LogFolio"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "asyncpg>=0.29,<1.0",
+    "fastapi>=0.116,<1.0",
+    "google-genai>=1.0,<2.0",
+    "pgvector>=0.4,<1.0",
+    "pydantic>=2.10,<3.0",
+    "pydantic-settings>=2.8,<3.0",
+    "uvicorn[standard]>=0.35,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27,<1.0",
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.24,<2.0",
+]
+embedding = [
+    "sentence-transformers>=3.0,<6.0",
+]
+
+[project.scripts]
+logfolio-ai = "logfolio_ai.main:run"
+logfolio-ai-eval = "logfolio_ai.evaluation.runner:main"
+logfolio-ai-e5-eval = "logfolio_ai.evaluation.embedding_runner:main"
+logfolio-ai-product-eval = "logfolio_ai.evaluation.product_runner:main"
+logfolio-ai-pipeline-eval = "logfolio_ai.evaluation.pipeline_runner:main"
+logfolio-ai-compare = "logfolio_ai.evaluation.comparison_runner:main"
+logfolio-ai-human-eval = "logfolio_ai.evaluation.human_runner:main"
+logfolio-ai-resilience-eval = "logfolio_ai.evaluation.resilience_runner:main"
+logfolio-ai-source-lifecycle-eval = "logfolio_ai.evaluation.source_lifecycle_runner:main"
+logfolio-ai-project-mismatch-eval = "logfolio_ai.evaluation.project_mismatch_runner:main"
+logfolio-ai-offline-check = "logfolio_ai.evaluation.offline_suite_runner:main"
+logfolio-ai-cost-guardrail = "logfolio_ai.evaluation.cost_guardrail_runner:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/logfolio_ai"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

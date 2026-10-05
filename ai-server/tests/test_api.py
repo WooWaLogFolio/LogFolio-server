@@ -1,0 +1,358 @@
+import asyncio
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+
+from logfolio_ai.analysis.dependencies import get_analysis_orchestrator, get_rag_service
+from logfolio_ai.core.config import Settings, get_settings
+from logfolio_ai.core.errors import AppError
+from logfolio_ai.main import app, prepare_runtime
+from logfolio_ai.models import (
+    AIUsageRecord,
+    SourceIndexItem,
+    SourceIndexResponse,
+)
+
+client = TestClient(app)
+
+
+def valid_analysis_payload() -> dict:
+    return {
+        "analysisRunId": str(uuid4()),
+        "projectId": str(uuid4()),
+        "documents": [
+            {
+                "sourceId": str(uuid4()),
+                "sourceName": "project.pdf",
+                "mimeType": "application/pdf",
+                "pages": [
+                    {
+                        "pageNumber": 1,
+                        "text": "JWT 인증 API를 구현했다.",
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_health_check() -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "service": "LogFolio AI Server",
+        "version": "0.1.0",
+        "environment": "local",
+    }
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_skips_fake_embedding(monkeypatch) -> None:
+    def fail_if_called():
+        raise AssertionError("fake embedding should not be preloaded")
+
+    monkeypatch.setattr("logfolio_ai.main.get_embedding_provider", fail_if_called)
+
+    await prepare_runtime(Settings(embedding_provider="fake"))
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_validates_e5_dimension(monkeypatch) -> None:
+    class Provider:
+        dimension = 768
+
+    monkeypatch.setattr(
+        "logfolio_ai.main.get_embedding_provider",
+        lambda: Provider(),
+    )
+
+    await prepare_runtime(Settings(embedding_provider="e5", vector_dimension=768))
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_rejects_e5_dimension_mismatch(monkeypatch) -> None:
+    class Provider:
+        dimension = 384
+
+    monkeypatch.setattr(
+        "logfolio_ai.main.get_embedding_provider",
+        lambda: Provider(),
+    )
+
+    with pytest.raises(RuntimeError, match="dimension"):
+        await prepare_runtime(Settings(embedding_provider="e5", vector_dimension=768))
+
+
+@pytest.mark.asyncio
+async def test_prepare_runtime_preloads_gemini_provider(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(
+        "logfolio_ai.main.get_llm_provider",
+        lambda: calls.append("gemini"),
+    )
+
+    await prepare_runtime(
+        Settings(llm_provider="gemini", gemini_api_key="test-key")
+    )
+
+    assert calls == ["gemini"]
+
+
+def test_fake_analysis_preserves_tracking_ids() -> None:
+    payload = valid_analysis_payload()
+
+    response = client.post("/api/v1/analyses", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["analysisRunId"] == payload["analysisRunId"]
+    assert body["projectId"] == payload["projectId"]
+    assert body["summary"] == "Fake LLM 근거 기반 분석 결과입니다."
+    assert body["candidates"] == []
+    assert body["questions"] == []
+    assert body["aiUsage"]["provider"] == "fake"
+    assert body["aiUsage"]["model"] == "fake"
+    assert body["aiUsage"]["inputTokens"] == 0
+    assert body["aiUsage"]["outputTokens"] == 0
+    assert body["aiUsage"]["latencyMs"] >= 0
+    assert body["aiUsage"]["retryCount"] == 0
+    assert body["aiUsage"]["taskType"] == "PROJECT_ANALYSIS"
+    assert body["aiUsage"]["estimatedCostUsd"] is None
+    assert body["aiUsage"]["estimatedCostKrw"] is None
+
+
+def test_validation_error_uses_shared_error_shape() -> None:
+    payload = valid_analysis_payload()
+    payload["analysisRunId"] = "not-a-uuid"
+
+    response = client.post("/api/v1/analyses", json=payload)
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "VALIDATION_ERROR"
+    assert body["message"] == "요청 값이 API 계약과 일치하지 않습니다."
+    assert body["details"][0]["field"] == "analysisRunId"
+
+
+def test_not_found_uses_shared_error_shape() -> None:
+    response = client.get("/not-found")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "code": "NOT_FOUND",
+        "message": "요청한 API를 찾을 수 없습니다.",
+        "details": [],
+    }
+
+
+def test_analysis_requires_matching_internal_api_key_when_configured() -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_auth_required=True,
+        internal_api_key="spring-secret",
+    )
+    try:
+        missing = client.post("/api/v1/analyses", json=valid_analysis_payload())
+        invalid = client.post(
+            "/api/v1/analyses",
+            json=valid_analysis_payload(),
+            headers={"X-Internal-API-Key": "wrong-secret"},
+        )
+        valid = client.post(
+            "/api/v1/analyses",
+            json=valid_analysis_payload(),
+            headers={"X-Internal-API-Key": "spring-secret"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert missing.status_code == 401
+    assert missing.json()["code"] == "INTERNAL_AUTH_FAILED"
+    assert invalid.status_code == 401
+    assert "spring-secret" not in invalid.text
+    assert valid.status_code == 200
+
+
+def test_required_internal_auth_fails_closed_without_server_key() -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_auth_required=True,
+    )
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_AUTH_NOT_CONFIGURED"
+
+
+def test_non_local_environment_fails_closed_without_server_key() -> None:
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        environment="production",
+        internal_auth_required=False,
+    )
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_AUTH_NOT_CONFIGURED"
+
+
+def test_analysis_timeout_uses_shared_error_shape() -> None:
+    class SlowOrchestrator:
+        async def analyze(self, request):
+            del request
+            await asyncio.sleep(0.05)
+
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        analysis_timeout_seconds=0.001,
+    )
+    app.dependency_overrides[get_analysis_orchestrator] = lambda: SlowOrchestrator()
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 504
+    assert response.json() == {
+        "code": "ANALYSIS_TIMEOUT",
+        "message": "AI 분석 제한 시간을 초과했습니다.",
+        "details": [],
+    }
+
+
+def test_provider_failure_can_return_usage_without_exposing_secrets() -> None:
+    class FailingOrchestrator:
+        async def analyze(self, request):
+            del request
+            raise AppError(
+                code="LLM_PROVIDER_ERROR",
+                message="LLM 공급자 호출에 실패했습니다.",
+                status_code=502,
+                ai_usage=AIUsageRecord(
+                    provider="gemini",
+                    model="test-model",
+                    latency_ms=1200,
+                    retry_count=1,
+                    success=False,
+                    error_type="LLM_PROVIDER_ERROR",
+                ),
+            )
+
+    app.dependency_overrides[get_analysis_orchestrator] = lambda: FailingOrchestrator()
+    try:
+        response = client.post("/api/v1/analyses", json=valid_analysis_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 502
+    assert response.json()["aiUsage"]["provider"] == "gemini"
+    assert response.json()["aiUsage"]["retryCount"] == 1
+    assert response.json()["aiUsage"]["success"] is False
+    assert response.json()["aiUsage"]["errorType"] == "LLM_PROVIDER_ERROR"
+
+
+def test_source_index_endpoint_accepts_project_file_and_quick_log() -> None:
+    class RecordingRagService:
+        async def index_sources(self, project_id, sources):
+            source_list = list(sources)
+            return SourceIndexResponse(
+                project_id=project_id,
+                indexed_count=2,
+                failed_count=0,
+                items=[
+                    SourceIndexItem(
+                        source_id=source.source_id,
+                        source_type=source.source_type,
+                        status="INDEXED",
+                        chunk_count=1,
+                    )
+                    for source in source_list
+                ],
+            )
+
+    project_id = uuid4()
+    payload = {
+        "projectId": str(project_id),
+        "sources": [
+            {
+                "sourceId": str(uuid4()),
+                "sourceType": "PROJECT_FILE",
+                "sourceName": "기획서.pdf",
+                "pages": [{"pageNumber": 1, "text": "서비스 기획 자료"}],
+            },
+            {
+                "sourceId": str(uuid4()),
+                "sourceType": "QUICK_LOG",
+                "sourceName": "30초 기록",
+                "pages": [{"text": "회의에서 검색 범위를 결정했다."}],
+            },
+        ],
+    }
+    app.dependency_overrides[get_rag_service] = lambda: RecordingRagService()
+    try:
+        response = client.post("/api/v1/sources/index", json=payload)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["indexedCount"] == 2
+    assert [item["sourceType"] for item in response.json()["items"]] == [
+        "PROJECT_FILE",
+        "QUICK_LOG",
+    ]
+
+
+def test_source_index_delete_is_project_scoped_and_idempotent() -> None:
+    class RecordingRagService:
+        def __init__(self):
+            self.calls = []
+
+        async def delete_source_index(self, project_id, source_id):
+            self.calls.append((project_id, source_id))
+
+    service = RecordingRagService()
+    project_id = uuid4()
+    source_id = uuid4()
+    app.dependency_overrides[get_rag_service] = lambda: service
+    try:
+        first = client.delete(
+            f"/api/v1/projects/{project_id}/sources/{source_id}/index"
+        )
+        second = client.delete(
+            f"/api/v1/projects/{project_id}/sources/{source_id}/index"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert first.status_code == 204
+    assert first.content == b""
+    assert second.status_code == 204
+    assert service.calls == [(project_id, source_id), (project_id, source_id)]
+
+
+def test_source_index_delete_requires_internal_api_key_when_configured() -> None:
+    class RecordingRagService:
+        async def delete_source_index(self, project_id, source_id):
+            raise AssertionError("unauthenticated deletion must not reach the service")
+
+    project_id = uuid4()
+    source_id = uuid4()
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        internal_auth_required=True,
+        internal_api_key="spring-secret",
+    )
+    app.dependency_overrides[get_rag_service] = lambda: RecordingRagService()
+    try:
+        response = client.delete(
+            f"/api/v1/projects/{project_id}/sources/{source_id}/index"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "INTERNAL_AUTH_FAILED"

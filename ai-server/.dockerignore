@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+evals/results
+evals/pricing.local.json
+tests

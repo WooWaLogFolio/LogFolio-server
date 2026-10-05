@@ -1,0 +1,476 @@
+from uuid import uuid4
+
+import pytest
+from pydantic import ValidationError
+
+from logfolio_ai.models import (
+    AnalysisResultType,
+    AnalysisRequest,
+    AnalysisResponse,
+    Claim,
+    ConflictDetail,
+    DocumentPage,
+    DocumentSource,
+    Evidence,
+    EvidenceType,
+    ExperienceCandidate,
+    ExistingExperience,
+    GapQuestion,
+    InformationNeedType,
+    ProjectContext,
+    ProvenanceType,
+    SubjectType,
+    SourceType,
+    SourceWarning,
+    VerificationStatus,
+    UserAnswer,
+)
+
+
+def make_document() -> DocumentSource:
+    return DocumentSource(
+        source_id=uuid4(),
+        source_name="project.pdf",
+        pages=[DocumentPage(page_number=1, text="JWT 인증 API를 구현했다.")],
+    )
+
+
+def make_evidence() -> Evidence:
+    return Evidence(
+        source_id=uuid4(),
+        chunk_id=uuid4(),
+        page_number=1,
+        excerpt="박수빈은 JWT 인증 API 구현을 담당했다.",
+    )
+
+
+def make_claim() -> Claim:
+    return Claim(
+        section_type="CONTRIBUTION",
+        content="JWT 인증 API 구현을 담당했다.",
+        subject_type=SubjectType.USER,
+        provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+        verification_status=VerificationStatus.VERIFIED,
+        evidence_type=EvidenceType.DIRECT,
+        evidences=[make_evidence()],
+        requires_user_confirmation=False,
+    )
+
+
+def test_request_accepts_at_most_three_documents() -> None:
+    with pytest.raises(ValidationError):
+        AnalysisRequest(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            documents=[make_document() for _ in range(4)],
+        )
+
+
+def test_source_content_hash_must_be_lowercase_sha256() -> None:
+    with pytest.raises(ValidationError):
+        DocumentSource(
+            source_id=uuid4(),
+            source_name="project.pdf",
+            content_hash="NOT-A-SHA256",
+            pages=[DocumentPage(text="프로젝트 자료")],
+        )
+
+    source = DocumentSource(
+        source_id=uuid4(),
+        source_name="project.pdf",
+        content_hash="a" * 64,
+        pages=[DocumentPage(text="프로젝트 자료")],
+    )
+
+    assert source.content_hash == "a" * 64
+
+
+def test_response_accepts_at_most_three_candidates_and_two_questions() -> None:
+    candidates = [
+        ExperienceCandidate(
+            candidate_id=uuid4(),
+            title=f"경험 {index}",
+            summary="인증 기능 구현 경험",
+            claims=[make_claim()],
+        )
+        for index in range(3)
+    ]
+    questions = [
+        GapQuestion(
+            question_id=uuid4(),
+            candidate_id=candidates[0].candidate_id,
+            target_section="RESULT",
+            question=f"결과를 알려주세요. {index}",
+        )
+        for index in range(2)
+    ]
+
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="프로젝트 분석 초안",
+        candidates=candidates,
+        questions=questions,
+    )
+
+    assert len(response.candidates) == 3
+    assert len(response.questions) == 2
+
+
+def test_question_candidate_must_reference_returned_candidate() -> None:
+    candidate = ExperienceCandidate(
+        candidate_id=uuid4(),
+        title="인증 기능 구현 경험",
+        summary="인증 기능 구현 경험",
+        claims=[make_claim()],
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="question candidateId must reference a returned candidate",
+    ):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="프로젝트 분석 초안",
+            candidates=[candidate],
+            questions=[
+                GapQuestion(
+                    question_id=uuid4(),
+                    candidate_id=uuid4(),
+                    target_section="RESULT",
+                    question="결과를 알려주세요.",
+                )
+            ],
+        )
+
+
+def test_source_extracted_claim_requires_evidence() -> None:
+    with pytest.raises(ValidationError, match="SOURCE_EXTRACTED claim requires evidence"):
+        Claim(
+            section_type="ACTION",
+            content="JWT 인증 API를 구현했다.",
+            subject_type=SubjectType.USER,
+            provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+            verification_status=VerificationStatus.VERIFIED,
+            evidence_type=EvidenceType.NONE,
+            requires_user_confirmation=False,
+        )
+
+
+def test_needs_confirmation_requires_confirmation_flag() -> None:
+    with pytest.raises(ValidationError, match="requiresUserConfirmation=true"):
+        Claim(
+            section_type="CONTRIBUTION",
+            content="사용자 인터뷰에 참여한 것으로 보인다.",
+            subject_type=SubjectType.UNKNOWN,
+            provenance_type=ProvenanceType.AI_INFERRED,
+            verification_status=VerificationStatus.NEEDS_CONFIRMATION,
+            evidence_type=EvidenceType.INDIRECT,
+            evidences=[make_evidence()],
+            requires_user_confirmation=False,
+        )
+
+
+def test_contract_serializes_with_camel_case_keys() -> None:
+    request = AnalysisRequest(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        documents=[make_document()],
+    )
+
+    payload = request.model_dump(mode="json", by_alias=True)
+
+    assert "analysisRunId" in payload
+    assert "projectId" in payload
+    assert "sourceId" in payload["documents"][0]
+    assert "pageNumber" in payload["documents"][0]["pages"][0]
+
+
+def test_contract_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        AnalysisRequest.model_validate(
+            {
+                "analysisRunId": str(uuid4()),
+                "projectId": str(uuid4()),
+                "documents": [
+                    {
+                        "sourceId": str(uuid4()),
+                        "sourceName": "project.pdf",
+                        "pages": [{"text": "프로젝트 자료"}],
+                    }
+                ],
+                "unexpectedField": True,
+            }
+        )
+
+
+def test_request_accepts_preindexed_sources_and_existing_experiences() -> None:
+    source_id = uuid4()
+    experience_id = uuid4()
+
+    request = AnalysisRequest(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        source_ids=[source_id],
+        existing_experiences=[
+            ExistingExperience(
+                experience_id=experience_id,
+                title="인증 개선",
+                summary="JWT 인증을 개선한 경험",
+            )
+        ],
+    )
+
+    assert request.source_ids == [source_id]
+    assert request.existing_experiences[0].experience_id == experience_id
+
+
+def test_request_accepts_stored_user_answers_for_reanalysis() -> None:
+    source_id = uuid4()
+    answer = UserAnswer(
+        answer_id=uuid4(),
+        question_id=uuid4(),
+        target_section="CONTRIBUTION",
+        answer="백엔드 API 설계를 직접 담당했습니다.",
+        provenance_type=ProvenanceType.USER_INPUT,
+    )
+    request = AnalysisRequest(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        source_ids=[source_id],
+        answers=[answer],
+    )
+
+    payload = request.model_dump(mode="json", by_alias=True)
+
+    assert payload["answers"][0]["answerId"] == str(answer.answer_id)
+    assert payload["answers"][0]["provenanceType"] == "USER_INPUT"
+
+
+def test_user_answer_cannot_claim_user_confirmed_provenance() -> None:
+    with pytest.raises(ValidationError, match="USER_INPUT or USER_EDITED"):
+        UserAnswer(
+            answer_id=uuid4(),
+            question_id=uuid4(),
+            target_section="RESULT",
+            answer="사용자가 답한 내용",
+            provenance_type=ProvenanceType.USER_CONFIRMED,
+        )
+
+
+def test_request_rejects_mixed_inline_and_preindexed_sources() -> None:
+    with pytest.raises(ValidationError, match="cannot be used together"):
+        AnalysisRequest(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            source_ids=[uuid4()],
+            documents=[make_document()],
+        )
+
+
+def test_existing_update_requires_target_experience() -> None:
+    with pytest.raises(ValidationError, match="requires targetExperienceId"):
+        ExperienceCandidate(
+            candidate_id=uuid4(),
+            result_type=AnalysisResultType.EXISTING_UPDATE,
+            title="기존 경험 보강",
+            summary="새 근거를 추가합니다.",
+        )
+
+
+def test_conflict_requires_structured_detail_referencing_candidate_claim() -> None:
+    experience_id = uuid4()
+    proposed_claim = make_claim().model_copy(
+        update={"section_type": "ACTION", "content": "인터뷰 진행까지 담당했다."}
+    )
+
+    with pytest.raises(ValidationError, match="requires conflict details"):
+        ExperienceCandidate(
+            candidate_id=uuid4(),
+            result_type=AnalysisResultType.EXISTING_UPDATE,
+            target_experience_id=experience_id,
+            conflict=True,
+            title="기존 경험 충돌",
+            summary="새 자료와 기존 내용이 다릅니다.",
+            claims=[proposed_claim],
+        )
+
+    candidate = ExperienceCandidate(
+        candidate_id=uuid4(),
+        result_type=AnalysisResultType.EXISTING_UPDATE,
+        target_experience_id=experience_id,
+        conflict=True,
+        conflicts=[
+            ConflictDetail(
+                section_type="ACTION",
+                existing_content="인터뷰 질문지를 설계했다.",
+                proposed_content="인터뷰 진행까지 담당했다.",
+                reason="담당 범위가 서로 다릅니다.",
+            )
+        ],
+        title="기존 경험 충돌",
+        summary="새 자료와 기존 내용이 다릅니다.",
+        claims=[proposed_claim],
+    )
+
+    assert candidate.conflicts[0].proposed_content == proposed_claim.content
+
+
+def test_empty_analysis_is_classified_as_no_update() -> None:
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="반영할 내용이 없습니다.",
+        candidates=[],
+        questions=[],
+        no_update_reason="새롭게 구조화할 정보가 없습니다.",
+    )
+
+    assert response.result_types == [AnalysisResultType.NO_UPDATE]
+
+
+def test_analysis_response_serializes_source_snapshots_with_camel_case() -> None:
+    input_source_ids = [uuid4(), uuid4()]
+    referenced_source_ids = [uuid4()]
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        input_source_ids=input_source_ids,
+        referenced_source_ids=referenced_source_ids,
+        summary="분석 완료",
+    )
+
+    payload = response.model_dump(mode="json", by_alias=True)
+
+    assert payload["inputSourceIds"] == [str(value) for value in input_source_ids]
+    assert payload["referencedSourceIds"] == [
+        str(value) for value in referenced_source_ids
+    ]
+
+
+def test_quick_log_is_a_supported_source_type() -> None:
+    source = DocumentSource(
+        source_id=uuid4(),
+        source_type=SourceType.QUICK_LOG,
+        source_name="30초 기록",
+        pages=[DocumentPage(text="사용자 테스트 결과를 보고 기능을 수정했다.")],
+    )
+
+    assert source.source_type == SourceType.QUICK_LOG
+
+
+def test_confirmed_source_must_be_part_of_analysis_sources() -> None:
+    with pytest.raises(ValidationError, match="confirmedSourceIds"):
+        AnalysisRequest(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            source_ids=[uuid4()],
+            confirmed_source_ids=[uuid4()],
+        )
+
+
+def test_source_warning_is_classified_as_needs_context() -> None:
+    source_id = uuid4()
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="자료 포함 여부를 확인해주세요.",
+        source_warnings=[
+            SourceWarning(
+                source_id=source_id,
+                source_name="other-project.pdf",
+                distance=0.9,
+                message="현재 프로젝트와 관련성이 낮아 보입니다.",
+            )
+        ],
+    )
+
+    assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+    assert response.source_warnings[0].source_id == source_id
+
+
+def test_project_context_and_confirmation_use_camel_case_contract() -> None:
+    source_id = uuid4()
+    request = AnalysisRequest(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        source_ids=[source_id],
+        project_context=ProjectContext(name="LogFolio", description="경험 정리 서비스"),
+        confirmed_source_ids=[source_id],
+    )
+
+    payload = request.model_dump(mode="json", by_alias=True)
+
+    assert payload["projectContext"]["name"] == "LogFolio"
+    assert payload["confirmedSourceIds"] == [str(source_id)]
+
+
+def test_questions_are_classified_as_user_answer_information_need() -> None:
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="개인 기여 확인이 필요합니다.",
+        questions=[
+            GapQuestion(
+                question_id=uuid4(),
+                target_section="CONTRIBUTION",
+                question="직접 담당한 부분은 무엇인가요?",
+            )
+        ],
+    )
+
+    assert response.information_need == InformationNeedType.USER_ANSWER
+    assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+
+
+def test_additional_source_is_needs_context_without_candidate_or_question() -> None:
+    response = AnalysisResponse(
+        analysis_run_id=uuid4(),
+        project_id=uuid4(),
+        summary="경험으로 정리할 자료가 부족합니다.",
+        information_need=InformationNeedType.ADDITIONAL_SOURCE,
+        information_need_reason=(
+            "구체적인 행동이나 의사결정을 확인할 수 있는 기록이 필요합니다."
+        ),
+    )
+
+    assert response.candidates == []
+    assert response.questions == []
+    assert response.result_types == [AnalysisResultType.NEEDS_CONTEXT]
+
+
+def test_additional_source_rejects_candidate_or_missing_reason() -> None:
+    with pytest.raises(ValidationError, match="informationNeedReason"):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="자료가 부족합니다.",
+            information_need=InformationNeedType.ADDITIONAL_SOURCE,
+        )
+
+    with pytest.raises(ValidationError, match="cannot include candidates or questions"):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="자료가 부족합니다.",
+            candidates=[
+                ExperienceCandidate(
+                    candidate_id=uuid4(),
+                    title="불완전한 경험",
+                    summary="생성하면 안 되는 후보",
+                )
+            ],
+            information_need=InformationNeedType.ADDITIONAL_SOURCE,
+            information_need_reason="자료가 부족합니다.",
+        )
+
+
+def test_user_answer_requires_question() -> None:
+    with pytest.raises(ValidationError, match="requires questions"):
+        AnalysisResponse(
+            analysis_run_id=uuid4(),
+            project_id=uuid4(),
+            summary="질문이 필요합니다.",
+            information_need=InformationNeedType.USER_ANSWER,
+        )

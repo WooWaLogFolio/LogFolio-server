@@ -1,0 +1,12 @@
+{
+  "version": "replace-with-provider-price-date",
+  "usdToKrw": null,
+  "models": {
+    "gemini/replace-with-model-name": {
+      "inputPerMillionUsd": 0,
+      "cachedInputPerMillionUsd": 0,
+      "outputPerMillionUsd": 0,
+      "reasoningPerMillionUsd": 0
+    }
+  }
+}

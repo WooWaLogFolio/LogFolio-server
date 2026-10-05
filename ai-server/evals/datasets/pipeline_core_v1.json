@@ -1,0 +1,315 @@
+{
+  "name": "pipeline_core_v1",
+  "cases": [
+    {
+      "caseId": "PIPELINE_VALID_01",
+      "title": "정상 근거 Claim 전체 통과",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000001",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000001",
+          "sourceName": "개발 회고.txt",
+          "pages": [{"pageNumber": 1, "text": "나는 JWT 갱신 중복 요청을 동기화 로직으로 해결했다."}]
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000001",
+        "sourceId": "41000000-0000-0000-0000-000000000001",
+        "sourceType": "PROJECT_FILE", "sourceName": "개발 회고.txt", "pageNumber": 1,
+        "text": "나는 JWT 갱신 중복 요청을 동기화 로직으로 해결했다.", "distance": 0.03
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000001",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "인증 오류 해결 경험",
+        "candidates": [{
+          "candidateId": "61000000-0000-0000-0000-000000000001",
+          "title": "JWT 갱신 오류 해결", "summary": "중복 요청을 해결했다.",
+          "claims": [{
+            "sectionType": "ACTION", "content": "JWT 갱신 중복 요청을 동기화 로직으로 해결했다.",
+            "subjectType": "USER", "provenanceType": "SOURCE_EXTRACTED",
+            "verificationStatus": "VERIFIED", "evidenceType": "DIRECT",
+            "evidences": [{"sourceId": "41000000-0000-0000-0000-000000000001", "chunkId": "31000000-0000-0000-0000-000000000001", "pageNumber": 1, "excerpt": "나는 JWT 갱신 중복 요청을 동기화 로직으로 해결했다."}],
+            "requiresUserConfirmation": false
+          }]
+        }]
+      },
+      "expected": {"resultTypes": ["NEW_EXPERIENCE"], "candidateCount": 1, "llmCalled": true, "subjectType": "USER"}
+    },
+    {
+      "caseId": "PIPELINE_INVALID_EVIDENCE_01",
+      "title": "원문에 없는 Evidence 제거",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000002",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{"sourceId": "41000000-0000-0000-0000-000000000002", "sourceName": "회의록.txt", "pages": [{"pageNumber": 1, "text": "팀은 인터뷰 질문지를 작성했다."}]}]
+      },
+      "retrievedChunks": [{"chunkId": "31000000-0000-0000-0000-000000000002", "sourceId": "41000000-0000-0000-0000-000000000002", "sourceName": "회의록.txt", "pageNumber": 1, "text": "팀은 인터뷰 질문지를 작성했다.", "distance": 0.05}],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000002", "projectId": "21000000-0000-0000-0000-000000000001", "summary": "조작된 근거",
+        "candidates": [{"candidateId": "61000000-0000-0000-0000-000000000002", "title": "허위 성과", "summary": "근거 검증 대상", "claims": [{
+          "sectionType": "RESULT", "content": "매출을 두 배 높였다.", "subjectType": "USER", "provenanceType": "SOURCE_EXTRACTED", "verificationStatus": "VERIFIED", "evidenceType": "DIRECT",
+          "evidences": [{"sourceId": "41000000-0000-0000-0000-000000000002", "chunkId": "31000000-0000-0000-0000-000000000002", "pageNumber": 1, "excerpt": "매출을 두 배 높였다."}], "requiresUserConfirmation": false
+        }]}]
+      },
+      "expected": {"resultTypes": ["NO_UPDATE"], "candidateCount": 0, "llmCalled": true}
+    },
+    {
+      "caseId": "PIPELINE_ATTRIBUTION_01",
+      "title": "TEAM을 USER로 오귀속한 Claim 교정",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000003", "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{"sourceId": "41000000-0000-0000-0000-000000000003", "sourceName": "결과보고서.txt", "pages": [{"pageNumber": 1, "text": "팀은 사용자 인터뷰를 진행했다."}]}]
+      },
+      "retrievedChunks": [{"chunkId": "31000000-0000-0000-0000-000000000003", "sourceId": "41000000-0000-0000-0000-000000000003", "sourceName": "결과보고서.txt", "pageNumber": 1, "text": "팀은 사용자 인터뷰를 진행했다.", "distance": 0.04}],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000003", "projectId": "21000000-0000-0000-0000-000000000001", "summary": "인터뷰 경험",
+        "candidates": [{"candidateId": "61000000-0000-0000-0000-000000000003", "title": "사용자 인터뷰", "summary": "인터뷰 진행", "claims": [{
+          "sectionType": "CONTRIBUTION", "content": "사용자 인터뷰를 진행했다.", "subjectType": "USER", "provenanceType": "SOURCE_EXTRACTED", "verificationStatus": "VERIFIED", "evidenceType": "DIRECT",
+          "evidences": [{"sourceId": "41000000-0000-0000-0000-000000000003", "chunkId": "31000000-0000-0000-0000-000000000003", "pageNumber": 1, "excerpt": "팀은 사용자 인터뷰를 진행했다."}], "requiresUserConfirmation": false
+        }]}]
+      },
+      "expected": {"resultTypes": ["NEW_EXPERIENCE"], "candidateCount": 1, "llmCalled": true, "subjectType": "UNKNOWN", "policyViolations": ["TEAM_TO_USER_ATTRIBUTION"]}
+    },
+    {
+      "caseId": "PIPELINE_EMPTY_RETRIEVAL_01",
+      "title": "검색 근거 없음",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000004", "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{"sourceId": "41000000-0000-0000-0000-000000000004", "sourceName": "빈자료.txt", "pages": [{"pageNumber": 1, "text": "처리할 수 없는 자료"}]}]
+      },
+      "retrievedChunks": [],
+      "expected": {"resultTypes": ["NO_UPDATE"], "candidateCount": 0, "llmCalled": false}
+    },
+    {
+      "caseId": "PIPELINE_USER_ANSWER_NEEDED_01",
+      "title": "한두 질문으로 보완 가능한 개인 맥락 부족",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000005",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000005",
+          "sourceName": "팀 회고.txt",
+          "pages": [{"pageNumber": 1, "text": "팀은 사용자 인터뷰 결과를 분류하고 기능 우선순위를 바꿨다."}]
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000005",
+        "sourceId": "41000000-0000-0000-0000-000000000005",
+        "sourceName": "팀 회고.txt", "pageNumber": 1,
+        "text": "팀은 사용자 인터뷰 결과를 분류하고 기능 우선순위를 바꿨다.", "distance": 0.06
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000005",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "개인의 구체적인 기여 확인이 필요합니다.",
+        "candidates": [],
+        "questions": [{
+          "questionId": "71000000-0000-0000-0000-000000000005",
+          "targetSection": "CONTRIBUTION",
+          "question": "이 과정에서 직접 담당한 부분은 무엇인가요?",
+          "suggestedAnswers": []
+        }]
+      },
+      "expected": {
+        "resultTypes": ["NEEDS_CONTEXT"], "candidateCount": 0,
+        "questionCount": 1, "informationNeed": "USER_ANSWER", "llmCalled": true
+      }
+    },
+    {
+      "caseId": "PIPELINE_ADDITIONAL_SOURCE_NEEDED_01",
+      "title": "질문만으로 보완할 수 없는 자료 부족",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000006",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000006",
+          "sourceName": "짧은 메모.txt",
+          "pages": [{"pageNumber": 1, "text": "회의함. 자료 정리함. 최종본 제출."}]
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000006",
+        "sourceId": "41000000-0000-0000-0000-000000000006",
+        "sourceName": "짧은 메모.txt", "pageNumber": 1,
+        "text": "회의함. 자료 정리함. 최종본 제출.", "distance": 0.15
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000006",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "경험을 특정하기에는 자료가 부족합니다.",
+        "candidates": [], "questions": [],
+        "informationNeed": "ADDITIONAL_SOURCE",
+        "informationNeedReason": "구체적인 행동이나 중요한 결정이 포함된 기록이 필요합니다."
+      },
+      "expected": {
+        "resultTypes": ["NEEDS_CONTEXT"], "candidateCount": 0,
+        "questionCount": 0, "informationNeed": "ADDITIONAL_SOURCE", "llmCalled": true
+      }
+    },
+    {
+      "caseId": "PIPELINE_ANSWERED_SECTION_NO_REPEAT_01",
+      "title": "이미 답변한 항목을 다시 질문하지 않음",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000007",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000007",
+          "sourceName": "업무 기록.txt",
+          "pages": [{"pageNumber": 1, "text": "사용자는 인증 오류를 조사했다."}]
+        }],
+        "answers": [{
+          "answerId": "81000000-0000-0000-0000-000000000007",
+          "questionId": "71000000-0000-0000-0000-000000000007",
+          "targetSection": "ACTION",
+          "answer": "JWT 갱신 로직의 동시성 문제를 직접 수정했다.",
+          "provenanceType": "USER_INPUT"
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000007",
+        "sourceId": "41000000-0000-0000-0000-000000000007",
+        "sourceName": "업무 기록.txt", "pageNumber": 1,
+        "text": "사용자는 인증 오류를 조사했다.", "distance": 0.05
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000007",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "이미 답변한 행동을 다시 질문했습니다.",
+        "candidates": [],
+        "questions": [{
+          "questionId": "71000000-0000-0000-0000-000000000008",
+          "targetSection": "ACTION",
+          "question": "직접 어떤 행동을 했나요?",
+          "suggestedAnswers": []
+        }]
+      },
+      "expected": {
+        "resultTypes": ["NO_UPDATE"], "candidateCount": 0,
+        "questionCount": 0, "llmCalled": true
+      }
+    },
+    {
+      "caseId": "PIPELINE_EXISTING_CONFLICT_01",
+      "title": "기존 확정 내용과 새 Source 충돌",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000008",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000008",
+          "sourceName": "새 회고.txt",
+          "pages": [{"pageNumber": 1, "text": "나는 인터뷰 진행까지 담당했다."}]
+        }],
+        "existingExperiences": [{
+          "experienceId": "51000000-0000-0000-0000-000000000008",
+          "title": "사용자 인터뷰 경험",
+          "claims": [{"sectionType": "ACTION", "content": "인터뷰 질문지를 설계했다."}]
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000008",
+        "sourceId": "41000000-0000-0000-0000-000000000008",
+        "sourceName": "새 회고.txt", "pageNumber": 1,
+        "text": "나는 인터뷰 진행까지 담당했다.", "distance": 0.03
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000008",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "기존 확정 내용과 새 근거의 담당 범위가 다릅니다.",
+        "candidates": [{
+          "candidateId": "61000000-0000-0000-0000-000000000008",
+          "resultType": "EXISTING_UPDATE",
+          "targetExperienceId": "51000000-0000-0000-0000-000000000008",
+          "conflict": true,
+          "conflicts": [{
+            "sectionType": "ACTION",
+            "existingContent": "인터뷰 질문지를 설계했다.",
+            "proposedContent": "인터뷰 진행까지 담당했다.",
+            "reason": "기존에 확정한 담당 범위와 새 자료의 범위가 다릅니다."
+          }],
+          "title": "사용자 인터뷰 경험 충돌",
+          "summary": "사용자 확인이 필요합니다.",
+          "claims": [{
+            "sectionType": "ACTION", "content": "인터뷰 진행까지 담당했다.",
+            "subjectType": "USER", "provenanceType": "SOURCE_EXTRACTED",
+            "verificationStatus": "VERIFIED", "evidenceType": "DIRECT",
+            "evidences": [{
+              "sourceId": "41000000-0000-0000-0000-000000000008",
+              "chunkId": "31000000-0000-0000-0000-000000000008",
+              "pageNumber": 1, "excerpt": "나는 인터뷰 진행까지 담당했다."
+            }],
+            "requiresUserConfirmation": false
+          }]
+        }]
+      },
+      "expected": {
+        "resultTypes": ["EXISTING_UPDATE"], "candidateCount": 1,
+        "llmCalled": true, "conflictCount": 1,
+        "targetExperienceId": "51000000-0000-0000-0000-000000000008",
+        "conflictExistingContents": ["인터뷰 질문지를 설계했다."]
+      }
+    },
+    {
+      "caseId": "PIPELINE_USER_EDIT_PROTECTED_01",
+      "title": "LLM이 놓친 사용자 수정값 충돌을 Policy가 생성",
+      "request": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000009",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "documents": [{
+          "sourceId": "41000000-0000-0000-0000-000000000009",
+          "sourceName": "추가 자료.txt",
+          "pages": [{"pageNumber": 1, "text": "나는 인터뷰 진행까지 담당했다."}]
+        }],
+        "existingExperiences": [{
+          "experienceId": "51000000-0000-0000-0000-000000000009",
+          "title": "사용자 인터뷰 경험",
+          "claims": [{"sectionType": "ACTION", "content": "인터뷰 업무에 참여했다."}]
+        }],
+        "corrections": [{
+          "experienceId": "51000000-0000-0000-0000-000000000009",
+          "sectionType": "ACTION",
+          "originalContent": "인터뷰 업무에 참여했다.",
+          "correctedContent": "인터뷰 질문지만 설계했다.",
+          "decision": "EDITED"
+        }]
+      },
+      "retrievedChunks": [{
+        "chunkId": "31000000-0000-0000-0000-000000000009",
+        "sourceId": "41000000-0000-0000-0000-000000000009",
+        "sourceName": "추가 자료.txt", "pageNumber": 1,
+        "text": "나는 인터뷰 진행까지 담당했다.", "distance": 0.03
+      }],
+      "providerOutput": {
+        "analysisRunId": "11000000-0000-0000-0000-000000000009",
+        "projectId": "21000000-0000-0000-0000-000000000001",
+        "summary": "기존 경험을 보강합니다.",
+        "candidates": [{
+          "candidateId": "61000000-0000-0000-0000-000000000009",
+          "resultType": "EXISTING_UPDATE",
+          "targetExperienceId": "51000000-0000-0000-0000-000000000009",
+          "conflict": false, "conflicts": [],
+          "title": "사용자 인터뷰 경험 보강",
+          "summary": "새 자료의 담당 범위를 추가합니다.",
+          "claims": [{
+            "sectionType": "ACTION", "content": "인터뷰 진행까지 담당했다.",
+            "subjectType": "USER", "provenanceType": "SOURCE_EXTRACTED",
+            "verificationStatus": "VERIFIED", "evidenceType": "DIRECT",
+            "evidences": [{
+              "sourceId": "41000000-0000-0000-0000-000000000009",
+              "chunkId": "31000000-0000-0000-0000-000000000009",
+              "pageNumber": 1, "excerpt": "나는 인터뷰 진행까지 담당했다."
+            }],
+            "requiresUserConfirmation": false
+          }]
+        }]
+      },
+      "expected": {
+        "resultTypes": ["EXISTING_UPDATE"], "candidateCount": 1,
+        "llmCalled": true, "conflictCount": 1,
+        "targetExperienceId": "51000000-0000-0000-0000-000000000009",
+        "conflictExistingContents": ["인터뷰 질문지만 설계했다."]
+      }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "name": "resilience_core_v1",
+  "cases": [
+    {
+      "caseId": "RETRY_INVALID_THEN_SUCCESS",
+      "scenario": "INVALID_THEN_SUCCESS",
+      "expectedOutcome": "SUCCESS",
+      "expectedAttempts": 2,
+      "expectedRetryCount": 1
+    },
+    {
+      "caseId": "TIMEOUT_AFTER_ONE_RETRY",
+      "scenario": "TIMEOUT",
+      "expectedOutcome": "LLM_TIMEOUT",
+      "expectedAttempts": 2,
+      "expectedRetryCount": 1
+    },
+    {
+      "caseId": "NON_TRANSIENT_4XX_NO_RETRY",
+      "scenario": "NON_TRANSIENT_4XX",
+      "expectedOutcome": "LLM_REQUEST_ERROR",
+      "expectedAttempts": 1,
+      "expectedRetryCount": 0
+    },
+    {
+      "caseId": "INVALID_OUTPUT_AFTER_RETRY",
+      "scenario": "INVALID_OUTPUT",
+      "expectedOutcome": "LLM_INVALID_RESPONSE",
+      "expectedAttempts": 2,
+      "expectedRetryCount": 1
+    },
+    {
+      "caseId": "PARTIAL_SOURCE_INDEXING",
+      "scenario": "PARTIAL_SOURCE_INDEXING",
+      "expectedOutcome": "PARTIAL_SUCCESS",
+      "expectedAttempts": 3,
+      "expectedRetryCount": 0
+    }
+  ]
+}
