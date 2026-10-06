@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  workflow_call:
+
+  pull_request:
+    branches: [develop, main]
+
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  backend-test:
+    name: Backend test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - run: chmod +x gradlew
+      - run: ./gradlew test --no-daemon
+
+  ai-test:
+    name: AI server test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai-server/pyproject.toml
+
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install ".[dev]"
+      - run: pytest
