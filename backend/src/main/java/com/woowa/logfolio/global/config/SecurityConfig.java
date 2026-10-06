@@ -52,7 +52,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/oauth2/**", "/login/**", "/api/auth/login/**", "/error",
                                 "/api/auth/signup", "/api/auth/password-reset/**",
-                                "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**")
+                                "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/health")
                         .permitAll()
                         .requestMatchers(
                                 "/api/auth/oauth2/pending-signup",
