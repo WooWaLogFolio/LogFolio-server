@@ -1,0 +1,10 @@
+{
+  "caseId": "INSUFFICIENT_MIXED_01", "title": "여러 자료지만 정보 부족", "category": "ADDITIONAL_SOURCE", "difficulty": "MEDIUM",
+  "description": "Source 개수가 많아도 내용이 빈약하면 억지 경험을 생성하지 않는지 평가",
+  "input": {"analysisRunId": "10000000-0000-0000-0000-000000000020", "projectId": "20000000-0000-0000-0000-000000000001", "chunks": [
+    {"chunkId": "30000000-0000-0000-0000-000000000023", "sourceId": "40000000-0000-0000-0000-000000000023", "sourceType": "QUICK_LOG", "sourceName": "메모", "text": "회의에 참여했다.", "distance": 0.22, "purposes": ["PROJECT_OVERVIEW"]},
+    {"chunkId": "30000000-0000-0000-0000-000000000024", "sourceId": "40000000-0000-0000-0000-000000000024", "sourceType": "PROJECT_FILE", "sourceName": "일정표", "pageNumber": 1, "text": "10월 2일 최종본 제출.", "distance": 0.24, "purposes": ["PROJECT_OVERVIEW"]}
+  ]},
+  "expected": {"resultType": "NEEDS_CONTEXT", "expectedExperienceCount": 0, "requiresQuestion": false, "informationNeed": "ADDITIONAL_SOURCE", "forbiddenPhrases": ["성공적으로 완료", "핵심 역할"]},
+  "humanRubric": ["Source 개수만으로 충분하다고 판단하지 않는다", "행동이나 결정이 드러나는 자료를 요청한다"]
+}

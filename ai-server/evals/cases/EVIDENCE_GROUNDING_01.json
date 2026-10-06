@@ -1,0 +1,10 @@
+{
+  "caseId": "EVIDENCE_GROUNDING_01", "title": "Claim 근거 연결", "category": "EVIDENCE", "difficulty": "MEDIUM",
+  "description": "Claim이 실제로 해당 내용을 담은 Chunk를 근거로 참조하는지 평가",
+  "input": {"analysisRunId": "10000000-0000-0000-0000-000000000017", "projectId": "20000000-0000-0000-0000-000000000001", "chunks": [
+    {"chunkId": "30000000-0000-0000-0000-000000000018", "sourceId": "40000000-0000-0000-0000-000000000018", "sourceType": "PROJECT_FILE", "sourceName": "실험 결과.pdf", "pageNumber": 3, "text": "캐시 적용 후 평균 조회 시간이 900ms에서 320ms로 줄었다.", "distance": 0.03, "purposes": ["OUTCOME"]},
+    {"chunkId": "30000000-0000-0000-0000-000000000019", "sourceId": "40000000-0000-0000-0000-000000000019", "sourceType": "PROJECT_FILE", "sourceName": "회의록.pdf", "pageNumber": 1, "text": "다음 회의는 금요일에 진행한다.", "distance": 0.35, "purposes": ["PROJECT_OVERVIEW"]}
+  ]},
+  "expected": {"resultType": "NEW_EXPERIENCE", "expectedExperienceCount": 1, "requiresQuestion": true, "questionIntents": ["CONTRIBUTION"], "expectedClaimKeywords": ["320ms"], "requiredEvidenceChunkIds": ["30000000-0000-0000-0000-000000000018"], "forbiddenPhrases": []},
+  "humanRubric": ["성과 Claim은 실험 결과 Chunk를 참조한다", "개인 기여는 추정하지 않는다"]
+}

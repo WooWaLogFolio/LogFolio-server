@@ -1,0 +1,251 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - logfolio-postgres:/var/lib/postgresql/data
+      - ../migrations/001_create_ai_document_chunks.sql:/docker-entrypoint-initdb.d/001_create_ai_document_chunks.sql:ro
+      - ../migrations/002_align_chunk_columns_with_project_files.sql:/docker-entrypoint-initdb.d/002_align_chunk_columns_with_project_files.sql:ro
+      - ../migrations/003_support_unified_sources.sql:/docker-entrypoint-initdb.d/003_support_unified_sources.sql:ro
+      - ../migrations/004_add_source_content_hash.sql:/docker-entrypoint-initdb.d/004_add_source_content_hash.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    command: ["sh", "/migrations/apply_migrations.sh"]
+    volumes:
+      - ../migrations:/migrations/sql:ro
+      - ../scripts/apply_migrations.sh:/migrations/apply_migrations.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai-server:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    environment:
+      LOGFOLIO_AI_ENVIRONMENT: local
+      LOGFOLIO_AI_LLM_PROVIDER: fake
+      LOGFOLIO_AI_EMBEDDING_PROVIDER: fake
+      LOGFOLIO_AI_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_AI_INTERNAL_AUTH_REQUIRED: "true"
+      LOGFOLIO_AI_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE: ${LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE:-0.65}
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  smoke:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    profiles: ["smoke"]
+    environment:
+      LOGFOLIO_SMOKE_BASE_URL: http://ai-server:8000
+      LOGFOLIO_SMOKE_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+    command: ["python", "/app/scripts/smoke_test.py"]
+    depends_on:
+      ai-server:
+        condition: service_healthy
+
+  e5-eval:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "true"
+    profiles: ["e5"]
+    environment:
+      HF_HOME: /home/logfolio/.cache/huggingface
+      LOGFOLIO_AI_EMBEDDING_MODEL: intfloat/multilingual-e5-base
+      LOGFOLIO_AI_VECTOR_DIMENSION: "768"
+    command: ["python", "-m", "logfolio_ai.evaluation.embedding_runner"]
+    volumes:
+      - logfolio-huggingface:/home/logfolio/.cache/huggingface
+
+  ai-server-e5:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "true"
+    profiles: ["e5-rag"]
+    environment:
+      HF_HOME: /home/logfolio/.cache/huggingface
+      LOGFOLIO_AI_ENVIRONMENT: local
+      LOGFOLIO_AI_LLM_PROVIDER: fake
+      LOGFOLIO_AI_EMBEDDING_PROVIDER: e5
+      LOGFOLIO_AI_EMBEDDING_MODEL: intfloat/multilingual-e5-base
+      LOGFOLIO_AI_VECTOR_DIMENSION: "768"
+      LOGFOLIO_AI_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_AI_INTERNAL_AUTH_REQUIRED: "true"
+      LOGFOLIO_AI_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE: ${LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE:-0.65}
+    ports:
+      - "8001:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - logfolio-huggingface:/home/logfolio/.cache/huggingface
+
+  e5-rag-smoke:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    profiles: ["e5-rag"]
+    environment:
+      LOGFOLIO_SMOKE_BASE_URL: http://ai-server-e5:8000
+      LOGFOLIO_SMOKE_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_SMOKE_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_SMOKE_MAX_SECONDS: "30"
+    command: ["python", "/app/scripts/e5_rag_smoke_test.py"]
+    depends_on:
+      ai-server-e5:
+        condition: service_healthy
+
+  ai-server-gemini:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    profiles: ["gemini"]
+    environment:
+      LOGFOLIO_AI_ENVIRONMENT: local
+      LOGFOLIO_AI_LLM_PROVIDER: gemini
+      LOGFOLIO_AI_GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      LOGFOLIO_AI_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LOGFOLIO_AI_LLM_TIMEOUT_SECONDS: "14"
+      LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS: "30"
+      LOGFOLIO_AI_EMBEDDING_PROVIDER: fake
+      LOGFOLIO_AI_INTERNAL_AUTH_REQUIRED: "true"
+      LOGFOLIO_AI_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE: ${LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE:-0.65}
+    ports:
+      - "8002:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  gemini-smoke:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    profiles: ["gemini"]
+    environment:
+      LOGFOLIO_SMOKE_BASE_URL: http://ai-server-gemini:8000
+      LOGFOLIO_SMOKE_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_SMOKE_MAX_SECONDS: "30"
+    command: ["python", "/app/scripts/gemini_smoke_test.py"]
+    depends_on:
+      ai-server-gemini:
+        condition: service_healthy
+
+  ai-server-full-pipeline:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "true"
+    profiles: ["full-pipeline"]
+    environment:
+      HF_HOME: /home/logfolio/.cache/huggingface
+      LOGFOLIO_AI_ENVIRONMENT: local
+      LOGFOLIO_AI_LLM_PROVIDER: gemini
+      LOGFOLIO_AI_GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      LOGFOLIO_AI_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LOGFOLIO_AI_LLM_TIMEOUT_SECONDS: "14"
+      LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS: "30"
+      LOGFOLIO_AI_EMBEDDING_PROVIDER: e5
+      LOGFOLIO_AI_EMBEDDING_MODEL: intfloat/multilingual-e5-base
+      LOGFOLIO_AI_VECTOR_DIMENSION: "768"
+      LOGFOLIO_AI_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_AI_INTERNAL_AUTH_REQUIRED: "true"
+      LOGFOLIO_AI_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE: ${LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE:-0.65}
+    ports:
+      - "8003:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - logfolio-huggingface:/home/logfolio/.cache/huggingface
+
+  full-pipeline-smoke:
+    build:
+      context: ..
+      args:
+        INSTALL_EMBEDDING: "false"
+    profiles: ["full-pipeline"]
+    environment:
+      LOGFOLIO_SMOKE_BASE_URL: http://ai-server-full-pipeline:8000
+      LOGFOLIO_SMOKE_INTERNAL_API_KEY: ${LOGFOLIO_INTERNAL_API_KEY:?Set LOGFOLIO_INTERNAL_API_KEY}
+      LOGFOLIO_SMOKE_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_SMOKE_MAX_SECONDS: "30"
+    command: ["python", "/app/scripts/full_pipeline_smoke_test.py"]
+    depends_on:
+      ai-server-full-pipeline:
+        condition: service_healthy
+
+volumes:
+  logfolio-postgres:
+  logfolio-huggingface:

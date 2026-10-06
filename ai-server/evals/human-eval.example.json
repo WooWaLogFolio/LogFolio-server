@@ -1,0 +1,24 @@
+{
+  "version": "human_eval_v1",
+  "evaluations": [
+    {
+      "caseId": "NEW_01",
+      "runNumber": 1,
+      "provider": "provider-name",
+      "model": "model-name",
+      "reviewer": null,
+      "scores": {
+        "accuracy": null,
+        "specificity": null,
+        "coreRelevance": null,
+        "individuality": null,
+        "structure": null,
+        "nonDuplication": null,
+        "reusability": null,
+        "noExaggeration": null
+      },
+      "criticalError": null,
+      "notes": null
+    }
+  ]
+}

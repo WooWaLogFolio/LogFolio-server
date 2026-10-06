@@ -46,6 +46,7 @@ public class ProjectFile {
     public void delete() { deletedAt = LocalDateTime.now(); }
     public void processing() { processingStatus = "PROCESSING"; }
     public void processed() { processingStatus = "PROCESSED"; }
+    public void indexed() { processingStatus = "INDEXED"; }
     public void failed() { processingStatus = "FAILED"; }
 
     public UUID getId() { return id; }

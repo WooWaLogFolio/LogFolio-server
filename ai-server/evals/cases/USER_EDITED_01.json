@@ -1,0 +1,12 @@
+{
+  "caseId": "USER_EDITED_01", "title": "사용자 수정값 보호", "category": "USER_EDITED", "difficulty": "HARD",
+  "description": "사용자가 수정한 기여 범위를 새 Source가 자동으로 덮어쓰지 않는지 평가",
+  "input": {
+    "analysisRunId": "10000000-0000-0000-0000-000000000021", "projectId": "20000000-0000-0000-0000-000000000001",
+    "chunks": [{"chunkId": "30000000-0000-0000-0000-000000000013", "sourceId": "40000000-0000-0000-0000-000000000013", "sourceType": "PROJECT_FILE", "sourceName": "팀 회의록", "text": "박수빈은 인터뷰 질문 작성과 진행을 담당했다.", "distance": 0.06, "purposes": ["USER_CONTRIBUTION"], "relatedExperienceIds": ["50000000-0000-0000-0000-000000000013"]}],
+    "existingExperiences": [{"experienceId": "50000000-0000-0000-0000-000000000013", "title": "인터뷰 설계", "summary": "인터뷰 질문지를 설계했다.", "claims": [{"sectionType": "ACTION", "content": "인터뷰 질문지만 작성했다."}]}],
+    "corrections": [{"experienceId": "50000000-0000-0000-0000-000000000013", "sectionType": "ACTION", "originalContent": "인터뷰를 진행했다.", "correctedContent": "인터뷰 질문지만 작성했다.", "decision": "EDITED"}]
+  },
+  "expected": {"resultType": "EXISTING_UPDATE", "targetExperienceId": "50000000-0000-0000-0000-000000000013", "expectedExperienceCount": 1, "requiresQuestion": false, "conflict": true, "forbiddenClaimKeywords": ["인터뷰를 진행했다"], "forbiddenPhrases": ["자동 수정했습니다"]},
+  "humanRubric": ["사용자 수정값을 우선한다", "새 자료와의 차이는 Conflict Review로 보낸다"]
+}

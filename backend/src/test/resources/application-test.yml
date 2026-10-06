@@ -19,3 +19,10 @@ spring:
           kakao:
             client-id: test-kakao-client
             client-secret: test-kakao-secret
+
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173
+  oauth2:
+    success-redirect-uri: http://localhost:5173/oauth2/success
+    signup-redirect-uri: http://localhost:5173/oauth2/complete-signup

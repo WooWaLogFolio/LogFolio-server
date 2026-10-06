@@ -1,0 +1,53 @@
+{
+  "name": "retrieval_core_v1",
+  "topK": 3,
+  "cases": [
+    {
+      "caseId": "RET_AUTH_01", "category": "NEW_SOURCE",
+      "query": "로그인 갱신 오류를 어떻게 해결했나요?", "projectId": "logfolio",
+      "expectedChunkIds": ["auth-fix"],
+      "candidates": [
+        {"chunkId": "auth-fix", "projectId": "logfolio", "text": "JWT 갱신 요청을 하나로 합치는 동기화 로직으로 중복 호출을 해결했다."},
+        {"chunkId": "interview", "projectId": "logfolio", "text": "사용자 인터뷰 질문지를 작성하고 참여자를 모집했다."},
+        {"chunkId": "other-project", "projectId": "nextime", "text": "다른 프로젝트에서 JWT 갱신 오류를 해결했다."}
+      ]
+    },
+    {
+      "caseId": "RET_CONTRIBUTION_01", "category": "USER_CONTRIBUTION",
+      "query": "사용자가 직접 담당한 행동은 무엇인가요?", "projectId": "logfolio",
+      "expectedChunkIds": ["user-action"],
+      "candidates": [
+        {"chunkId": "user-action", "projectId": "logfolio", "text": "나는 인터뷰 질문지를 설계하고 응답을 분류했다."},
+        {"chunkId": "team-result", "projectId": "logfolio", "text": "팀은 사용자 인터뷰를 진행했다."},
+        {"chunkId": "cross-user", "projectId": "other", "text": "나는 인터뷰 질문지를 설계했다."}
+      ]
+    },
+    {
+      "caseId": "RET_DECISION_01", "category": "DECISION_REASON",
+      "query": "온보딩 단계를 줄인 판단 근거는 무엇인가요?", "projectId": "logfolio",
+      "expectedChunkIds": ["decision-reason"],
+      "candidates": [
+        {"chunkId": "decision-reason", "projectId": "logfolio", "text": "인터뷰에서 가입 절차가 길다는 의견이 반복되어 온보딩을 다섯 단계에서 세 단계로 줄였다."},
+        {"chunkId": "presentation", "projectId": "logfolio", "text": "최종 발표 자료의 글꼴과 색상을 변경했다."}
+      ]
+    },
+    {
+      "caseId": "RET_EXISTING_01", "category": "EXISTING_EXPERIENCE",
+      "query": "기존 로그인 안정화 경험과 관련된 과거 근거", "projectId": "logfolio",
+      "expectedChunkIds": ["historical-auth"],
+      "candidates": [
+        {"chunkId": "historical-auth", "projectId": "logfolio", "text": "기존 경험 근거: 토큰 만료 경쟁 조건을 분석하고 재발 방지 테스트를 추가했다."},
+        {"chunkId": "new-design", "projectId": "logfolio", "text": "새 디자인 시안을 제작했다."}
+      ]
+    },
+    {
+      "caseId": "RET_REUSE_01", "category": "INDEX_REUSE",
+      "query": "이전에 인덱싱한 조회 성능 개선 근거", "projectId": "logfolio",
+      "expectedChunkIds": ["indexed-performance"],
+      "candidates": [
+        {"chunkId": "indexed-performance", "projectId": "logfolio", "text": "데이터베이스 인덱스를 추가하고 쿼리를 최적화해 조회 시간을 줄였다."},
+        {"chunkId": "demo-video", "projectId": "logfolio", "text": "프로젝트 발표용 데모 영상을 제작했다."}
+      ]
+    }
+  ]
+}

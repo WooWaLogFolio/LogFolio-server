@@ -1,0 +1,25 @@
+{
+  "periodMonth": "2026-10",
+  "observations": [
+    {
+      "analysisRunId": "91000000-0000-0000-0000-000000000001",
+      "userId": "92000000-0000-0000-0000-000000000001",
+      "estimatedCostUsd": 0.4,
+      "estimatedCostKrw": 24,
+      "createdExperienceCount": 12,
+      "updatedExperienceCount": 8,
+      "acceptedExperienceCount": 20,
+      "rejectedExperienceCount": 0
+    },
+    {
+      "analysisRunId": "91000000-0000-0000-0000-000000000002",
+      "userId": "92000000-0000-0000-0000-000000000002",
+      "estimatedCostUsd": 0.1,
+      "estimatedCostKrw": 6,
+      "createdExperienceCount": 3,
+      "updatedExperienceCount": 2,
+      "acceptedExperienceCount": 5,
+      "rejectedExperienceCount": 0
+    }
+  ]
+}

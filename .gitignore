@@ -25,3 +25,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local AI evaluation outputs (may contain model responses)
+ai-server/evals/results/

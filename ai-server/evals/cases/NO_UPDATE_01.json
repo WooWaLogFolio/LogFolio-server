@@ -1,0 +1,37 @@
+{
+  "caseId": "NO_UPDATE_01",
+  "title": "기존 Experience와 완전히 같은 Source",
+  "category": "NO_UPDATE",
+  "difficulty": "MEDIUM",
+  "description": "이해 가능한 Source지만 기존 Experience에 이미 모두 반영되어 새 가치가 없을 때 NO_UPDATE를 반환하는지 평가",
+  "input": {
+    "analysisRunId": "10000000-0000-0000-0000-000000000011",
+    "projectId": "20000000-0000-0000-0000-000000000001",
+    "chunks": [{
+      "chunkId": "30000000-0000-0000-0000-000000000011",
+      "sourceId": "40000000-0000-0000-0000-000000000011",
+      "sourceType": "QUICK_LOG",
+      "sourceName": "중복 회고",
+      "text": "나는 JWT 갱신 요청을 하나로 합치는 동기화 로직을 적용해 중복 호출을 막았다.",
+      "distance": 0.03,
+      "purposes": ["USER_CONTRIBUTION", "OUTCOME"],
+      "relatedExperienceIds": ["50000000-0000-0000-0000-000000000011"]
+    }],
+    "existingExperiences": [{
+      "experienceId": "50000000-0000-0000-0000-000000000011",
+      "title": "JWT 갱신 중복 호출 해결",
+      "summary": "동기화 로직으로 갱신 요청 중복을 막았다.",
+      "claims": [
+        {"sectionType": "ACTION", "content": "JWT 갱신 요청을 하나로 합치는 동기화 로직을 적용했다."},
+        {"sectionType": "RESULT", "content": "갱신 요청 중복 호출을 막았다."}
+      ]
+    }]
+  },
+  "expected": {
+    "resultType": "NO_UPDATE",
+    "expectedExperienceCount": 0,
+    "requiresQuestion": false,
+    "forbiddenPhrases": []
+  },
+  "humanRubric": ["이미 반영된 내용을 새 Candidate로 중복 생성하지 않는다", "정보 부족이 아니므로 추가 자료를 요구하지 않는다"]
+}

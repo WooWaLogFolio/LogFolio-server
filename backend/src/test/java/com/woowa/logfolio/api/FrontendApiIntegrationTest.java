@@ -25,8 +25,11 @@ import java.util.UUID;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -38,6 +41,16 @@ class FrontendApiIntegrationTest {
     @Autowired MockMvc mockMvc;
     @Autowired UserRepository userRepository;
     @Autowired OAuthAccountRepository oauthAccountRepository;
+
+    @Test
+    void allowsCredentialedCorsRequestsFromLocalViteServer() throws Exception {
+        mockMvc.perform(options("/api/auth/me")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
 
     @Test
     void signsUpWithEmailAndStartsAuthenticatedSession() throws Exception {
@@ -137,6 +150,74 @@ class FrontendApiIntegrationTest {
                                 {"email":"%s"}
                                 """.formatted(existing.getEmail())))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void completesAnalysisCandidateDecisionAndExperienceConfirmationFlow() throws Exception {
+        User user = userRepository.save(new User("flow-" + UUID.randomUUID() + "@example.com", "플로우 사용자"));
+        var auth = authenticationFor(user);
+
+        String projectJson = mockMvc.perform(post("/api/projects").with(authentication(auth)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"첫 프로젝트","status":"IN_PROGRESS"}
+                                """))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String projectId = JsonPath.read(projectJson, "$.id");
+
+        String logJson = mockMvc.perform(post("/api/quick-logs").with(authentication(auth)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"사용자 인터뷰를 바탕으로 핵심 기능을 정했다.","projectId":"%s"}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String quickLogId = JsonPath.read(logJson, "$.id");
+
+        String runJson = mockMvc.perform(post("/api/projects/{projectId}/analysis-runs", projectId)
+                        .with(authentication(auth)).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quickLogIds":["%s"]}
+                                """.formatted(quickLogId)))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.runType").value("PROJECT_INITIAL"))
+                .andReturn().getResponse().getContentAsString();
+        String runId = JsonPath.read(runJson, "$.id");
+
+        String candidatesJson = mockMvc.perform(post("/api/analysis-runs/{runId}/results", runId)
+                        .with(authentication(auth)).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"modelVersion":"test-model","candidates":[{
+                                  "candidateType":"NEW","matchConfidence":0.91,"matchReason":"새 경험",
+                                  "title":"핵심 기능 결정","summary":"인터뷰 기반 결정",
+                                  "draftContent":{"action":"우선순위를 정함","result":"MVP 범위 확정"}
+                                }]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].candidateType").value("NEW"))
+                .andReturn().getResponse().getContentAsString();
+        String candidateId = JsonPath.read(candidatesJson, "$[0].id");
+
+        mockMvc.perform(put("/api/experience-candidates/{candidateId}/decision", candidateId)
+                        .with(authentication(auth)).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"decision":"CREATE_NEW"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CREATE_NEW"));
+
+        String finalizeJson = mockMvc.perform(post("/api/analysis-runs/{runId}/finalize", runId)
+                        .with(authentication(auth)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdExperienceIds.length()").value(1))
+                .andExpect(jsonPath("$.updatedExperienceIds.length()").value(0))
+                .andReturn().getResponse().getContentAsString();
+        String experienceId = JsonPath.read(finalizeJson, "$.createdExperienceIds[0]");
+
+        mockMvc.perform(get("/api/experiences/{id}/evidence", experienceId).with(authentication(auth)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].quickLogId").value(quickLogId));
+        mockMvc.perform(post("/api/experiences/{id}/confirm", experienceId)
+                        .with(authentication(auth)).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SAVED"));
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(User user) {
