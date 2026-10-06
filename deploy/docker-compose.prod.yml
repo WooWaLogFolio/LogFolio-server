@@ -1,0 +1,109 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ai-migrate:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    command: ["sh", "/migrations/apply_migrations.sh"]
+    volumes:
+      - ../ai-server/migrations:/migrations/sql:ro
+      - ../ai-server/scripts/apply_migrations.sh:/migrations/apply_migrations.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai-server:
+    image: ${AI_IMAGE}:${IMAGE_TAG}
+    restart: unless-stopped
+    environment:
+      LOGFOLIO_AI_ENVIRONMENT: production
+      LOGFOLIO_AI_LLM_PROVIDER: gemini
+      LOGFOLIO_AI_GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LOGFOLIO_AI_GEMINI_MODEL: ${GEMINI_MODEL}
+      LOGFOLIO_AI_LLM_TIMEOUT_SECONDS: "14"
+      LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS: "30"
+
+      LOGFOLIO_AI_EMBEDDING_PROVIDER: e5
+      LOGFOLIO_AI_EMBEDDING_MODEL: intfloat/multilingual-e5-base
+      LOGFOLIO_AI_VECTOR_DIMENSION: "768"
+
+      LOGFOLIO_AI_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LOGFOLIO_AI_INTERNAL_AUTH_REQUIRED: "true"
+      LOGFOLIO_AI_INTERNAL_API_KEY: ${AI_SERVER_INTERNAL_API_KEY}
+    volumes:
+      - huggingface-cache:/home/logfolio/.cache/huggingface
+    depends_on:
+      ai-migrate:
+        condition: service_completed_successfully
+
+  backend:
+    image: ${BACKEND_IMAGE}:${IMAGE_TAG}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      OAUTH2_SUCCESS_REDIRECT_URI: ${OAUTH2_SUCCESS_REDIRECT_URI}
+      OAUTH2_SIGNUP_REDIRECT_URI: ${OAUTH2_SIGNUP_REDIRECT_URI}
+
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+
+      FILE_STORAGE_ROOT: /app/storage/uploads
+
+      AI_SERVER_ENABLED: "true"
+      AI_SERVER_BASE_URL: http://ai-server:8000
+      AI_SERVER_INTERNAL_API_KEY: ${AI_SERVER_INTERNAL_API_KEY}
+    volumes:
+      - uploads-data:/app/storage/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-server:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  uploads-data:
+  huggingface-cache:
+  caddy-data:
+  caddy-config:
