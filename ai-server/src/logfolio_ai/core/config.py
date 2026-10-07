@@ -20,8 +20,10 @@ class Settings(BaseSettings):
     llm_provider: Literal["fake", "gemini"] = "fake"
     gemini_api_key: Optional[SecretStr] = None
     gemini_model: str = "gemini-3.5-flash"
-    llm_timeout_seconds: float = Field(default=14.0, gt=0, le=30)
-    analysis_timeout_seconds: float = Field(default=30.0, gt=0, le=30)
+    # A production Gemini request can take longer than the short local default.
+    # The analysis timeout must accommodate the configured two-attempt retry policy.
+    llm_timeout_seconds: float = Field(default=45.0, gt=0, le=120)
+    analysis_timeout_seconds: float = Field(default=110.0, gt=0, le=180)
     internal_auth_required: bool = False
     internal_api_key: Optional[SecretStr] = None
     chunk_size_tokens: int = Field(default=700, ge=100, le=2000)

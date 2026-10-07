@@ -53,8 +53,8 @@ services:
       LOGFOLIO_AI_LLM_PROVIDER: gemini
       LOGFOLIO_AI_GEMINI_API_KEY: ${GEMINI_API_KEY}
       LOGFOLIO_AI_GEMINI_MODEL: ${GEMINI_MODEL}
-      LOGFOLIO_AI_LLM_TIMEOUT_SECONDS: "14"
-      LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS: "30"
+      LOGFOLIO_AI_LLM_TIMEOUT_SECONDS: ${AI_LLM_TIMEOUT_SECONDS:-45}
+      LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS: ${AI_ANALYSIS_TIMEOUT_SECONDS:-110}
 
       LOGFOLIO_AI_EMBEDDING_PROVIDER: e5
       LOGFOLIO_AI_EMBEDDING_MODEL: intfloat/multilingual-e5-base
@@ -93,6 +93,8 @@ services:
       AI_SERVER_ENABLED: "true"
       AI_SERVER_BASE_URL: http://ai-server:8000
       AI_SERVER_INTERNAL_API_KEY: ${AI_SERVER_INTERNAL_API_KEY}
+      # Must exceed the AI server's full analysis timeout, including its retry.
+      AI_SERVER_READ_TIMEOUT: ${AI_SERVER_READ_TIMEOUT:-120s}
     volumes:
       - uploads-data:/app/storage/uploads
     depends_on:
