@@ -20,6 +20,10 @@ public class AiIntegrationConfig {
     RestClient aiRestClient(AiServerProperties properties) {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(properties.connectTimeout())
+                // Uvicorn serves this private Docker-network endpoint over HTTP/1.1.
+                // Prevent the JDK client from attempting an h2c upgrade, which Uvicorn
+                // rejects with "Invalid HTTP request received".
+                .version(HttpClient.Version.HTTP_1_1)
                 .build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
         factory.setReadTimeout(properties.readTimeout());
