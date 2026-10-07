@@ -8,6 +8,8 @@ import org.springframework.web.client.RestClientException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @Component
@@ -32,8 +34,15 @@ public class AiServerClient {
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (httpRequest, httpResponse) -> {
                         boolean retryable = httpResponse.getStatusCode().is5xxServerError();
+                        String detail;
+                        try {
+                            detail = new String(httpResponse.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                        } catch (IOException exception) {
+                            detail = "응답 본문을 읽지 못했습니다.";
+                        }
                         throw new AiServerException(
-                                "AI Source 인덱싱 요청이 실패했습니다: " + httpResponse.getStatusCode(),
+                                "AI Source 인덱싱 요청이 실패했습니다: "
+                                        + httpResponse.getStatusCode() + " - " + detail,
                                 retryable,
                                 null
                         );
