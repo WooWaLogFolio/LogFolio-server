@@ -60,6 +60,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Keep version-controlled runtime files in sync without ever copying .env,
+      # which contains production-only secrets on the EC2 instance.
+      - name: Sync deployment configuration to EC2
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          port: 22
+          source: "deploy/docker-compose.prod.yml,deploy/Caddyfile,ai-server/migrations,ai-server/scripts/apply_migrations.sh"
+          target: /opt/logfolio
+
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
