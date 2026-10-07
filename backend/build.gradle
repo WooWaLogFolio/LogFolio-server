@@ -39,6 +39,8 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.apache.tika:tika-core:3.2.3'
+	implementation 'org.apache.tika:tika-parsers-standard-package:3.2.3'
 }
 
 tasks.named('test') {
