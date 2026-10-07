@@ -4,6 +4,7 @@ import com.woowa.logfolio.analysis.entity.AnalysisRun;
 import com.woowa.logfolio.analysis.entity.ExperienceCandidate;
 import com.woowa.logfolio.analysis.repository.AnalysisRunRepository;
 import com.woowa.logfolio.analysis.repository.ExperienceCandidateRepository;
+import com.woowa.logfolio.ai.AnalysisRequestedEvent;
 import com.woowa.logfolio.experience.entity.Experience;
 import com.woowa.logfolio.experience.repository.ExperienceRepository;
 import com.woowa.logfolio.file.entity.ProjectFile;
@@ -15,6 +16,7 @@ import com.woowa.logfolio.quicklog.service.QuickLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,6 +43,7 @@ public class AnalysisService {
     private final ProjectFileService fileService;
     private final QuickLogService quickLogService;
     private final JdbcTemplate jdbcTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public AnalysisRunResponse start(UUID userId, UUID projectId, String requestedRunType,
@@ -63,6 +66,7 @@ public class AnalysisService {
             requireSameProject(projectId, log.getProject().getId(), "Quick Log");
             run.addInputLog(log);
         }
+        eventPublisher.publishEvent(new AnalysisRequestedEvent(userId, run.getId()));
         return AnalysisRunResponse.from(run);
     }
 
@@ -103,6 +107,12 @@ public class AnalysisService {
         if ("FINALIZED".equals(run.getStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "확정된 분석은 실패 처리할 수 없습니다.");
         run.fail();
         return AnalysisRunResponse.from(run);
+    }
+
+    @Transactional
+    public void markProcessing(UUID userId, UUID runId) {
+        AnalysisRun run = findRun(userId, runId);
+        if ("QUEUED".equals(run.getStatus())) run.start("ai-server");
     }
 
     @Transactional
