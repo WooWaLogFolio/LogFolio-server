@@ -25,7 +25,11 @@ dev = [
     "pytest-asyncio>=0.24,<2.0",
 ]
 embedding = [
-    "sentence-transformers>=3.0,<6.0",
+    # Keep the CPU-only Torch image compatible with Transformers 4.x.
+    # Transformers 5.x probes accelerator APIs during import on this EC2 host.
+    "sentence-transformers>=3.0,<4.0",
+    "transformers>=4.41,<5.0",
+    "torch>=2.5,<2.7",
 ]
 
 [project.scripts]
