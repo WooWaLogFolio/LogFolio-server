@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 from typing import Dict, Iterable, List, Optional, Sequence
 from uuid import UUID
 
@@ -21,6 +22,9 @@ from logfolio_ai.rag.models import (
     RetrievalContext,
 )
 from logfolio_ai.vector_store import VectorSearchResult, VectorStore
+
+
+logger = logging.getLogger("uvicorn.error")
 
 DEFAULT_ANALYSIS_QUERIES: Dict[AnalysisPurpose, str] = {
     AnalysisPurpose.PROJECT_OVERVIEW: "프로젝트가 해결하려던 문제, 목적, 주요 기능과 진행 기간",
@@ -204,6 +208,12 @@ class RagService:
                 )
             except Exception as exc:
                 error_code = getattr(exc, "code", "SOURCE_INDEXING_ERROR")
+                logger.exception(
+                    "Source indexing failed: project_id=%s source_id=%s error_code=%s",
+                    project_id,
+                    source.source_id,
+                    error_code,
+                )
                 items.append(
                     SourceIndexItem(
                         source_id=source.source_id,
