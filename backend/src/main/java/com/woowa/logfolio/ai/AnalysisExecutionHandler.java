@@ -89,6 +89,7 @@ public class AnalysisExecutionHandler {
                 indexed.add(file.getId());
             } else {
                 file.failed();
+                throw sourceIndexingFailure(result, file.getId(), file.getOriginalName());
             }
         }
         for (QuickLog log : run.getInputLogs()) {
@@ -103,6 +104,7 @@ public class AnalysisExecutionHandler {
                 indexed.add(log.getId());
             } else {
                 log.failed();
+                throw sourceIndexingFailure(result, log.getId(), "30초 기록");
             }
         }
         return indexed;
@@ -112,6 +114,19 @@ public class AnalysisExecutionHandler {
         return response.items() != null && response.items().stream()
                 .anyMatch(item -> sourceId.equals(item.sourceId())
                         && ("INDEXED".equals(item.status()) || "DUPLICATE".equals(item.status())));
+    }
+
+    private IllegalStateException sourceIndexingFailure(
+            AiServerContract.SourceIndexResponse response, UUID sourceId, String sourceName
+    ) {
+        String reason = response.items() == null ? "AI 서버 응답에 항목이 없습니다."
+                : response.items().stream()
+                        .filter(item -> sourceId.equals(item.sourceId()))
+                        .findFirst()
+                        .map(item -> "status=" + item.status()
+                                + (item.errorCode() == null ? "" : ", errorCode=" + item.errorCode()))
+                        .orElse("AI 서버 응답에 해당 Source가 없습니다.");
+        return new IllegalStateException("AI Source 인덱싱 실패: " + sourceName + " (" + reason + ")");
     }
 
     private List<AiServerContract.Page> extractPages(ProjectFile file) {
