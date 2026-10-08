@@ -124,9 +124,10 @@ class GeminiLLMProvider:
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_POLICY.strip(),
                         response_mime_type="application/json",
-                        response_json_schema=AnalysisResponse.model_json_schema(
-                            by_alias=True
-                        ),
+                        # Let the SDK derive its supported schema from the Pydantic
+                        # model. Sending Pydantic's raw JSON Schema can include
+                        # keywords Gemini rejects with INVALID_ARGUMENT.
+                        response_schema=AnalysisResponse,
                         temperature=0.1,
                     ),
                 ),
@@ -140,6 +141,10 @@ class GeminiLLMProvider:
             ) from exc
         except Exception as exc:
             status_code = getattr(exc, "status_code", None)
+            # google-genai ClientError exposes HTTP status as ``code`` rather
+            # than ``status_code``. Treat non-retryable 4xx errors accordingly.
+            if not isinstance(status_code, int):
+                status_code = getattr(exc, "code", None)
             provider_message = str(exc).replace("\n", " ")[:500]
             logger.warning(
                 "Gemini request failed: error_type=%s status_code=%s message=%s",
