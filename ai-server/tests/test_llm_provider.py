@@ -128,9 +128,7 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert "END_UNTRUSTED_INPUT" in call["contents"]
     assert SYSTEM_POLICY.strip() not in call["contents"]
     assert call["config"].system_instruction == SYSTEM_POLICY.strip()
-    assert call["config"].response_json_schema == AnalysisResponse.model_json_schema(
-        by_alias=True
-    )
+    assert call["config"].response_schema == AnalysisResponse
 
 
 @pytest.mark.asyncio
@@ -291,6 +289,25 @@ async def test_gemini_provider_does_not_retry_non_transient_4xx() -> None:
         await provider.analyze_grounded(grounded_request())
 
     assert error.value.code == "LLM_REQUEST_ERROR"
+    assert generate_content.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_does_not_retry_google_client_error_code_4xx() -> None:
+    class InvalidRequestError(Exception):
+        code = 400
+
+    generate_content = AsyncMock(side_effect=InvalidRequestError("invalid argument"))
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider("test-key", "test-model", 14, client=client)
+
+    with pytest.raises(AppError) as error:
+        await provider.analyze_grounded(grounded_request())
+
+    assert error.value.code == "LLM_REQUEST_ERROR"
+    assert error.value.status_code == 502
     assert generate_content.await_count == 1
 
 
