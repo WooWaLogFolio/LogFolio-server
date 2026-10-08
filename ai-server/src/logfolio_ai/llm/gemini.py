@@ -124,10 +124,12 @@ class GeminiLLMProvider:
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_POLICY.strip(),
                         response_mime_type="application/json",
-                        # Let the SDK derive its supported schema from the Pydantic
-                        # model. Sending Pydantic's raw JSON Schema can include
-                        # keywords Gemini rejects with INVALID_ARGUMENT.
-                        response_schema=AnalysisResponse,
+                        # Do not attach the application's deeply nested Pydantic
+                        # schema here. google-genai 1.x translates ``response_schema``
+                        # through a narrower OpenAPI subset and rejects our
+                        # ``additionalProperties`` constraints as INVALID_ARGUMENT.
+                        # The trusted prompt supplies the JSON Schema instead; the
+                        # response is still validated by AnalysisResponse below.
                         temperature=0.1,
                     ),
                 ),
