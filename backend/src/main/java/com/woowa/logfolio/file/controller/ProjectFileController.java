@@ -51,4 +51,11 @@ public class ProjectFileController {
     public void delete(@AuthenticationPrincipal LogfolioOAuth2User principal, @PathVariable UUID fileId) {
         service.delete(principal.getUserId(), fileId);
     }
+
+    @PostMapping("/files/{fileId}/indexing/retry")
+    @Operation(summary = "파일 AI 인덱싱 재시도")
+    public ProjectFileService.FileResponse retryIndexing(@AuthenticationPrincipal LogfolioOAuth2User principal,
+                                                         @PathVariable UUID fileId) {
+        return service.retryIndexing(principal.getUserId(), fileId);
+    }
 }
