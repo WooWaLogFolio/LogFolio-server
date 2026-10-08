@@ -1,6 +1,8 @@
 package com.woowa.logfolio.file.service;
 
 import com.woowa.logfolio.file.entity.ProjectFile;
+import com.woowa.logfolio.file.ProjectFileDeletedEvent;
+import com.woowa.logfolio.file.ProjectFileUploadedEvent;
 import com.woowa.logfolio.file.repository.ProjectFileRepository;
 import com.woowa.logfolio.project.entity.Project;
 import com.woowa.logfolio.project.service.ProjectService;
@@ -8,6 +10,7 @@ import com.woowa.logfolio.user.entity.User;
 import com.woowa.logfolio.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,7 @@ public class ProjectFileService {
     private final ProjectFileRepository repository;
     private final ProjectService projectService;
     private final UserService userService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.storage.root:./storage/uploads}")
     private String storageRoot;
@@ -63,6 +67,7 @@ public class ProjectFileService {
         ProjectFile file = repository.save(new ProjectFile(project, user, originalName, storageKey,
                 multipart.getContentType() == null ? "application/octet-stream" : multipart.getContentType(),
                 multipart.getSize()));
+        eventPublisher.publishEvent(new ProjectFileUploadedEvent(userId, file.getId()));
         return FileResponse.from(file);
     }
 
@@ -90,6 +95,15 @@ public class ProjectFileService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 삭제에 실패했습니다.", exception);
         }
         file.delete();
+        eventPublisher.publishEvent(new ProjectFileDeletedEvent(file.getProject().getId(), file.getId()));
+    }
+
+    @Transactional
+    public FileResponse retryIndexing(UUID userId, UUID fileId) {
+        ProjectFile file = findOwned(userId, fileId);
+        file.processing();
+        eventPublisher.publishEvent(new ProjectFileUploadedEvent(userId, file.getId()));
+        return FileResponse.from(file);
     }
 
     public ProjectFile findOwned(UUID userId, UUID fileId) {

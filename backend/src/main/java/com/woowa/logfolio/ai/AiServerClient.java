@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -80,6 +81,25 @@ public class AiServerClient {
                 throw new AiServerException("AI 분석 응답이 비어 있습니다.", true, null);
             }
             return response;
+        } catch (AiServerException exception) {
+            throw exception;
+        } catch (RestClientException exception) {
+            throw new AiServerException("AI 서버에 연결하지 못했습니다.", true, exception);
+        }
+    }
+
+    public void deleteSourceIndex(UUID projectId, UUID sourceId) {
+        if (!properties.enabled()) return;
+        try {
+            aiRestClient.delete()
+                    .uri("/api/v1/projects/{projectId}/sources/{sourceId}/index", projectId, sourceId)
+                    .header(INTERNAL_API_KEY_HEADER, requiredApiKey())
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (httpRequest, httpResponse) -> {
+                        throw new AiServerException("AI Source 인덱스 삭제가 실패했습니다: " + httpResponse.getStatusCode(),
+                                httpResponse.getStatusCode().is5xxServerError(), null);
+                    })
+                    .toBodilessEntity();
         } catch (AiServerException exception) {
             throw exception;
         } catch (RestClientException exception) {

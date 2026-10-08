@@ -57,4 +57,5 @@ public class ProjectFile {
     public long getSizeBytes() { return sizeBytes; }
     public String getProcessingStatus() { return processingStatus; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
 }

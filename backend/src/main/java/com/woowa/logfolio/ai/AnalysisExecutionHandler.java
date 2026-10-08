@@ -7,11 +7,11 @@ import com.woowa.logfolio.analysis.service.AnalysisService;
 import com.woowa.logfolio.experience.entity.Experience;
 import com.woowa.logfolio.experience.repository.ExperienceRepository;
 import com.woowa.logfolio.file.entity.ProjectFile;
+import com.woowa.logfolio.file.DocumentTextExtractor;
 import com.woowa.logfolio.quicklog.entity.QuickLog;
 import lombok.RequiredArgsConstructor;
-import org.apache.tika.Tika;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
@@ -20,10 +20,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -44,6 +41,7 @@ public class AnalysisExecutionHandler {
     private final ExperienceRepository experienceRepository;
     private final AnalysisService analysisService;
     private final AiServerClient aiServerClient;
+    private final DocumentTextExtractor textExtractor;
 
     @Value("${app.storage.root:./storage/uploads}")
     private String storageRoot;
@@ -131,17 +129,9 @@ public class AnalysisExecutionHandler {
 
     private List<AiServerContract.Page> extractPages(ProjectFile file) {
         Path root = Path.of(storageRoot).toAbsolutePath().normalize();
-        Path target = root.resolve(file.getStorageKey()).normalize();
-        if (!target.startsWith(root)) throw new IllegalArgumentException("올바르지 않은 저장 경로입니다.");
-        try (InputStream input = Files.newInputStream(target)) {
-            String text = new Tika().parseToString(input);
-            if (text == null || text.isBlank()) throw new IllegalArgumentException("파일에서 추출할 텍스트가 없습니다.");
-            // The AI source contract accepts pages. Tika's generic extraction has no reliable
-            // page boundary for every supported format, so this is intentionally one page.
-            return List.of(new AiServerContract.Page(1, text.strip()));
-        } catch (IOException | org.apache.tika.exception.TikaException exception) {
-            throw new IllegalStateException("파일 텍스트 추출에 실패했습니다.", exception);
-        }
+        Path source = root.resolve(file.getStorageKey()).normalize();
+        if (!source.startsWith(root)) throw new IllegalArgumentException("올바르지 않은 저장 경로입니다.");
+        return textExtractor.extract(source, file.getOriginalName());
     }
 
     private Map<String, Object> buildRequest(AnalysisRun run, List<UUID> sourceIds) {
