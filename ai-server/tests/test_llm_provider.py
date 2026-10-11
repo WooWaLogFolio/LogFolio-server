@@ -128,7 +128,10 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert "END_UNTRUSTED_INPUT" in call["contents"]
     assert SYSTEM_POLICY.strip() not in call["contents"]
     assert call["config"].system_instruction == SYSTEM_POLICY.strip()
-    assert call["config"].response_schema == AnalysisResponse
+    assert call["config"].response_schema is None
+    assert call["config"].response_json_schema is None
+    assert "TRUSTED_OUTPUT_JSON_SCHEMA" in call["contents"]
+    assert "analysisRunId" in call["contents"]
 
 
 @pytest.mark.asyncio
