@@ -12,6 +12,11 @@ spring:
 
   flyway:
     enabled: true
+    # AI migrations create pgvector tables in the shared public schema before
+    # Spring starts. Baseline at 0 so a non-empty AI-only schema still runs
+    # every Spring migration beginning with V1.
+    baseline-on-migrate: true
+    baseline-version: 0
 
   servlet:
     multipart:
