@@ -73,7 +73,8 @@ public class AiServerClient {
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (httpRequest, httpResponse) -> {
                         throw new AiServerException(
-                                "AI 분석 요청이 실패했습니다: " + httpResponse.getStatusCode(),
+                                "AI 분석 요청이 실패했습니다: "
+                                        + httpResponse.getStatusCode() + " - " + errorBody(httpResponse),
                                 httpResponse.getStatusCode().is5xxServerError(), null);
                     })
                     .body(JsonNode.class);
@@ -113,5 +114,16 @@ public class AiServerClient {
             throw new IllegalStateException("app.ai.internal-api-key 설정이 필요합니다.");
         }
         return apiKey;
+    }
+
+    private String errorBody(org.springframework.http.client.ClientHttpResponse response) {
+        try {
+            String body = new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8);
+            if (body.isBlank()) return "응답 본문이 비어 있습니다.";
+            // Prevent an unexpectedly large provider error from flooding application logs.
+            return body.length() <= 4000 ? body : body.substring(0, 4000) + "... (truncated)";
+        } catch (IOException exception) {
+            return "응답 본문을 읽지 못했습니다.";
+        }
     }
 }

@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -82,6 +84,10 @@ public class AnalysisExecutionHandler {
     private List<UUID> indexInputSources(AnalysisRun run) {
         List<UUID> indexed = new ArrayList<>();
         for (ProjectFile file : run.getInputFiles()) {
+            if ("INDEXED".equals(file.getProcessingStatus())) {
+                indexed.add(file.getId());
+                continue;
+            }
             List<AiServerContract.Page> pages = extractPages(file);
             AiServerContract.Source source = new AiServerContract.Source(
                     file.getId(), "PROJECT_FILE", file.getOriginalName(), file.getMimeType(), file.getContentHash(), pages);
@@ -93,14 +99,19 @@ public class AnalysisExecutionHandler {
                 indexed.add(file.getId());
             } else if (isDuplicate(result, file.getId())) {
                 // FastAPI intentionally stores no chunks for a duplicate Source.
-                // It must not be sent as a new analysis input.
+                // Analyze the already indexed canonical Source instead.
                 file.indexed();
+                duplicateOfSourceId(result, file.getId()).ifPresent(indexed::add);
             } else {
                 file.failed();
                 throw sourceIndexingFailure(result, file.getId(), file.getOriginalName());
             }
         }
         for (QuickLog log : run.getInputLogs()) {
+            if ("INDEXED".equals(log.getProcessingStatus())) {
+                indexed.add(log.getId());
+                continue;
+            }
             AiServerContract.Source source = new AiServerContract.Source(
                     log.getId(), "QUICK_LOG", "30초 기록", "text/plain",
                     contentHash(log.getContent()), List.of(new AiServerContract.Page(null, log.getContent())));
@@ -112,12 +123,13 @@ public class AnalysisExecutionHandler {
                 indexed.add(log.getId());
             } else if (isDuplicate(result, log.getId())) {
                 log.indexed();
+                duplicateOfSourceId(result, log.getId()).ifPresent(indexed::add);
             } else {
                 log.failed();
                 throw sourceIndexingFailure(result, log.getId(), "30초 기록");
             }
         }
-        return indexed;
+        return indexed.stream().distinct().toList();
     }
 
     private boolean isIndexed(AiServerContract.SourceIndexResponse response, UUID sourceId) {
@@ -128,6 +140,17 @@ public class AnalysisExecutionHandler {
     private boolean isDuplicate(AiServerContract.SourceIndexResponse response, UUID sourceId) {
         return response.items() != null && response.items().stream()
                 .anyMatch(item -> sourceId.equals(item.sourceId()) && "DUPLICATE".equals(item.status()));
+    }
+
+    private Optional<UUID> duplicateOfSourceId(
+            AiServerContract.SourceIndexResponse response, UUID sourceId
+    ) {
+        if (response.items() == null) return Optional.empty();
+        return response.items().stream()
+                .filter(item -> sourceId.equals(item.sourceId()) && "DUPLICATE".equals(item.status()))
+                .map(AiServerContract.SourceIndexItem::duplicateOfSourceId)
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 
     private IllegalStateException sourceIndexingFailure(
