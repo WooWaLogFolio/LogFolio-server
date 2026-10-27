@@ -94,7 +94,8 @@ public class AnalysisService {
             validateCandidate(input);
             Experience target = resolveTarget(userId, run, input.targetExperienceId());
             candidates.add(new ExperienceCandidate(run, input.candidateType(), target, input.matchConfidence(),
-                    input.matchReason(), input.title(), input.summary(), input.draftContent()));
+                    input.matchReason(), input.title(), input.summary(), input.draftContent(),
+                    input.aiCandidateId(), input.aiClaims(), input.conflicts()));
         }
         List<ExperienceCandidate> saved = candidateRepository.saveAll(candidates);
         run.reviewReady(modelVersion);
@@ -113,6 +114,16 @@ public class AnalysisService {
     public void markProcessing(UUID userId, UUID runId) {
         AnalysisRun run = findRun(userId, runId);
         if ("QUEUED".equals(run.getStatus())) run.start("ai-server");
+    }
+
+    @Transactional
+    public void recordAiResponse(UUID userId, UUID runId, String summary, String informationNeed,
+                                 String informationNeedReason, String noUpdateReason,
+                                 List<String> inputSourceIds, List<String> referencedSourceIds,
+                                 List<Map<String, Object>> sourceWarnings,
+                                 List<Map<String, Object>> questions, Map<String, Object> aiUsage) {
+        findRun(userId, runId).recordAiResponse(summary, informationNeed, informationNeedReason,
+                noUpdateReason, inputSourceIds, referencedSourceIds, sourceWarnings, questions, aiUsage);
     }
 
     @Transactional
@@ -160,13 +171,42 @@ public class AnalysisService {
                 experience.augmentFrom(candidate);
                 updated.add(experience.getId());
             } else continue;
-            attachRunEvidence(run, experience.getId());
+            attachCandidateEvidence(run, candidate, experience.getId());
             candidate.finalized();
         }
         run.finalizeRun();
         return new FinalizeResult(created, updated);
     }
 
+    private void attachCandidateEvidence(AnalysisRun run, ExperienceCandidate candidate, UUID experienceId) {
+        if (candidate.getAiClaims().isEmpty()) {
+            attachRunEvidence(run, experienceId);
+            return;
+        }
+        for (Map<String, Object> claim : candidate.getAiClaims()) {
+            String section = String.valueOf(claim.getOrDefault("sectionType", "GENERAL"));
+            Object evidenceValue = claim.get("evidences");
+            if (!(evidenceValue instanceof List<?> evidences)) continue;
+            for (Object evidenceObject : evidences) {
+                if (!(evidenceObject instanceof Map<?, ?> evidence)) continue;
+                UUID sourceId;
+                UUID chunkId;
+                try {
+                    sourceId = UUID.fromString(String.valueOf(evidence.get("sourceId")));
+                    chunkId = UUID.fromString(String.valueOf(evidence.get("chunkId")));
+                } catch (IllegalArgumentException ignored) { continue; }
+                String excerpt = evidence.get("excerpt") == null ? null : String.valueOf(evidence.get("excerpt"));
+                Integer page = evidence.get("pageNumber") instanceof Number number ? number.intValue() : null;
+                if (run.getInputFiles().stream().anyMatch(file -> file.getId().equals(sourceId))) {
+                    attachEvidence(run.getProject().getId(), experienceId, sourceId, null, chunkId, excerpt, page, section);
+                } else if (run.getInputLogs().stream().anyMatch(log -> log.getId().equals(sourceId))) {
+                    attachEvidence(run.getProject().getId(), experienceId, null, sourceId, chunkId, excerpt, page, section);
+                }
+            }
+        }
+    }
+
+    /* Legacy candidates without claim metadata retain broad source provenance. */
     private void attachRunEvidence(AnalysisRun run, UUID experienceId) {
         for (ProjectFile file : run.getInputFiles()) {
             attachEvidence(run.getProject().getId(), experienceId, file.getId(), null);
@@ -177,18 +217,23 @@ public class AnalysisService {
     }
 
     private void attachEvidence(UUID projectId, UUID experienceId, UUID fileId, UUID logId) {
+        attachEvidence(projectId, experienceId, fileId, logId, null, null, null, "GENERAL");
+    }
+    private void attachEvidence(UUID projectId, UUID experienceId, UUID fileId, UUID logId,
+                                UUID chunkId, String excerpt, Integer pageNumber, String sectionType) {
         String sourceColumn = fileId != null ? "project_file_id" : "quick_log_id";
         UUID sourceId = fileId != null ? fileId : logId;
         Integer count = jdbcTemplate.queryForObject("select count(*) from evidence_items ei " +
                         "join experience_evidence ee on ee.evidence_item_id = ei.id " +
-                        "where ee.experience_id = ? and ei." + sourceColumn + " = ?",
-                Integer.class, experienceId, sourceId);
+                        "where ee.experience_id = ? and ei." + sourceColumn + " = ? " +
+                        "and ee.section_type = ? and (ei.chunk_id is not distinct from ?)",
+                Integer.class, experienceId, sourceId, sectionType, chunkId);
         if (count != null && count > 0) return;
         UUID evidenceId = UUID.randomUUID();
-        jdbcTemplate.update("insert into evidence_items (id, project_id, project_file_id, quick_log_id, created_at) values (?, ?, ?, ?, ?)",
-                evidenceId, projectId, fileId, logId, LocalDateTime.now());
+        jdbcTemplate.update("insert into evidence_items (id, project_id, project_file_id, quick_log_id, chunk_id, excerpt, page_number, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
+                evidenceId, projectId, fileId, logId, chunkId, excerpt, pageNumber, LocalDateTime.now());
         jdbcTemplate.update("insert into experience_evidence (experience_id, evidence_item_id, section_type) values (?, ?, ?)",
-                experienceId, evidenceId, "GENERAL");
+                experienceId, evidenceId, sectionType);
     }
 
     private Experience resolveTarget(UUID userId, AnalysisRun run, UUID targetId) {
@@ -222,23 +267,37 @@ public class AnalysisService {
     private <T> List<T> safe(List<T> values) { return values == null ? List.of() : values; }
 
     public record CandidateInput(String candidateType, UUID targetExperienceId, BigDecimal matchConfidence,
-                                 String matchReason, String title, String summary, Map<String, Object> draftContent) {}
+                                 String matchReason, String title, String summary, Map<String, Object> draftContent,
+                                 UUID aiCandidateId, List<Map<String, Object>> aiClaims,
+                                 List<Map<String, Object>> conflicts) {
+        public CandidateInput(String candidateType, UUID targetExperienceId, BigDecimal matchConfidence,
+                              String matchReason, String title, String summary, Map<String, Object> draftContent) {
+            this(candidateType, targetExperienceId, matchConfidence, matchReason, title, summary,
+                    draftContent, null, List.of(), List.of());
+        }
+    }
     public record FinalizeResult(List<UUID> createdExperienceIds, List<UUID> updatedExperienceIds) {}
     public record AnalysisRunResponse(UUID id, UUID projectId, String runType, String status, String modelVersion,
-                                      LocalDateTime startedAt, LocalDateTime completedAt, LocalDateTime createdAt) {
+                                      String summary, String informationNeed, String informationNeedReason,
+                                      String noUpdateReason, List<Map<String, Object>> sourceWarnings,
+                                      List<Map<String, Object>> questions, LocalDateTime startedAt,
+                                      LocalDateTime completedAt, LocalDateTime createdAt) {
         static AnalysisRunResponse from(AnalysisRun run) {
             return new AnalysisRunResponse(run.getId(), run.getProject().getId(), run.getRunType(), run.getStatus(),
-                    run.getModelVersion(), run.getStartedAt(), run.getCompletedAt(), run.getCreatedAt());
+                    run.getModelVersion(), run.getAiSummary(), run.getInformationNeed(), run.getInformationNeedReason(),
+                    run.getNoUpdateReason(), run.getSourceWarnings(), run.getAiQuestions(), run.getStartedAt(),
+                    run.getCompletedAt(), run.getCreatedAt());
         }
     }
     public record CandidateResponse(UUID id, String candidateType, UUID targetExperienceId,
                                     BigDecimal matchConfidence, String matchReason, String title, String summary,
-                                    Map<String, Object> draftContent, String status, LocalDateTime createdAt) {
+                                    Map<String, Object> draftContent, List<Map<String, Object>> conflicts,
+                                    String status, LocalDateTime createdAt) {
         static CandidateResponse from(ExperienceCandidate candidate) {
             return new CandidateResponse(candidate.getId(), candidate.getCandidateType(),
                     candidate.getTargetExperience() == null ? null : candidate.getTargetExperience().getId(),
                     candidate.getMatchConfidence(), candidate.getMatchReason(), candidate.getTitle(), candidate.getSummary(),
-                    candidate.getDraftContent(), candidate.getStatus(), candidate.getCreatedAt());
+                    candidate.getDraftContent(), candidate.getConflicts(), candidate.getStatus(), candidate.getCreatedAt());
         }
     }
 }

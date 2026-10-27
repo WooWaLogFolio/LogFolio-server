@@ -15,6 +15,7 @@ public record AiServerProperties(
     public AiServerProperties {
         baseUrl = baseUrl == null || baseUrl.isBlank() ? "http://localhost:8000" : baseUrl;
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(3) : connectTimeout;
-        readTimeout = readTimeout == null ? Duration.ofSeconds(35) : readTimeout;
+        // Must outlive FastAPI's two-attempt analysis window (110 seconds by default).
+        readTimeout = readTimeout == null ? Duration.ofSeconds(130) : readTimeout;
     }
 }

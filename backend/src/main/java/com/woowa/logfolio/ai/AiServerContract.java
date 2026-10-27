@@ -13,8 +13,13 @@ public final class AiServerContract {
             String sourceType,
             String sourceName,
             String mimeType,
+            String contentHash,
             List<Page> pages
-    ) {}
+    ) {
+        public Source(UUID sourceId, String sourceType, String sourceName, String mimeType, List<Page> pages) {
+            this(sourceId, sourceType, sourceName, mimeType, null, pages);
+        }
+    }
 
     public record SourceIndexRequest(UUID projectId, List<Source> sources) {}
 
@@ -23,13 +28,23 @@ public final class AiServerContract {
             String sourceType,
             String status,
             int chunkCount,
+            UUID duplicateOfSourceId,
             String errorCode
-    ) {}
+    ) {
+        public SourceIndexItem(UUID sourceId, String sourceType, String status, int chunkCount, String errorCode) {
+            this(sourceId, sourceType, status, chunkCount, null, errorCode);
+        }
+    }
 
     public record SourceIndexResponse(
             UUID projectId,
             int indexedCount,
+            int duplicateCount,
             int failedCount,
             List<SourceIndexItem> items
-    ) {}
+    ) {
+        public SourceIndexResponse(UUID projectId, int indexedCount, int failedCount, List<SourceIndexItem> items) {
+            this(projectId, indexedCount, 0, failedCount, items);
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.woowa.logfolio.quicklog.service;
 
 import com.woowa.logfolio.ai.AiServerProperties;
 import com.woowa.logfolio.ai.SourceIndexRequestedEvent;
+import com.woowa.logfolio.quicklog.QuickLogIndexDeletedEvent;
 import com.woowa.logfolio.project.entity.Project;
 import com.woowa.logfolio.project.service.ProjectService;
 import com.woowa.logfolio.quicklog.entity.QuickLog;
@@ -62,14 +63,23 @@ public class QuickLogService {
     @Transactional
     public QuickLogResponse linkProject(UUID userId, UUID id, UUID projectId) {
         QuickLog log = findOwned(userId, id);
+        UUID previousProjectId = log.getProject() == null ? null : log.getProject().getId();
         Project project = projectId == null ? null : projectService.findOwnedProject(userId, projectId);
         log.linkProject(project);
+        if (previousProjectId != null && (project == null || !previousProjectId.equals(project.getId()))) {
+            eventPublisher.publishEvent(new QuickLogIndexDeletedEvent(previousProjectId, log.getId()));
+        }
         requestIndexing(log);
         return QuickLogResponse.from(log);
     }
 
     @Transactional
-    public void delete(UUID userId, UUID id) { findOwned(userId, id).delete(); }
+    public void delete(UUID userId, UUID id) {
+        QuickLog log = findOwned(userId, id);
+        UUID projectId = log.getProject() == null ? null : log.getProject().getId();
+        log.delete();
+        if (projectId != null) eventPublisher.publishEvent(new QuickLogIndexDeletedEvent(projectId, log.getId()));
+    }
 
     public QuickLog findOwned(UUID userId, UUID id) {
         return repository.findByIdAndUserIdAndDeletedAtIsNull(id, userId)

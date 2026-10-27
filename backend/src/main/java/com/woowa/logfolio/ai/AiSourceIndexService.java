@@ -36,6 +36,7 @@ public class AiSourceIndexService {
                 "PROJECT_FILE",
                 file.getOriginalName(),
                 file.getMimeType(),
+                file.getContentHash(),
                 extractedPages
         );
         try {
@@ -46,7 +47,7 @@ public class AiSourceIndexService {
             );
             boolean indexed = response.items() != null && response.items().stream()
                     .anyMatch(item -> file.getId().equals(item.sourceId())
-                            && "INDEXED".equals(item.status()));
+                            && ("INDEXED".equals(item.status()) || "DUPLICATE".equals(item.status())));
             if (indexed) {
                 file.indexed();
                 return "INDEXED";
