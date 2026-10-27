@@ -117,6 +117,11 @@ public class AnalysisService {
     }
 
     @Transactional
+    public boolean claimQueuedRun(UUID runId) {
+        return runRepository.claimQueuedRun(runId) == 1;
+    }
+
+    @Transactional
     public void recordAiResponse(UUID userId, UUID runId, String summary, String informationNeed,
                                  String informationNeedReason, String noUpdateReason,
                                  List<String> inputSourceIds, List<String> referencedSourceIds,
