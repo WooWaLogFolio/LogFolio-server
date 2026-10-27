@@ -4,6 +4,7 @@ import com.woowa.logfolio.analysis.repository.AnalysisRunRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Transactional application events are in-memory. Recover runs left in QUEUED
@@ -16,6 +17,7 @@ public class QueuedAnalysisRecovery {
     private final AnalysisExecutionHandler analysisExecutionHandler;
 
     @Scheduled(fixedDelayString = "${app.ai.queued-recovery-delay:20000}")
+    @Transactional(readOnly = true)
     public void recover() {
         runRepository.findTop100ByStatusOrderByCreatedAtAsc("QUEUED").forEach(run ->
                 analysisExecutionHandler.execute(new AnalysisRequestedEvent(
