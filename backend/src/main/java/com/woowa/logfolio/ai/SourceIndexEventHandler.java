@@ -31,7 +31,7 @@ public class SourceIndexEventHandler {
             AiServerContract.SourceIndexResponse response = callWithOneRetry(event);
             boolean indexed = response.items() != null && response.items().stream()
                     .anyMatch(item -> event.sourceId().equals(item.sourceId())
-                            && "INDEXED".equals(item.status()));
+                            && ("INDEXED".equals(item.status()) || "DUPLICATE".equals(item.status())));
             if (indexed) log.indexed();
             else log.failed();
         } catch (RuntimeException exception) {
@@ -41,7 +41,7 @@ public class SourceIndexEventHandler {
 
     private AiServerContract.SourceIndexResponse callWithOneRetry(SourceIndexRequestedEvent event) {
         AiServerContract.Source source = new AiServerContract.Source(
-                event.sourceId(), event.sourceType(), event.sourceName(), event.mimeType(), event.pages()
+                event.sourceId(), event.sourceType(), event.sourceName(), event.mimeType(), event.contentHash(), event.pages()
         );
         AiServerContract.SourceIndexRequest request = new AiServerContract.SourceIndexRequest(
                 event.projectId(), List.of(source)

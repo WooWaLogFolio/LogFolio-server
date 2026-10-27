@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
 
 @Entity
 @Table(name = "experience_candidates")
@@ -30,6 +31,11 @@ public class ExperienceCandidate {
     private BigDecimal matchConfidence;
     @Column(name = "match_reason", columnDefinition = "text")
     private String matchReason;
+    @Column(name = "ai_candidate_id") private UUID aiCandidateId;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "ai_claims", columnDefinition = "jsonb")
+    private List<Map<String, Object>> aiClaims;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "conflicts", columnDefinition = "jsonb")
+    private List<Map<String, Object>> conflicts;
     @Column(nullable = false) private String title;
     @Column(columnDefinition = "text") private String summary;
     @JdbcTypeCode(SqlTypes.JSON)
@@ -41,11 +47,13 @@ public class ExperienceCandidate {
     protected ExperienceCandidate() {}
     public ExperienceCandidate(AnalysisRun run, String candidateType, Experience targetExperience,
                                BigDecimal matchConfidence, String matchReason, String title, String summary,
-                               Map<String, Object> draftContent) {
+                               Map<String, Object> draftContent, UUID aiCandidateId,
+                               List<Map<String, Object>> aiClaims, List<Map<String, Object>> conflicts) {
         this.id = UUID.randomUUID(); this.analysisRun = run; this.title = title; this.summary = summary;
         this.candidateType = candidateType; this.targetExperience = targetExperience;
         this.matchConfidence = matchConfidence; this.matchReason = matchReason;
         if (draftContent != null) this.draftContent = new LinkedHashMap<>(draftContent);
+        this.aiCandidateId = aiCandidateId; this.aiClaims = aiClaims; this.conflicts = conflicts;
         this.status = "PENDING";
     }
     @PrePersist void onCreate() { createdAt = LocalDateTime.now(); }
@@ -72,4 +80,7 @@ public class ExperienceCandidate {
     public Map<String, Object> getDraftContent() { return draftContent; }
     public String getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public UUID getAiCandidateId() { return aiCandidateId; }
+    public List<Map<String, Object>> getAiClaims() { return aiClaims == null ? List.of() : aiClaims; }
+    public List<Map<String, Object>> getConflicts() { return conflicts == null ? List.of() : conflicts; }
 }

@@ -20,6 +20,8 @@ public class EvidenceItem {
     @JoinColumn(name = "quick_log_id") private QuickLog quickLog;
     @Column(columnDefinition = "text") private String excerpt;
     @Column(length = 255) private String location;
+    @Column(name = "chunk_id") private UUID chunkId;
+    @Column(name = "page_number") private Integer pageNumber;
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     protected EvidenceItem() {}
     @PrePersist void onCreate() { createdAt = LocalDateTime.now(); }
@@ -29,5 +31,7 @@ public class EvidenceItem {
     public QuickLog getQuickLog() { return quickLog; }
     public String getExcerpt() { return excerpt; }
     public String getLocation() { return location; }
+    public UUID getChunkId() { return chunkId; }
+    public Integer getPageNumber() { return pageNumber; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

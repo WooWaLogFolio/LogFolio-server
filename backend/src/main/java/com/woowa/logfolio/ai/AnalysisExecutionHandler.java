@@ -61,6 +61,11 @@ public class AnalysisExecutionHandler {
             }
 
             JsonNode response = aiServerClient.analyze(buildRequest(run, sourceIds));
+            analysisService.recordAiResponse(event.userId(), run.getId(), response.path("summary").asText(null),
+                    nullableText(response, "informationNeed"), nullableText(response, "informationNeedReason"),
+                    nullableText(response, "noUpdateReason"), stringList(response.path("inputSourceIds")),
+                    stringList(response.path("referencedSourceIds")), objectList(response.path("sourceWarnings")),
+                    objectList(response.path("questions")), objectMap(response.path("aiUsage")));
             analysisService.saveResults(event.userId(), run.getId(), modelVersion(response), candidates(response));
         } catch (RuntimeException exception) {
             log.error("AI analysis failed: runId={}", event.analysisRunId(), exception);
@@ -78,13 +83,17 @@ public class AnalysisExecutionHandler {
         for (ProjectFile file : run.getInputFiles()) {
             List<AiServerContract.Page> pages = extractPages(file);
             AiServerContract.Source source = new AiServerContract.Source(
-                    file.getId(), "PROJECT_FILE", file.getOriginalName(), file.getMimeType(), pages);
+                    file.getId(), "PROJECT_FILE", file.getOriginalName(), file.getMimeType(), file.getContentHash(), pages);
             file.processing();
             AiServerContract.SourceIndexResponse result = aiServerClient.indexSources(
                     new AiServerContract.SourceIndexRequest(run.getProject().getId(), List.of(source)));
             if (isIndexed(result, file.getId())) {
                 file.indexed();
                 indexed.add(file.getId());
+            } else if (isDuplicate(result, file.getId())) {
+                // FastAPI intentionally stores no chunks for a duplicate Source.
+                // It must not be sent as a new analysis input.
+                file.indexed();
             } else {
                 file.failed();
                 throw sourceIndexingFailure(result, file.getId(), file.getOriginalName());
@@ -93,13 +102,15 @@ public class AnalysisExecutionHandler {
         for (QuickLog log : run.getInputLogs()) {
             AiServerContract.Source source = new AiServerContract.Source(
                     log.getId(), "QUICK_LOG", "30초 기록", "text/plain",
-                    List.of(new AiServerContract.Page(null, log.getContent())));
+                    contentHash(log.getContent()), List.of(new AiServerContract.Page(null, log.getContent())));
             log.processing();
             AiServerContract.SourceIndexResponse result = aiServerClient.indexSources(
                     new AiServerContract.SourceIndexRequest(run.getProject().getId(), List.of(source)));
             if (isIndexed(result, log.getId())) {
                 log.indexed();
                 indexed.add(log.getId());
+            } else if (isDuplicate(result, log.getId())) {
+                log.indexed();
             } else {
                 log.failed();
                 throw sourceIndexingFailure(result, log.getId(), "30초 기록");
@@ -111,7 +122,11 @@ public class AnalysisExecutionHandler {
     private boolean isIndexed(AiServerContract.SourceIndexResponse response, UUID sourceId) {
         return response.items() != null && response.items().stream()
                 .anyMatch(item -> sourceId.equals(item.sourceId())
-                        && ("INDEXED".equals(item.status()) || "DUPLICATE".equals(item.status())));
+                        && "INDEXED".equals(item.status()));
+    }
+    private boolean isDuplicate(AiServerContract.SourceIndexResponse response, UUID sourceId) {
+        return response.items() != null && response.items().stream()
+                .anyMatch(item -> sourceId.equals(item.sourceId()) && "DUPLICATE".equals(item.status()));
     }
 
     private IllegalStateException sourceIndexingFailure(
@@ -148,7 +163,7 @@ public class AnalysisExecutionHandler {
                 .findAllByProjectIdAndProjectUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
                         run.getProject().getId(), run.getProject().getUser().getId()).stream()
                 .map(this::existingExperience).toList());
-        request.put("corrections", List.of());
+        request.put("corrections", List.of()); // Review history migration is introduced separately from legacy rows.
         request.put("answers", List.of());
         return request;
     }
@@ -177,9 +192,11 @@ public class AnalysisExecutionHandler {
                     ? UUID.fromString(candidate.get("targetExperienceId").asText()) : null;
             String type = "EXISTING_UPDATE".equals(candidate.path("resultType").asText())
                     ? "ENHANCE_EXISTING" : "NEW";
+            UUID aiCandidateId = UUID.fromString(candidate.path("candidateId").asText());
             result.add(new AnalysisService.CandidateInput(type, target, (BigDecimal) null,
                     "AI 분석 결과", candidate.path("title").asText(), candidate.path("summary").asText(),
-                    draftContent(candidate.path("claims"))));
+                    draftContent(candidate.path("claims")), aiCandidateId, objectList(candidate.path("claims")),
+                    objectList(candidate.path("conflicts"))));
         }
         return result;
     }
@@ -204,6 +221,53 @@ public class AnalysisExecutionHandler {
     private String modelVersion(JsonNode response) {
         String model = response.path("aiUsage").path("model").asText();
         return model.isBlank() ? "ai-server" : model;
+    }
+    private List<String> stringList(JsonNode node) {
+        List<String> values = new ArrayList<>();
+        if (node.isArray()) node.forEach(value -> values.add(value.asText()));
+        return values;
+    }
+    private List<Map<String, Object>> objectList(JsonNode node) {
+        if (!node.isArray()) return List.of();
+        List<Map<String, Object>> values = new ArrayList<>();
+        node.forEach(value -> {
+            if (value.isObject()) values.add(objectMap(value));
+        });
+        return values;
+    }
+    private Map<String, Object> objectMap(JsonNode node) {
+        if (!node.isObject()) return Map.of();
+        Map<String, Object> values = new LinkedHashMap<>();
+        node.fields().forEachRemaining(entry -> values.put(entry.getKey(), nodeValue(entry.getValue())));
+        return values;
+    }
+    private Object nodeValue(JsonNode node) {
+        if (node.isNull()) return null;
+        if (node.isTextual()) return node.asText();
+        if (node.isBoolean()) return node.asBoolean();
+        if (node.isIntegralNumber()) return node.asLong();
+        if (node.isFloatingPointNumber()) return node.asDouble();
+        if (node.isObject()) return objectMap(node);
+        if (node.isArray()) {
+            List<Object> values = new ArrayList<>();
+            node.forEach(value -> values.add(nodeValue(value)));
+            return values;
+        }
+        return node.asText();
+    }
+    private String nullableText(JsonNode node, String field) {
+        return node.hasNonNull(field) ? node.get(field).asText() : null;
+    }
+    private String contentHash(String content) {
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder result = new StringBuilder(64);
+            for (byte value : hash) result.append(String.format("%02x", value));
+            return result.toString();
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", exception);
+        }
     }
 
     private String nullToEmpty(String value) { return value == null ? "" : value; }

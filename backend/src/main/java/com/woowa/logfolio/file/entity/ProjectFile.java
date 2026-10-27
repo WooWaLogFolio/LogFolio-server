@@ -24,6 +24,7 @@ public class ProjectFile {
     @Column(name = "storage_key", nullable = false, length = 500, unique = true) private String storageKey;
     @Column(name = "mime_type", nullable = false, length = 100) private String mimeType;
     @Column(name = "size_bytes", nullable = false) private long sizeBytes;
+    @Column(name = "content_hash", length = 64) private String contentHash;
     @Column(name = "processing_status", nullable = false, length = 30) private String processingStatus;
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "deleted_at") private LocalDateTime deletedAt;
@@ -54,6 +55,8 @@ public class ProjectFile {
     public String getOriginalName() { return originalName; }
     public String getStorageKey() { return storageKey; }
     public String getMimeType() { return mimeType; }
+    public String getContentHash() { return contentHash; }
+    public void setContentHash(String contentHash) { this.contentHash = contentHash; }
     public long getSizeBytes() { return sizeBytes; }
     public String getProcessingStatus() { return processingStatus; }
     public LocalDateTime getCreatedAt() { return createdAt; }

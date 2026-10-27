@@ -64,7 +64,7 @@ app:
     base-url: ${AI_SERVER_BASE_URL:http://localhost:8000}
     internal-api-key: ${AI_SERVER_INTERNAL_API_KEY:}
     connect-timeout: ${AI_SERVER_CONNECT_TIMEOUT:3s}
-    read-timeout: ${AI_SERVER_READ_TIMEOUT:35s}
+    read-timeout: ${AI_SERVER_READ_TIMEOUT:130s}
 
 springdoc:
   swagger-ui:

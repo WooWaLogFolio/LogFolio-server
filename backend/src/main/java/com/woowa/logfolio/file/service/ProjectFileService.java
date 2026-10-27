@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -67,6 +69,7 @@ public class ProjectFileService {
         ProjectFile file = repository.save(new ProjectFile(project, user, originalName, storageKey,
                 multipart.getContentType() == null ? "application/octet-stream" : multipart.getContentType(),
                 multipart.getSize()));
+        file.setContentHash(sha256(target));
         eventPublisher.publishEvent(new ProjectFileUploadedEvent(userId, file.getId()));
         return FileResponse.from(file);
     }
@@ -131,6 +134,16 @@ public class ProjectFileService {
     private String extension(String name) {
         String ext = extensionWithoutDot(name);
         return ext.isEmpty() ? "" : "." + ext;
+    }
+    private String sha256(Path file) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file));
+            StringBuilder result = new StringBuilder(64);
+            for (byte value : hash) result.append(String.format("%02x", value));
+            return result.toString();
+        } catch (NoSuchAlgorithmException | IOException exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 해시 계산에 실패했습니다.", exception);
+        }
     }
 
     public record FileResponse(UUID id, UUID projectId, String originalName, String mimeType,
