@@ -51,7 +51,8 @@ public class AnalysisExecutionHandler {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void execute(AnalysisRequestedEvent event) {
         try {
-            analysisService.markProcessing(event.userId(), event.analysisRunId());
+            // The event listener and queued-job recovery may race. Only one worker may own a run.
+            if (!analysisService.claimQueuedRun(event.analysisRunId())) return;
             AnalysisRun run = runRepository.findByIdAndProjectUserId(event.analysisRunId(), event.userId())
                     .orElseThrow();
 
