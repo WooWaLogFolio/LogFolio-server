@@ -501,7 +501,7 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gem
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gemini down
 ```
 
-Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다. Smoke Test는 30초 이내 응답, 요청 추적 ID, 후보·질문 개수 제한과 사용자 전용 출처 상태 위조 여부를 확인합니다.
+Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다. Smoke Test는 기본 120초 이내 응답, 요청 추적 ID, 후보·질문 개수 제한과 사용자 전용 출처 상태 위조 여부를 확인합니다.
 
 ### Full E5, pgvector, Gemini pipeline validation
 
@@ -509,8 +509,8 @@ Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다.
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline up -d --build postgres migrate ai-server-full-pipeline
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm full-pipeline-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm --build full-pipeline-smoke
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline down
 ```
 
-검증 항목은 30초 이내 응답, 추적 ID 보존, 경험 후보 1~3개, 질문 최대 2개, 원문과 일치하는 근거, 다른 프로젝트 자료 격리, 768차원 E5 벡터와 모델명입니다. 외부 LLM 응답 시간은 변동될 수 있으므로 첫 실패에는 동일 `analysisRunId`로 최대 1회만 재시도합니다.
+검증 항목은 기본 120초 이내 응답, 추적 ID 보존, 경험 후보 1~3개, 질문 최대 2개, 원문과 일치하는 근거, 다른 프로젝트 자료 격리, 768차원 E5 벡터와 모델명입니다. 외부 LLM 응답 시간은 변동될 수 있으므로 첫 실패에는 동일 `analysisRunId`로 최대 1회만 재시도합니다.

@@ -75,6 +75,9 @@ POSTGRES_PASSWORD=로컬에서만_사용할_비밀번호
 LOGFOLIO_INTERNAL_API_KEY=로컬에서만_사용할_내부키
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
+AI_LLM_TIMEOUT_SECONDS=45
+AI_ANALYSIS_TIMEOUT_SECONDS=110
+AI_SMOKE_MAX_SECONDS=120
 ```
 
 주의 사항:
@@ -275,13 +278,13 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gem
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gemini down
 ```
 
-Structured Output, 30초 제한, Candidate·Question 개수와 기본 Policy를 확인한다.
+Structured Output, 기본 120초 제한, Candidate·Question 개수와 기본 Policy를 확인한다.
 
 ### 6.2 실제 E5 + pgvector + Gemini 전체 파이프라인
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline up -d --build postgres migrate ai-server-full-pipeline
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm full-pipeline-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm --build full-pipeline-smoke
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline down
 ```
 
