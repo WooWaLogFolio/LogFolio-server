@@ -78,6 +78,9 @@ GEMINI_MODEL=gemini-3.5-flash
 AI_LLM_TIMEOUT_SECONDS=45
 AI_ANALYSIS_TIMEOUT_SECONDS=110
 AI_SMOKE_MAX_SECONDS=120
+AI_LLM_RETRY_BASE_DELAY_SECONDS=2
+AI_LLM_RETRY_MAX_DELAY_SECONDS=8
+AI_LLM_RETRY_JITTER_SECONDS=1
 ```
 
 주의 사항:
@@ -86,6 +89,9 @@ AI_SMOKE_MAX_SECONDS=120
 - Gemini를 사용하지 않는 테스트에서는 `GEMINI_API_KEY`를 비워둬도 된다.
 - 실제 API Key를 문서, 메신저, 커밋, 터미널 캡처에 노출하지 않는다.
 - 무료 Gemini 테스트에는 합성·비식별 자료만 사용한다.
+- Gemini의 429, 503, timeout과 같은 일시 오류는 첫 실패 후 기본
+  2~3초 대기하고 한 번만 재시도한다. 재시도 대기시간까지
+  `AI_ANALYSIS_TIMEOUT_SECONDS` 안에 들어가야 한다.
 
 ## 3. FastAPI 로컬 실행
 

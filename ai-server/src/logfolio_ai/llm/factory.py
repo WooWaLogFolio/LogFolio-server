@@ -25,6 +25,9 @@ def build_llm_provider(settings: Settings) -> LLMProvider:
         api_key=settings.gemini_api_key.get_secret_value(),
         model=settings.gemini_model,
         timeout_seconds=settings.llm_timeout_seconds,
+        retry_base_delay_seconds=settings.llm_retry_base_delay_seconds,
+        retry_max_delay_seconds=settings.llm_retry_max_delay_seconds,
+        retry_jitter_seconds=settings.llm_retry_jitter_seconds,
     )
 
 

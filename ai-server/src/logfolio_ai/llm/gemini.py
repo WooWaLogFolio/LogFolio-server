@@ -1,8 +1,9 @@
 import asyncio
 import logging
+import random
 import time
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from pydantic import ValidationError
 
@@ -27,6 +28,11 @@ class GeminiLLMProvider:
         client: Optional[Any] = None,
         max_attempts: int = 2,
         privacy_redactor: Optional[PrivacyRedactor] = None,
+        retry_base_delay_seconds: float = 2.0,
+        retry_max_delay_seconds: float = 8.0,
+        retry_jitter_seconds: float = 1.0,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        random_uniform: Callable[[float, float], float] = random.uniform,
     ) -> None:
         if client is None:
             from google import genai
@@ -37,6 +43,11 @@ class GeminiLLMProvider:
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
         self._privacy_redactor = privacy_redactor or PrivacyRedactor()
+        self._retry_base_delay_seconds = retry_base_delay_seconds
+        self._retry_max_delay_seconds = retry_max_delay_seconds
+        self._retry_jitter_seconds = retry_jitter_seconds
+        self._sleep = sleep
+        self._random_uniform = random_uniform
         self._last_call_metrics: ContextVar[Optional[LLMCallMetrics]] = ContextVar(
             "gemini_llm_call_metrics",
             default=None,
@@ -96,12 +107,23 @@ class GeminiLLMProvider:
                     ))
                     raise
                 logger.warning(
-                    "Retrying Gemini request: attempt=%d next_attempt=%d code=%s",
+                    "Retrying Gemini request after backoff: "
+                    "attempt=%d next_attempt=%d code=%s delay_seconds=%.3f",
                     attempt,
                     attempt + 1,
                     exc.code,
+                    delay_seconds := self._retry_delay_seconds(attempt),
                 )
+                await self._sleep(delay_seconds)
         raise RuntimeError("unreachable")
+
+    def _retry_delay_seconds(self, failed_attempt: int) -> float:
+        exponential_delay = min(
+            self._retry_base_delay_seconds * (2 ** (failed_attempt - 1)),
+            self._retry_max_delay_seconds,
+        )
+        jitter = self._random_uniform(0.0, self._retry_jitter_seconds)
+        return exponential_delay + jitter
 
     @staticmethod
     def _usage_value(usage: Any, field: str) -> Optional[int]:

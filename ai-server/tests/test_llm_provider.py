@@ -197,10 +197,18 @@ async def test_gemini_provider_always_redacts_sensitive_input() -> None:
 @pytest.mark.asyncio
 async def test_gemini_provider_maps_timeout_to_app_error() -> None:
     generate_content = AsyncMock(side_effect=asyncio.TimeoutError)
+    sleep = AsyncMock()
     client = SimpleNamespace(
         aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
     )
-    provider = GeminiLLMProvider("test-key", "test-model", 30, client=client)
+    provider = GeminiLLMProvider(
+        "test-key",
+        "test-model",
+        30,
+        client=client,
+        sleep=sleep,
+        random_uniform=lambda _start, _end: 0.5,
+    )
 
     with pytest.raises(AppError) as error:
         await provider.analyze_grounded(grounded_request())
@@ -208,6 +216,7 @@ async def test_gemini_provider_maps_timeout_to_app_error() -> None:
     assert error.value.code == "LLM_TIMEOUT"
     assert error.value.status_code == 504
     assert generate_content.await_count == 2
+    sleep.assert_awaited_once_with(2.5)
     assert provider.last_call_metrics.success is False
     assert provider.last_call_metrics.error_type == "LLM_TIMEOUT"
     assert provider.last_call_metrics.retry_count == 1
@@ -234,16 +243,20 @@ def test_prompt_keeps_injection_text_inside_untrusted_boundary() -> None:
 @pytest.mark.asyncio
 async def test_gemini_provider_rejects_invalid_structured_output() -> None:
     generate_content = AsyncMock(return_value=SimpleNamespace(text="not-json"))
+    sleep = AsyncMock()
     client = SimpleNamespace(
         aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
     )
-    provider = GeminiLLMProvider("test-key", "test-model", 30, client=client)
+    provider = GeminiLLMProvider(
+        "test-key", "test-model", 30, client=client, sleep=sleep
+    )
 
     with pytest.raises(AppError) as error:
         await provider.analyze_grounded(grounded_request())
 
     assert error.value.code == "LLM_INVALID_RESPONSE"
     assert generate_content.await_count == 2
+    sleep.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -267,13 +280,67 @@ async def test_gemini_provider_retries_invalid_output_and_accepts_second_respons
     client = SimpleNamespace(
         aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
     )
+    sleep = AsyncMock()
 
-    provider = GeminiLLMProvider("test-key", "test-model", 14, client=client)
+    provider = GeminiLLMProvider(
+        "test-key",
+        "test-model",
+        14,
+        client=client,
+        sleep=sleep,
+        random_uniform=lambda _start, _end: 0.25,
+    )
 
     result = await provider.analyze_grounded(request)
 
     assert result.summary == "재시도 후 정상 응답"
     assert generate_content.await_count == 2
+    sleep.assert_awaited_once_with(2.25)
+    assert provider.last_call_metrics.retry_count == 1
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_backs_off_before_retrying_transient_503() -> None:
+    class ServiceUnavailableError(Exception):
+        status_code = 503
+
+    request = grounded_request()
+    valid_response = json.dumps(
+        {
+            "analysisRunId": str(uuid4()),
+            "projectId": str(uuid4()),
+            "summary": "과부하 해소 후 정상 응답",
+            "candidates": [],
+            "questions": [],
+        }
+    )
+    generate_content = AsyncMock(
+        side_effect=[
+            ServiceUnavailableError("high demand"),
+            SimpleNamespace(text=valid_response),
+        ]
+    )
+    sleep = AsyncMock()
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider(
+        "test-key",
+        "test-model",
+        14,
+        client=client,
+        retry_base_delay_seconds=3,
+        retry_max_delay_seconds=8,
+        retry_jitter_seconds=2,
+        sleep=sleep,
+        random_uniform=lambda _start, _end: 1.5,
+    )
+
+    result = await provider.analyze_grounded(request)
+
+    assert result.summary == "과부하 해소 후 정상 응답"
+    assert generate_content.await_count == 2
+    sleep.assert_awaited_once_with(4.5)
     assert provider.last_call_metrics.retry_count == 1
 
 
@@ -319,7 +386,27 @@ def test_gemini_timeout_budget_allows_two_attempts() -> None:
         llm_provider="gemini",
         gemini_api_key="test-key",
         llm_timeout_seconds=14,
-        analysis_timeout_seconds=30,
+        analysis_timeout_seconds=32,
     )
 
-    assert settings.llm_timeout_seconds * 2 < settings.analysis_timeout_seconds
+    retry_budget = min(
+        settings.llm_retry_base_delay_seconds,
+        settings.llm_retry_max_delay_seconds,
+    ) + settings.llm_retry_jitter_seconds
+    assert (
+        settings.llm_timeout_seconds * 2 + retry_budget
+        < settings.analysis_timeout_seconds
+    )
+
+
+def test_gemini_timeout_budget_includes_retry_backoff() -> None:
+    with pytest.raises(ValueError, match="retry backoff"):
+        Settings(
+            llm_provider="gemini",
+            gemini_api_key="test-key",
+            llm_timeout_seconds=14,
+            analysis_timeout_seconds=30,
+            llm_retry_base_delay_seconds=1,
+            llm_retry_max_delay_seconds=1,
+            llm_retry_jitter_seconds=1,
+        )
