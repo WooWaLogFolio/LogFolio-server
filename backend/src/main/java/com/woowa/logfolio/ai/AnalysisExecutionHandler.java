@@ -1,6 +1,6 @@
 package com.woowa.logfolio.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.woowa.logfolio.analysis.entity.AnalysisRun;
 import com.woowa.logfolio.analysis.repository.AnalysisRunRepository;
 import com.woowa.logfolio.analysis.service.AnalysisService;
@@ -261,7 +261,7 @@ public class AnalysisExecutionHandler {
     private Map<String, Object> objectMap(JsonNode node) {
         if (!node.isObject()) return Map.of();
         Map<String, Object> values = new LinkedHashMap<>();
-        node.fields().forEachRemaining(entry -> values.put(entry.getKey(), nodeValue(entry.getValue())));
+        node.properties().forEach(entry -> values.put(entry.getKey(), nodeValue(entry.getValue())));
         return values;
     }
     private Object nodeValue(JsonNode node) {
