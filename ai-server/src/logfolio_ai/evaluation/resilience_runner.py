@@ -160,6 +160,7 @@ async def _evaluate_llm_case(case: ResilienceEvalCase) -> tuple[str, int, int]:
         "offline-scripted-model",
         0.1,
         client=client,
+        sleep=AsyncMock(),
     )
     try:
         await provider.analyze_grounded(_request())

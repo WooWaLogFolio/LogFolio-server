@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # The analysis timeout must accommodate the configured two-attempt retry policy.
     llm_timeout_seconds: float = Field(default=45.0, gt=0, le=120)
     analysis_timeout_seconds: float = Field(default=110.0, gt=0, le=180)
+    llm_retry_base_delay_seconds: float = Field(default=2.0, ge=0, le=30)
+    llm_retry_max_delay_seconds: float = Field(default=8.0, ge=0, le=60)
+    llm_retry_jitter_seconds: float = Field(default=1.0, ge=0, le=10)
     internal_auth_required: bool = False
     internal_api_key: Optional[SecretStr] = None
     chunk_size_tokens: int = Field(default=700, ge=100, le=2000)
@@ -49,12 +52,18 @@ class Settings(BaseSettings):
     def validate_chunk_window(self) -> "Settings":
         if self.chunk_overlap_tokens >= self.chunk_size_tokens:
             raise ValueError("chunk overlap must be smaller than chunk size")
+        retry_delay_budget = min(
+            self.llm_retry_base_delay_seconds,
+            self.llm_retry_max_delay_seconds,
+        ) + self.llm_retry_jitter_seconds
         if (
             self.llm_provider == "gemini"
-            and self.llm_timeout_seconds * 2 >= self.analysis_timeout_seconds
+            and self.llm_timeout_seconds * 2 + retry_delay_budget
+            >= self.analysis_timeout_seconds
         ):
             raise ValueError(
-                "analysis timeout must allow two LLM attempts within the total limit"
+                "analysis timeout must allow two LLM attempts and retry backoff "
+                "within the total limit"
             )
         return self
 

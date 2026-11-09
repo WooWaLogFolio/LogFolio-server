@@ -410,7 +410,11 @@ Gemini를 사용할 때만 로컬 `.env` 또는 배포 환경의 Secret에 다�
 LOGFOLIO_AI_LLM_PROVIDER=gemini
 LOGFOLIO_AI_GEMINI_API_KEY=your-api-key
 LOGFOLIO_AI_GEMINI_MODEL=gemini-3.5-flash
-LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=14
+LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=45
+LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS=110
+LOGFOLIO_AI_LLM_RETRY_BASE_DELAY_SECONDS=2
+LOGFOLIO_AI_LLM_RETRY_MAX_DELAY_SECONDS=8
+LOGFOLIO_AI_LLM_RETRY_JITTER_SECONDS=1
 LOGFOLIO_AI_CHUNK_SIZE_TOKENS=700
 LOGFOLIO_AI_CHUNK_OVERLAP_TOKENS=100
 LOGFOLIO_AI_EMBEDDING_PROVIDER=fake
@@ -424,6 +428,10 @@ LOGFOLIO_AI_EXISTING_EXPERIENCE_MATCH_DISTANCE=0.4
 LOGFOLIO_AI_PROJECT_SOURCE_MATCH_DISTANCE=0.65
 LOGFOLIO_AI_MAX_RELATED_EXPERIENCES=3
 ```
+
+Gemini가 429, 503 또는 timeout처럼 복구 가능한 오류를 반환하면 즉시
+몰아서 호출하지 않고 지수 백오프와 jitter를 적용한 뒤 최대 한 번
+재시도합니다. 인증·요청 형식과 같은 비복구성 4xx 오류는 재시도하지 않습니다.
 
 실제 로컬 E5를 사용할 때는 `LOGFOLIO_AI_EMBEDDING_PROVIDER=e5`로 변경합니다.
 
@@ -501,7 +509,7 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gem
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gemini down
 ```
 
-Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다. Smoke Test는 30초 이내 응답, 요청 추적 ID, 후보·질문 개수 제한과 사용자 전용 출처 상태 위조 여부를 확인합니다.
+Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다. Smoke Test는 기본 120초 이내 응답, 요청 추적 ID, 후보·질문 개수 제한과 사용자 전용 출처 상태 위조 여부를 확인합니다.
 
 ### Full E5, pgvector, Gemini pipeline validation
 
@@ -509,8 +517,8 @@ Gemini 서버는 API 키와 Provider 구성을 시작 시점에 확인합니다.
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline up -d --build postgres migrate ai-server-full-pipeline
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm full-pipeline-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm --build full-pipeline-smoke
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline down
 ```
 
-검증 항목은 30초 이내 응답, 추적 ID 보존, 경험 후보 1~3개, 질문 최대 2개, 원문과 일치하는 근거, 다른 프로젝트 자료 격리, 768차원 E5 벡터와 모델명입니다. 외부 LLM 응답 시간은 변동될 수 있으므로 첫 실패에는 동일 `analysisRunId`로 최대 1회만 재시도합니다.
+검증 항목은 기본 120초 이내 응답, 추적 ID 보존, 경험 후보 1~3개, 질문 최대 2개, 원문과 일치하는 근거, 다른 프로젝트 자료 격리, 768차원 E5 벡터와 모델명입니다. 외부 LLM 응답 시간은 변동될 수 있으므로 첫 실패에는 동일 `analysisRunId`로 최대 1회만 재시도합니다.

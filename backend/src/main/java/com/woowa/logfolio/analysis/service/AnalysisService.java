@@ -19,6 +19,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -66,7 +68,7 @@ public class AnalysisService {
             requireSameProject(projectId, log.getProject().getId(), "Quick Log");
             run.addInputLog(log);
         }
-        eventPublisher.publishEvent(new AnalysisRequestedEvent(userId, run.getId()));
+        publishAfterCommit(new AnalysisRequestedEvent(userId, run.getId()));
         return AnalysisRunResponse.from(run);
     }
 
@@ -168,7 +170,10 @@ public class AnalysisService {
             Experience experience;
             if ("CREATE_NEW".equals(candidate.getStatus())) {
                 if (experienceRepository.existsByCandidateId(candidate.getId())) continue;
-                experience = experienceRepository.save(new Experience(run.getProject(), candidate, candidate.getTitle(), candidate.getSummary()));
+                // Evidence is linked through JdbcTemplate immediately below. Flush the new
+                // experience first so PostgreSQL can satisfy the foreign-key constraint.
+                experience = experienceRepository.saveAndFlush(
+                        new Experience(run.getProject(), candidate, candidate.getTitle(), candidate.getSummary()));
                 created.add(experience.getId());
             } else if ("MERGE_EXISTING".equals(candidate.getStatus())) {
                 experience = candidate.getTargetExperience();
@@ -267,6 +272,18 @@ public class AnalysisService {
     }
     private void requireSameProject(UUID expected, UUID actual, String target) {
         if (!expected.equals(actual)) throw badRequest(target + "이(가) 분석 프로젝트에 속하지 않습니다.");
+    }
+    private void publishAfterCommit(AnalysisRequestedEvent event) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            eventPublisher.publishEvent(event);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                eventPublisher.publishEvent(event);
+            }
+        });
     }
     private ResponseStatusException badRequest(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
     private <T> List<T> safe(List<T> values) { return values == null ? List.of() : values; }

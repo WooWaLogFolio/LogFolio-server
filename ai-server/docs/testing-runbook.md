@@ -75,6 +75,12 @@ POSTGRES_PASSWORD=로컬에서만_사용할_비밀번호
 LOGFOLIO_INTERNAL_API_KEY=로컬에서만_사용할_내부키
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
+AI_LLM_TIMEOUT_SECONDS=45
+AI_ANALYSIS_TIMEOUT_SECONDS=110
+AI_SMOKE_MAX_SECONDS=120
+AI_LLM_RETRY_BASE_DELAY_SECONDS=2
+AI_LLM_RETRY_MAX_DELAY_SECONDS=8
+AI_LLM_RETRY_JITTER_SECONDS=1
 ```
 
 주의 사항:
@@ -83,6 +89,9 @@ GEMINI_MODEL=gemini-3.5-flash
 - Gemini를 사용하지 않는 테스트에서는 `GEMINI_API_KEY`를 비워둬도 된다.
 - 실제 API Key를 문서, 메신저, 커밋, 터미널 캡처에 노출하지 않는다.
 - 무료 Gemini 테스트에는 합성·비식별 자료만 사용한다.
+- Gemini의 429, 503, timeout과 같은 일시 오류는 첫 실패 후 기본
+  2~3초 대기하고 한 번만 재시도한다. 재시도 대기시간까지
+  `AI_ANALYSIS_TIMEOUT_SECONDS` 안에 들어가야 한다.
 
 ## 3. FastAPI 로컬 실행
 
@@ -275,13 +284,13 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gem
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile gemini down
 ```
 
-Structured Output, 30초 제한, Candidate·Question 개수와 기본 Policy를 확인한다.
+Structured Output, 기본 120초 제한, Candidate·Question 개수와 기본 Policy를 확인한다.
 
 ### 6.2 실제 E5 + pgvector + Gemini 전체 파이프라인
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline up -d --build postgres migrate ai-server-full-pipeline
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm full-pipeline-smoke
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline run --rm --build full-pipeline-smoke
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile full-pipeline down
 ```
 
