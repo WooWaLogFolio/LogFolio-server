@@ -170,7 +170,10 @@ public class AnalysisService {
             Experience experience;
             if ("CREATE_NEW".equals(candidate.getStatus())) {
                 if (experienceRepository.existsByCandidateId(candidate.getId())) continue;
-                experience = experienceRepository.save(new Experience(run.getProject(), candidate, candidate.getTitle(), candidate.getSummary()));
+                // Evidence is linked through JdbcTemplate immediately below. Flush the new
+                // experience first so PostgreSQL can satisfy the foreign-key constraint.
+                experience = experienceRepository.saveAndFlush(
+                        new Experience(run.getProject(), candidate, candidate.getTitle(), candidate.getSummary()));
                 created.add(experience.getId());
             } else if ("MERGE_EXISTING".equals(candidate.getStatus())) {
                 experience = candidate.getTargetExperience();
