@@ -148,6 +148,10 @@ def search_result(*, distance: float = 0.2) -> VectorSearchResult:
     )
 
 
+def result_for_source(source_id: UUID, *, distance: float) -> VectorSearchResult:
+    return search_result(distance=distance).model_copy(update={"source_id": source_id})
+
+
 def empty_response(analysis_request: AnalysisRequest) -> AnalysisResponse:
     return AnalysisResponse(
         analysis_run_id=analysis_request.analysis_run_id,
@@ -204,6 +208,43 @@ async def test_orchestrator_sends_only_deduplicated_retrieved_chunks() -> None:
     ]
     assert response.referenced_source_ids == []
     assert llm.grounded_input.answers == [answer]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_reserves_context_for_every_input_source() -> None:
+    analysis_request = request()
+    second_source = DocumentSource(
+        source_id=uuid4(),
+        source_name="independent-project.pdf",
+        pages=[DocumentPage(page_number=1, text="서로 다른 독립 경험")],
+    )
+    analysis_request.documents.append(second_source)
+    first_source_id = analysis_request.documents[0].source_id
+    first_source_chunks = [
+        result_for_source(first_source_id, distance=0.01 + index / 100)
+        for index in range(15)
+    ]
+    second_source_chunk = result_for_source(second_source.source_id, distance=0.9)
+    contexts = [
+        RetrievalContext(
+            purpose=AnalysisPurpose.PROJECT_OVERVIEW,
+            query="프로젝트 개요",
+            chunks=[*first_source_chunks, second_source_chunk],
+        )
+    ]
+    rag = RecordingRagService(contexts)
+    llm = RecordingLLMProvider(empty_response(analysis_request))
+
+    await AnalysisOrchestrator(rag, llm, max_grounded_chunks=15).analyze(
+        analysis_request
+    )
+
+    assert llm.grounded_input is not None
+    assert len(llm.grounded_input.chunks) == 15
+    assert {chunk.source_id for chunk in llm.grounded_input.chunks} == {
+        first_source_id,
+        second_source.source_id,
+    }
 
 
 @pytest.mark.asyncio

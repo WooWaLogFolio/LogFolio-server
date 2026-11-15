@@ -272,6 +272,58 @@ async def test_analysis_context_uses_five_distinct_purposes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_analysis_context_adds_one_representative_per_requested_source() -> None:
+    embedding = RecordingEmbeddingProvider()
+    source_ids = [uuid4(), uuid4()]
+
+    class SourceAwareStore(RecordingVectorStore):
+        async def search(
+            self,
+            project_id: UUID,
+            query_embedding: Sequence[float],
+            *,
+            top_k: int = 5,
+            source_ids: Optional[Sequence[UUID]] = None,
+        ) -> List[VectorSearchResult]:
+            await super().search(
+                project_id,
+                query_embedding,
+                top_k=top_k,
+                source_ids=source_ids,
+            )
+            if source_ids and len(source_ids) == 1:
+                source_id = source_ids[0]
+                return [
+                    VectorSearchResult(
+                        chunk_id=uuid4(),
+                        source_id=source_id,
+                        source_name=f"{source_id}.pdf",
+                        sequence=0,
+                        char_start=0,
+                        char_end=10,
+                        text="Source 대표 근거",
+                        distance=0.5,
+                    )
+                ]
+            return []
+
+    store = SourceAwareStore()
+    service = rag_service(embedding, store)
+
+    contexts = await service.retrieve_analysis_context(
+        uuid4(), source_ids=source_ids
+    )
+
+    overview = next(
+        context
+        for context in contexts
+        if context.purpose == AnalysisPurpose.PROJECT_OVERVIEW
+    )
+    assert {chunk.source_id for chunk in overview.chunks} == set(source_ids)
+    assert len(store.search_calls) == 7
+
+
+@pytest.mark.asyncio
 async def test_blank_query_is_rejected_before_embedding() -> None:
     embedding = RecordingEmbeddingProvider()
     store = RecordingVectorStore()

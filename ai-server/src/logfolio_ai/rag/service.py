@@ -283,7 +283,7 @@ class RagService:
             )
             return RetrievalContext(purpose=purpose, query=query, chunks=chunks)
 
-        return list(
+        contexts = list(
             await asyncio.gather(
                 *(
                     retrieve_purpose(purpose, query, query_embedding)
@@ -293,6 +293,45 @@ class RagService:
                 )
             )
         )
+
+        # Global Top-K retrieval can be monopolized by one long or highly relevant
+        # Source. Fetch one overview representative per requested Source so the
+        # orchestrator can guarantee that every input reaches the LLM context.
+        if source_ids:
+            overview_embedding = query_embeddings[
+                purposes.index(AnalysisPurpose.PROJECT_OVERVIEW)
+            ]
+
+            async def retrieve_source_representative(
+                source_id: UUID,
+            ) -> Optional[VectorSearchResult]:
+                chunks = await self._vector_store.search(
+                    project_id,
+                    overview_embedding,
+                    top_k=1,
+                    source_ids=[source_id],
+                )
+                if not chunks or chunks[0].source_id != source_id:
+                    return None
+                return chunks[0]
+
+            representatives = await asyncio.gather(
+                *(retrieve_source_representative(source_id) for source_id in source_ids)
+            )
+            overview_index = purposes.index(AnalysisPurpose.PROJECT_OVERVIEW)
+            overview = contexts[overview_index]
+            known_chunk_ids = {chunk.chunk_id for chunk in overview.chunks}
+            coverage_chunks = [
+                chunk
+                for chunk in representatives
+                if chunk is not None and chunk.chunk_id not in known_chunk_ids
+            ]
+            if coverage_chunks:
+                contexts[overview_index] = overview.model_copy(
+                    update={"chunks": [*overview.chunks, *coverage_chunks]}
+                )
+
+        return contexts
 
     async def retrieve_related_experience_context(
         self,
