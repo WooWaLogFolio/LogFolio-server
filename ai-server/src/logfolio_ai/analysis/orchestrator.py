@@ -1,5 +1,6 @@
 import logging
 import time
+from collections import Counter
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -43,6 +44,7 @@ class AnalysisOrchestrator:
     def _build_grounded_chunks(
         self,
         contexts: List[RetrievalContext],
+        required_source_ids: List[UUID],
     ) -> List[GroundedChunk]:
         by_chunk_id: Dict[UUID, Tuple[GroundedChunk, List[AnalysisPurpose]]] = {}
 
@@ -76,7 +78,31 @@ class AnalysisOrchestrator:
             for chunk, purposes in by_chunk_id.values()
         ]
         merged.sort(key=lambda chunk: (chunk.distance, str(chunk.chunk_id)))
-        return merged[: self._max_grounded_chunks]
+
+        # Reserve one slot per input Source before filling the remaining context
+        # by semantic distance. This preserves source coverage without forcing one
+        # candidate per file; experience boundaries remain the LLM's semantic job.
+        selected: List[GroundedChunk] = []
+        selected_chunk_ids = set()
+        for source_id in dict.fromkeys(required_source_ids):
+            representative = next(
+                (chunk for chunk in merged if chunk.source_id == source_id),
+                None,
+            )
+            if representative is None:
+                continue
+            selected.append(representative)
+            selected_chunk_ids.add(representative.chunk_id)
+            if len(selected) >= self._max_grounded_chunks:
+                return selected
+
+        for chunk in merged:
+            if chunk.chunk_id in selected_chunk_ids:
+                continue
+            selected.append(chunk)
+            if len(selected) >= self._max_grounded_chunks:
+                break
+        return selected
 
     @staticmethod
     def _normalize_content(value: str) -> str:
@@ -327,7 +353,7 @@ class AnalysisOrchestrator:
             source_ids=source_ids,
         )
         retrieved_at = time.perf_counter()
-        grounded_chunks = self._build_grounded_chunks(contexts)
+        grounded_chunks = self._build_grounded_chunks(contexts, source_ids)
         if not grounded_chunks:
             source_chunks = await self._rag_service.retrieve_source_chunks(
                 request.project_id,
@@ -388,10 +414,22 @@ class AnalysisOrchestrator:
                 sorted(redaction_summary.counts),
             )
         logger.info(
-            "Analysis grounding prepared: index=%.3fs retrieve=%.3fs chunks=%d",
+            "Analysis grounding prepared: index=%.3fs retrieve=%.3fs chunks=%d "
+            "source_chunk_counts=%s missing_sources=%s",
             indexed_at - started_at,
             retrieved_at - indexed_at,
             len(grounded_chunks),
+            {
+                str(source_id): count
+                for source_id, count in Counter(
+                    chunk.source_id for chunk in grounded_chunks
+                ).items()
+            },
+            [
+                str(source_id)
+                for source_id in source_ids
+                if source_id not in {chunk.source_id for chunk in grounded_chunks}
+            ],
         )
         try:
             response = await self._llm_provider.analyze_grounded(provider_input)
