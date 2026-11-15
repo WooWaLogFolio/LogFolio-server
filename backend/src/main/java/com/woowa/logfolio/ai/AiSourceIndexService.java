@@ -3,6 +3,8 @@ package com.woowa.logfolio.ai;
 import com.woowa.logfolio.file.entity.ProjectFile;
 import com.woowa.logfolio.file.service.ProjectFileService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +14,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AiSourceIndexService {
+    private static final Logger log = LoggerFactory.getLogger(AiSourceIndexService.class);
+
     private final AiServerClient aiServerClient;
     private final AiServerProperties properties;
     private final ProjectFileService projectFileService;
@@ -50,11 +54,17 @@ public class AiSourceIndexService {
                             && ("INDEXED".equals(item.status()) || "DUPLICATE".equals(item.status())));
             if (indexed) {
                 file.indexed();
+                log.info("AI source indexing accepted the project file: fileId={}, projectId={}, response={}",
+                        file.getId(), file.getProject().getId(), response);
                 return "INDEXED";
             }
+            log.warn("AI source indexing rejected the project file: fileId={}, projectId={}, response={}",
+                    file.getId(), file.getProject().getId(), response);
             file.failed();
             return "FAILED";
         } catch (RuntimeException exception) {
+            log.error("AI source indexing request failed: fileId={}, projectId={}, name={}",
+                    file.getId(), file.getProject().getId(), file.getOriginalName(), exception);
             file.failed();
             return "FAILED";
         }
@@ -67,6 +77,9 @@ public class AiSourceIndexService {
             return aiServerClient.indexSources(request);
         } catch (AiServerException firstFailure) {
             if (!firstFailure.isRetryable()) throw firstFailure;
+            log.warn("Retrying AI source indexing after a retryable failure: projectId={}, sourceIds={}",
+                    request.projectId(), request.sources().stream().map(AiServerContract.Source::sourceId).toList(),
+                    firstFailure);
             return aiServerClient.indexSources(request);
         }
     }
