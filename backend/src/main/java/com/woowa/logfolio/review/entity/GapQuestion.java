@@ -24,6 +24,15 @@ public class GapQuestion {
     @Column(name = "display_order", nullable = false) private int displayOrder;
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     protected GapQuestion() {}
+    public GapQuestion(UUID id, Experience experience, String targetSection, String question,
+                       List<String> suggestedAnswers, int displayOrder) {
+        this.id = id;
+        this.experience = experience;
+        this.targetSection = targetSection;
+        this.question = question;
+        if (suggestedAnswers != null) this.suggestedAnswers = new ArrayList<>(suggestedAnswers);
+        this.displayOrder = displayOrder;
+    }
     @PrePersist void onCreate() { createdAt = LocalDateTime.now(); }
     public UUID getId() { return id; }
     public Experience getExperience() { return experience; }

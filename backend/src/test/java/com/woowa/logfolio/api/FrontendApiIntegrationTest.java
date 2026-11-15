@@ -5,6 +5,7 @@ import com.woowa.logfolio.auth.model.LogfolioOAuth2User;
 import com.woowa.logfolio.auth.model.PendingOAuth2User;
 import com.woowa.logfolio.auth.entity.OAuthProvider;
 import com.woowa.logfolio.auth.repository.OAuthAccountRepository;
+import com.woowa.logfolio.analysis.service.AnalysisService;
 import com.woowa.logfolio.user.entity.User;
 import com.woowa.logfolio.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class FrontendApiIntegrationTest {
     @Autowired MockMvc mockMvc;
     @Autowired UserRepository userRepository;
     @Autowired OAuthAccountRepository oauthAccountRepository;
+    @Autowired AnalysisService analysisService;
 
     @Test
     void allowsCredentialedCorsRequestsFromLocalViteServer() throws Exception {
@@ -183,6 +185,16 @@ class FrontendApiIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         String runId = JsonPath.read(runJson, "$.id");
 
+        UUID questionId = UUID.randomUUID();
+        analysisService.recordAiResponse(user.getId(), UUID.fromString(runId), "분석 요약", "USER_ANSWER",
+                "개인 기여 확인 필요", null, List.of(quickLogId), List.of(quickLogId), List.of(),
+                List.of(Map.of(
+                        "questionId", questionId.toString(),
+                        "targetSection", "CONTRIBUTION",
+                        "question", "직접 담당한 역할은 무엇인가요?",
+                        "suggestedAnswers", List.of("기능 우선순위 결정")
+                )), Map.of());
+
         String candidatesJson = mockMvc.perform(post("/api/analysis-runs/{runId}/results", runId)
                         .with(authentication(auth)).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -215,6 +227,12 @@ class FrontendApiIntegrationTest {
 
         mockMvc.perform(get("/api/experiences/{id}/evidence", experienceId).with(authentication(auth)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].quickLogId").value(quickLogId));
+        mockMvc.perform(get("/api/experiences/{id}/gap-questions", experienceId).with(authentication(auth)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(questionId.toString()))
+                .andExpect(jsonPath("$[0].targetSection").value("CONTRIBUTION"))
+                .andExpect(jsonPath("$[0].question").value("직접 담당한 역할은 무엇인가요?"))
+                .andExpect(jsonPath("$[0].suggestedAnswers[0]").value("기능 우선순위 결정"));
         mockMvc.perform(post("/api/experiences/{id}/confirm", experienceId)
                         .with(authentication(auth)).with(csrf()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SAVED"));
