@@ -13,6 +13,8 @@ import com.woowa.logfolio.project.entity.Project;
 import com.woowa.logfolio.project.service.ProjectService;
 import com.woowa.logfolio.quicklog.entity.QuickLog;
 import com.woowa.logfolio.quicklog.service.QuickLogService;
+import com.woowa.logfolio.review.entity.GapQuestion;
+import com.woowa.logfolio.review.repository.GapQuestionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -44,6 +46,7 @@ public class AnalysisService {
     private final ProjectService projectService;
     private final ProjectFileService fileService;
     private final QuickLogService quickLogService;
+    private final GapQuestionRepository gapQuestionRepository;
     private final JdbcTemplate jdbcTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -164,9 +167,13 @@ public class AnalysisService {
     public FinalizeResult finalizeDecisions(UUID userId, UUID runId) {
         AnalysisRun run = findRun(userId, runId);
         if (!"REVIEW_READY".equals(run.getStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "REVIEW_READY 상태의 분석만 확정할 수 있습니다.");
+        List<ExperienceCandidate> runCandidates = candidateRepository.findAllByAnalysisRunIdOrderByCreatedAt(runId);
+        long selectedCandidateCount = runCandidates.stream()
+                .filter(candidate -> List.of("CREATE_NEW", "MERGE_EXISTING").contains(candidate.getStatus()))
+                .count();
         List<UUID> created = new ArrayList<>();
         List<UUID> updated = new ArrayList<>();
-        for (ExperienceCandidate candidate : candidateRepository.findAllByAnalysisRunIdOrderByCreatedAt(runId)) {
+        for (ExperienceCandidate candidate : runCandidates) {
             Experience experience;
             if ("CREATE_NEW".equals(candidate.getStatus())) {
                 if (experienceRepository.existsByCandidateId(candidate.getId())) continue;
@@ -182,10 +189,59 @@ public class AnalysisService {
                 updated.add(experience.getId());
             } else continue;
             attachCandidateEvidence(run, candidate, experience.getId());
+            attachCandidateQuestions(run, candidate, experience, selectedCandidateCount);
             candidate.finalized();
         }
         run.finalizeRun();
         return new FinalizeResult(created, updated);
+    }
+
+    private void attachCandidateQuestions(AnalysisRun run, ExperienceCandidate candidate,
+                                          Experience experience, long selectedCandidateCount) {
+        List<Map<String, Object>> questions = run.getAiQuestions();
+        if (questions == null || questions.isEmpty()) return;
+
+        int displayOrder = gapQuestionRepository
+                .findAllByExperienceIdAndExperienceProjectUserIdOrderByDisplayOrder(
+                        experience.getId(), run.getProject().getUser().getId())
+                .stream().mapToInt(GapQuestion::getDisplayOrder).max().orElse(-1) + 1;
+
+        for (Map<String, Object> questionData : questions) {
+            if (!belongsToCandidate(questionData, candidate, selectedCandidateCount)) continue;
+            String question = textValue(questionData.get("question"));
+            String targetSection = textValue(questionData.get("targetSection"));
+            if (question == null || question.isBlank() || targetSection == null || targetSection.isBlank()) continue;
+
+            UUID questionId = uuidValue(questionData.get("questionId"));
+            if (questionId == null) questionId = UUID.randomUUID();
+            if (gapQuestionRepository.existsById(questionId)) continue;
+
+            gapQuestionRepository.save(new GapQuestion(questionId, experience, targetSection, question,
+                    stringValues(questionData.get("suggestedAnswers")), displayOrder++));
+        }
+    }
+
+    private boolean belongsToCandidate(Map<String, Object> question, ExperienceCandidate candidate,
+                                       long selectedCandidateCount) {
+        UUID questionCandidateId = uuidValue(question.get("candidateId"));
+        if (questionCandidateId == null) return selectedCandidateCount == 1;
+        return questionCandidateId.equals(candidate.getAiCandidateId())
+                || questionCandidateId.equals(candidate.getId());
+    }
+
+    private UUID uuidValue(Object value) {
+        if (value == null) return null;
+        try { return UUID.fromString(String.valueOf(value)); }
+        catch (IllegalArgumentException ignored) { return null; }
+    }
+
+    private String textValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private List<String> stringValues(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        return values.stream().filter(java.util.Objects::nonNull).map(String::valueOf).toList();
     }
 
     private void attachCandidateEvidence(AnalysisRun run, ExperienceCandidate candidate, UUID experienceId) {
