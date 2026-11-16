@@ -10,6 +10,7 @@ from logfolio_ai.vector_store import VectorSearchResult
 
 
 class AnalysisPurpose(str, Enum):
+    EXPERIENCE_DISCOVERY = "EXPERIENCE_DISCOVERY"
     PROJECT_OVERVIEW = "PROJECT_OVERVIEW"
     USER_CONTRIBUTION = "USER_CONTRIBUTION"
     DECISION_REASON = "DECISION_REASON"

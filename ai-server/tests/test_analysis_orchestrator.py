@@ -248,6 +248,65 @@ async def test_orchestrator_reserves_context_for_every_input_source() -> None:
 
 
 @pytest.mark.asyncio
+async def test_orchestrator_reserves_multiple_discovery_chunks_per_source() -> None:
+    analysis_request = request()
+    second_source = DocumentSource(
+        source_id=uuid4(),
+        source_name="independent-project.pdf",
+        pages=[DocumentPage(page_number=1, text="서로 다른 독립 경험")],
+    )
+    analysis_request.documents.append(second_source)
+    first_source_id = analysis_request.documents[0].source_id
+    first_discovery = [
+        result_for_source(first_source_id, distance=0.01 + index / 100)
+        for index in range(5)
+    ]
+    second_discovery = [
+        result_for_source(second_source.source_id, distance=0.5 + index / 100)
+        for index in range(3)
+    ]
+    dominant_general = [
+        result_for_source(first_source_id, distance=0.001 + index / 1000)
+        for index in range(15)
+    ]
+    contexts = [
+        RetrievalContext(
+            purpose=AnalysisPurpose.EXPERIENCE_DISCOVERY,
+            query="독립 경험 탐색",
+            chunks=[*first_discovery, *second_discovery],
+        ),
+        RetrievalContext(
+            purpose=AnalysisPurpose.PROJECT_OVERVIEW,
+            query="프로젝트 개요",
+            chunks=dominant_general,
+        ),
+    ]
+    rag = RecordingRagService(contexts)
+    llm = RecordingLLMProvider(empty_response(analysis_request))
+
+    await AnalysisOrchestrator(rag, llm, max_grounded_chunks=15).analyze(
+        analysis_request
+    )
+
+    assert llm.grounded_input is not None
+    selected_discovery_counts = {
+        source_id: len(
+            [
+                chunk
+                for chunk in llm.grounded_input.chunks
+                if chunk.source_id == source_id
+                and AnalysisPurpose.EXPERIENCE_DISCOVERY in chunk.purposes
+            ]
+        )
+        for source_id in (first_source_id, second_source.source_id)
+    }
+    assert selected_discovery_counts == {
+        first_source_id: 3,
+        second_source.source_id: 3,
+    }
+
+
+@pytest.mark.asyncio
 async def test_orchestrator_accepts_exact_excerpt_from_retrieved_chunk() -> None:
     analysis_request = request()
     result = search_result().model_copy(

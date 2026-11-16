@@ -27,6 +27,10 @@ from logfolio_ai.vector_store import VectorSearchResult, VectorStore
 logger = logging.getLogger("uvicorn.error")
 
 DEFAULT_ANALYSIS_QUERIES: Dict[AnalysisPurpose, str] = {
+    AnalysisPurpose.EXPERIENCE_DISCOVERY: (
+        "자료 전체에서 서로 다른 프로젝트, 문제, 목표, 행동, 의사결정과 결과를 찾아 "
+        "독립적인 경험 경계를 구분"
+    ),
     AnalysisPurpose.PROJECT_OVERVIEW: "프로젝트가 해결하려던 문제, 목적, 주요 기능과 진행 기간",
     AnalysisPurpose.USER_CONTRIBUTION: "사용자가 직접 담당하거나 수행한 역할, 행동과 개인 기여",
     AnalysisPurpose.DECISION_REASON: "핵심 의사결정, 선택한 방법과 그렇게 판단한 이유",
@@ -300,41 +304,43 @@ class RagService:
             )
         )
 
-        # Global Top-K retrieval can be monopolized by one long or highly relevant
-        # Source. Fetch one overview representative per requested Source so the
-        # orchestrator can guarantee that every input reaches the LLM context.
+        # Global Top-K retrieval can be monopolized by one dominant experience.
+        # Fetch several discovery chunks per Source so separate experiences in a
+        # second file (or another section of one file) still reach the LLM.
         if source_ids:
-            overview_embedding = query_embeddings[
-                purposes.index(AnalysisPurpose.PROJECT_OVERVIEW)
+            discovery_embedding = query_embeddings[
+                purposes.index(AnalysisPurpose.EXPERIENCE_DISCOVERY)
             ]
 
-            async def retrieve_source_representative(
+            async def retrieve_source_discovery_chunks(
                 source_id: UUID,
-            ) -> Optional[VectorSearchResult]:
+            ) -> List[VectorSearchResult]:
                 chunks = await self._vector_store.search(
                     project_id,
-                    overview_embedding,
-                    top_k=1,
+                    discovery_embedding,
+                    top_k=min(3, self._top_k),
                     source_ids=[source_id],
                 )
-                if not chunks or chunks[0].source_id != source_id:
-                    return None
-                return chunks[0]
+                return [chunk for chunk in chunks if chunk.source_id == source_id]
 
-            representatives = await asyncio.gather(
-                *(retrieve_source_representative(source_id) for source_id in source_ids)
+            per_source_chunks = await asyncio.gather(
+                *(
+                    retrieve_source_discovery_chunks(source_id)
+                    for source_id in source_ids
+                )
             )
-            overview_index = purposes.index(AnalysisPurpose.PROJECT_OVERVIEW)
-            overview = contexts[overview_index]
-            known_chunk_ids = {chunk.chunk_id for chunk in overview.chunks}
+            discovery_index = purposes.index(AnalysisPurpose.EXPERIENCE_DISCOVERY)
+            discovery = contexts[discovery_index]
+            known_chunk_ids = {chunk.chunk_id for chunk in discovery.chunks}
             coverage_chunks = [
                 chunk
-                for chunk in representatives
-                if chunk is not None and chunk.chunk_id not in known_chunk_ids
+                for chunks in per_source_chunks
+                for chunk in chunks
+                if chunk.chunk_id not in known_chunk_ids
             ]
             if coverage_chunks:
-                contexts[overview_index] = overview.model_copy(
-                    update={"chunks": [*overview.chunks, *coverage_chunks]}
+                contexts[discovery_index] = discovery.model_copy(
+                    update={"chunks": [*discovery.chunks, *coverage_chunks]}
                 )
 
         return contexts

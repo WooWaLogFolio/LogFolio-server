@@ -278,7 +278,7 @@ async def test_retrieve_embeds_query_and_keeps_project_scope() -> None:
 
 
 @pytest.mark.asyncio
-async def test_analysis_context_uses_five_distinct_purposes() -> None:
+async def test_analysis_context_uses_six_distinct_purposes() -> None:
     embedding = RecordingEmbeddingProvider()
     store = RecordingVectorStore()
     service = rag_service(embedding, store)
@@ -287,12 +287,12 @@ async def test_analysis_context_uses_five_distinct_purposes() -> None:
 
     assert [context.purpose for context in contexts] == list(AnalysisPurpose)
     assert len(embedding.query_batch_calls) == 1
-    assert len(set(embedding.query_batch_calls[0])) == 5
-    assert len(store.search_calls) == 5
+    assert len(set(embedding.query_batch_calls[0])) == 6
+    assert len(store.search_calls) == 6
 
 
 @pytest.mark.asyncio
-async def test_analysis_context_adds_one_representative_per_requested_source() -> None:
+async def test_analysis_context_adds_discovery_chunks_per_requested_source() -> None:
     embedding = RecordingEmbeddingProvider()
     source_ids = [uuid4(), uuid4()]
 
@@ -323,7 +323,17 @@ async def test_analysis_context_adds_one_representative_per_requested_source() -
                         char_end=10,
                         text="Source 대표 근거",
                         distance=0.5,
-                    )
+                    ),
+                    VectorSearchResult(
+                        chunk_id=uuid4(),
+                        source_id=source_id,
+                        source_name=f"{source_id}.pdf",
+                        sequence=5,
+                        char_start=50,
+                        char_end=70,
+                        text="Source의 다른 경험 근거",
+                        distance=0.6,
+                    ),
                 ]
             return []
 
@@ -334,13 +344,14 @@ async def test_analysis_context_adds_one_representative_per_requested_source() -
         uuid4(), source_ids=source_ids
     )
 
-    overview = next(
+    discovery = next(
         context
         for context in contexts
-        if context.purpose == AnalysisPurpose.PROJECT_OVERVIEW
+        if context.purpose == AnalysisPurpose.EXPERIENCE_DISCOVERY
     )
-    assert {chunk.source_id for chunk in overview.chunks} == set(source_ids)
-    assert len(store.search_calls) == 7
+    assert {chunk.source_id for chunk in discovery.chunks} == set(source_ids)
+    assert len(discovery.chunks) == 4
+    assert len(store.search_calls) == 8
 
 
 @pytest.mark.asyncio
