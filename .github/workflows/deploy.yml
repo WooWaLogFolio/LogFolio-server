@@ -82,6 +82,11 @@ jobs:
           script: |
             cd /opt/logfolio/deploy
             export IMAGE_TAG=${{ github.sha }}
+            # Free old, unused image layers before pulling the next release.
+            # Running containers and named volumes (including PostgreSQL data)
+            # are preserved. Pruning only after deployment is too late when the
+            # host has no room to extract the incoming image.
+            docker image prune -af
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml run --rm ai-migrate
             docker compose --env-file .env -f docker-compose.prod.yml up -d --wait --remove-orphans
