@@ -263,10 +263,16 @@ public class AnalysisService {
                 } catch (IllegalArgumentException ignored) { continue; }
                 String excerpt = evidence.get("excerpt") == null ? null : String.valueOf(evidence.get("excerpt"));
                 Integer page = evidence.get("pageNumber") instanceof Number number ? number.intValue() : null;
-                if (run.getInputFiles().stream().anyMatch(file -> file.getId().equals(sourceId))) {
-                    attachEvidence(run.getProject().getId(), experienceId, sourceId, null, chunkId, excerpt, page, section);
-                } else if (run.getInputLogs().stream().anyMatch(log -> log.getId().equals(sourceId))) {
-                    attachEvidence(run.getProject().getId(), experienceId, null, sourceId, chunkId, excerpt, page, section);
+                ProjectFile inputFile = run.getInputFiles().stream()
+                        .filter(file -> file.getRetrievalSourceId().equals(sourceId)).findFirst().orElse(null);
+                QuickLog inputLog = run.getInputLogs().stream()
+                        .filter(log -> log.getRetrievalSourceId().equals(sourceId)).findFirst().orElse(null);
+                if (inputFile != null) {
+                    attachEvidence(run.getProject().getId(), experienceId, inputFile.getId(), null,
+                            chunkId, excerpt, page, section);
+                } else if (inputLog != null) {
+                    attachEvidence(run.getProject().getId(), experienceId, null, inputLog.getId(),
+                            chunkId, excerpt, page, section);
                 }
             }
         }

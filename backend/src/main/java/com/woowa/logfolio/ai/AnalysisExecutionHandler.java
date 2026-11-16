@@ -84,7 +84,7 @@ public class AnalysisExecutionHandler {
         List<UUID> indexed = new ArrayList<>();
         for (ProjectFile file : run.getInputFiles()) {
             if ("INDEXED".equals(file.getProcessingStatus())) {
-                indexed.add(file.getId());
+                indexed.add(file.getRetrievalSourceId());
                 continue;
             }
             List<AiServerContract.Page> pages = extractPages(file);
@@ -99,8 +99,10 @@ public class AnalysisExecutionHandler {
             } else if (isDuplicate(result, file.getId())) {
                 // FastAPI intentionally stores no chunks for a duplicate Source.
                 // Analyze the already indexed canonical Source instead.
-                file.indexed();
-                duplicateOfSourceId(result, file.getId()).ifPresent(indexed::add);
+                UUID canonicalSourceId = duplicateOfSourceId(result, file.getId())
+                        .orElseThrow(() -> new IllegalStateException("중복 파일의 원본 Source ID가 없습니다."));
+                file.indexedAsDuplicateOf(canonicalSourceId);
+                indexed.add(canonicalSourceId);
             } else {
                 file.failed();
                 throw sourceIndexingFailure(result, file.getId(), file.getOriginalName());
@@ -108,7 +110,7 @@ public class AnalysisExecutionHandler {
         }
         for (QuickLog log : run.getInputLogs()) {
             if ("INDEXED".equals(log.getProcessingStatus())) {
-                indexed.add(log.getId());
+                indexed.add(log.getRetrievalSourceId());
                 continue;
             }
             AiServerContract.Source source = new AiServerContract.Source(
@@ -121,8 +123,10 @@ public class AnalysisExecutionHandler {
                 log.indexed();
                 indexed.add(log.getId());
             } else if (isDuplicate(result, log.getId())) {
-                log.indexed();
-                duplicateOfSourceId(result, log.getId()).ifPresent(indexed::add);
+                UUID canonicalSourceId = duplicateOfSourceId(result, log.getId())
+                        .orElseThrow(() -> new IllegalStateException("중복 Quick Log의 원본 Source ID가 없습니다."));
+                log.indexedAsDuplicateOf(canonicalSourceId);
+                indexed.add(canonicalSourceId);
             } else {
                 log.failed();
                 throw sourceIndexingFailure(result, log.getId(), "30초 기록");

@@ -18,6 +18,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -35,8 +36,10 @@ class AnalysisExecutionHandlerTest {
         UUID logId = UUID.randomUUID();
 
         when(file.getId()).thenReturn(fileId);
+        when(file.getRetrievalSourceId()).thenReturn(fileId);
         when(file.getProcessingStatus()).thenReturn("INDEXED");
         when(log.getId()).thenReturn(logId);
+        when(log.getRetrievalSourceId()).thenReturn(logId);
         when(log.getProcessingStatus()).thenReturn("INDEXED");
         when(run.getInputFiles()).thenReturn(Set.of(file));
         when(run.getInputLogs()).thenReturn(Set.of(log));
@@ -74,6 +77,29 @@ class AnalysisExecutionHandlerTest {
         List<UUID> sourceIds = ReflectionTestUtils.invokeMethod(handler, "indexInputSources", run);
 
         assertThat(sourceIds).containsExactly(canonicalId);
+        verify(log).indexedAsDuplicateOf(canonicalId);
+    }
+
+    @Test
+    void reusesPersistedCanonicalSourceForPreviouslyIndexedDuplicate() {
+        AiServerClient client = mock(AiServerClient.class);
+        DocumentTextExtractor extractor = mock(DocumentTextExtractor.class);
+        AnalysisExecutionHandler handler = handler(client, extractor);
+        AnalysisRun run = mock(AnalysisRun.class);
+        ProjectFile file = mock(ProjectFile.class);
+        UUID duplicateId = UUID.randomUUID();
+        UUID canonicalId = UUID.randomUUID();
+
+        when(file.getId()).thenReturn(duplicateId);
+        when(file.getProcessingStatus()).thenReturn("INDEXED");
+        when(file.getRetrievalSourceId()).thenReturn(canonicalId);
+        when(run.getInputFiles()).thenReturn(Set.of(file));
+        when(run.getInputLogs()).thenReturn(Set.of());
+
+        List<UUID> sourceIds = ReflectionTestUtils.invokeMethod(handler, "indexInputSources", run);
+
+        assertThat(sourceIds).containsExactly(canonicalId);
+        verifyNoInteractions(client, extractor);
     }
 
     private AnalysisExecutionHandler handler(AiServerClient client, DocumentTextExtractor extractor) {

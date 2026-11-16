@@ -45,6 +45,9 @@ public class QuickLog {
     @Column(name = "processing_status", length = 30)
     private String processingStatus;
 
+    @Column(name = "canonical_source_id")
+    private UUID canonicalSourceId;
+
     protected QuickLog() {}
 
     public QuickLog(User user, Project project, String content) {
@@ -66,7 +69,11 @@ public class QuickLog {
     public void updateContent(String content) { this.content = content; }
     public void linkProject(Project project) { this.project = project; }
     public void processing() { this.processingStatus = "PROCESSING"; }
-    public void indexed() { this.processingStatus = "INDEXED"; }
+    public void indexed() { this.processingStatus = "INDEXED"; this.canonicalSourceId = null; }
+    public void indexedAsDuplicateOf(UUID canonicalSourceId) {
+        this.processingStatus = "INDEXED";
+        this.canonicalSourceId = canonicalSourceId;
+    }
     public void failed() { this.processingStatus = "FAILED"; }
     public void delete() { this.deletedAt = LocalDateTime.now(); }
 
@@ -77,4 +84,6 @@ public class QuickLog {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public String getProcessingStatus() { return processingStatus; }
+    public UUID getCanonicalSourceId() { return canonicalSourceId; }
+    public UUID getRetrievalSourceId() { return canonicalSourceId == null ? id : canonicalSourceId; }
 }

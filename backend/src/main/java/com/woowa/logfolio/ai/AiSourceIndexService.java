@@ -49,13 +49,19 @@ public class AiSourceIndexService {
                             file.getProject().getId(), List.of(source)
                     )
             );
-            boolean indexed = response.items() != null && response.items().stream()
-                    .anyMatch(item -> file.getId().equals(item.sourceId())
-                            && ("INDEXED".equals(item.status()) || "DUPLICATE".equals(item.status())));
-            if (indexed) {
+            AiServerContract.SourceIndexItem item = response.items() == null ? null : response.items().stream()
+                    .filter(candidate -> file.getId().equals(candidate.sourceId()))
+                    .findFirst().orElse(null);
+            if (item != null && "INDEXED".equals(item.status())) {
                 file.indexed();
                 log.info("AI source indexing accepted the project file: fileId={}, projectId={}, response={}",
                         file.getId(), file.getProject().getId(), response);
+                return "INDEXED";
+            }
+            if (item != null && "DUPLICATE".equals(item.status()) && item.duplicateOfSourceId() != null) {
+                file.indexedAsDuplicateOf(item.duplicateOfSourceId());
+                log.info("AI source indexing linked a duplicate project file: fileId={}, canonicalSourceId={}",
+                        file.getId(), item.duplicateOfSourceId());
                 return "INDEXED";
             }
             log.warn("AI source indexing rejected the project file: fileId={}, projectId={}, response={}",

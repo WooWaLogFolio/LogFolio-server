@@ -25,6 +25,7 @@ public class ProjectFile {
     @Column(name = "mime_type", nullable = false, length = 100) private String mimeType;
     @Column(name = "size_bytes", nullable = false) private long sizeBytes;
     @Column(name = "content_hash", length = 64) private String contentHash;
+    @Column(name = "canonical_source_id") private UUID canonicalSourceId;
     @Column(name = "processing_status", nullable = false, length = 30) private String processingStatus;
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "deleted_at") private LocalDateTime deletedAt;
@@ -47,7 +48,11 @@ public class ProjectFile {
     public void delete() { deletedAt = LocalDateTime.now(); }
     public void processing() { processingStatus = "PROCESSING"; }
     public void processed() { processingStatus = "PROCESSED"; }
-    public void indexed() { processingStatus = "INDEXED"; }
+    public void indexed() { processingStatus = "INDEXED"; canonicalSourceId = null; }
+    public void indexedAsDuplicateOf(UUID canonicalSourceId) {
+        processingStatus = "INDEXED";
+        this.canonicalSourceId = canonicalSourceId;
+    }
     public void failed() { processingStatus = "FAILED"; }
 
     public UUID getId() { return id; }
@@ -59,6 +64,8 @@ public class ProjectFile {
     public void setContentHash(String contentHash) { this.contentHash = contentHash; }
     public long getSizeBytes() { return sizeBytes; }
     public String getProcessingStatus() { return processingStatus; }
+    public UUID getCanonicalSourceId() { return canonicalSourceId; }
+    public UUID getRetrievalSourceId() { return canonicalSourceId == null ? id : canonicalSourceId; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getDeletedAt() { return deletedAt; }
 }

@@ -29,11 +29,13 @@ public class SourceIndexEventHandler {
 
         try {
             AiServerContract.SourceIndexResponse response = callWithOneRetry(event);
-            boolean indexed = response.items() != null && response.items().stream()
-                    .anyMatch(item -> event.sourceId().equals(item.sourceId())
-                            && ("INDEXED".equals(item.status()) || "DUPLICATE".equals(item.status())));
-            if (indexed) log.indexed();
-            else log.failed();
+            AiServerContract.SourceIndexItem item = response.items() == null ? null : response.items().stream()
+                    .filter(candidate -> event.sourceId().equals(candidate.sourceId()))
+                    .findFirst().orElse(null);
+            if (item != null && "INDEXED".equals(item.status())) log.indexed();
+            else if (item != null && "DUPLICATE".equals(item.status()) && item.duplicateOfSourceId() != null) {
+                log.indexedAsDuplicateOf(item.duplicateOfSourceId());
+            } else log.failed();
         } catch (RuntimeException exception) {
             log.failed();
         }
