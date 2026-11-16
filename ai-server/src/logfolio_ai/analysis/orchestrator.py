@@ -79,22 +79,30 @@ class AnalysisOrchestrator:
         ]
         merged.sort(key=lambda chunk: (chunk.distance, str(chunk.chunk_id)))
 
-        # Reserve one slot per input Source before filling the remaining context
-        # by semantic distance. This preserves source coverage without forcing one
-        # candidate per file; experience boundaries remain the LLM's semantic job.
+        # Reserve up to three discovery chunks per input Source before filling the
+        # remaining context by semantic distance. One representative was too
+        # fragile: a dominant experience could hide independent material elsewhere
+        # in the same Source or in another file.
         selected: List[GroundedChunk] = []
         selected_chunk_ids = set()
         for source_id in dict.fromkeys(required_source_ids):
-            representative = next(
-                (chunk for chunk in merged if chunk.source_id == source_id),
-                None,
-            )
-            if representative is None:
-                continue
-            selected.append(representative)
-            selected_chunk_ids.add(representative.chunk_id)
-            if len(selected) >= self._max_grounded_chunks:
-                return selected
+            discovery_chunks = [
+                chunk
+                for chunk in merged
+                if chunk.source_id == source_id
+                and AnalysisPurpose.EXPERIENCE_DISCOVERY in chunk.purposes
+            ][:3]
+            if not discovery_chunks:
+                discovery_chunks = [
+                    chunk for chunk in merged if chunk.source_id == source_id
+                ][:1]
+            for chunk in discovery_chunks:
+                if chunk.chunk_id in selected_chunk_ids:
+                    continue
+                selected.append(chunk)
+                selected_chunk_ids.add(chunk.chunk_id)
+                if len(selected) >= self._max_grounded_chunks:
+                    return selected
 
         for chunk in merged:
             if chunk.chunk_id in selected_chunk_ids:

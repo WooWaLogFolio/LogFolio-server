@@ -55,6 +55,12 @@ Do not ask a question whose targetSection is already answered by a valid supplie
 Do not force a Source into an existing Experience when the mapping is ambiguous.
 Treat experience boundaries semantically, not by Source or file boundaries. Multiple Sources can
 describe one continuous experience, and one Source can contain multiple independent experiences.
+Before creating candidates, audit all supplied chunks for distinct problem/goal clusters. Do not
+stop after finding the first or most detailed experience. Check whether remaining chunks describe
+another materially independent problem, action, decision, or result. Represent every supported
+independent cluster as a separate candidate, up to the three-candidate limit. This is a coverage
+check, not a rule to create one candidate per Source: merge chunks that truly describe the same
+continuous experience and never invent a candidate merely to fill the limit.
 Merge material into one candidate when it describes the same problem or goal and a continuing
 action, decision, or result. Split it into separate candidates when the problem, action, decision,
 or result is materially independent. Never merge candidates merely because they share a Project,
