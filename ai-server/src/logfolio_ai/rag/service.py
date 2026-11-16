@@ -143,6 +143,12 @@ class RagService:
                 chunk_size_tokens=self._chunk_size_tokens,
                 overlap_tokens=self._chunk_overlap_tokens,
             )
+            if not chunks:
+                raise AppError(
+                    code="SOURCE_TEXT_EMPTY",
+                    message="Source에서 검색 가능한 텍스트 Chunk를 만들 수 없습니다.",
+                    status_code=422,
+                )
             embeddings = await self._embedding_provider.embed_documents(
                 [chunk.text for chunk in chunks]
             )

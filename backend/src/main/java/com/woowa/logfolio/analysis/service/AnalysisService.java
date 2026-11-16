@@ -77,6 +77,11 @@ public class AnalysisService {
 
     public AnalysisRunResponse get(UUID userId, UUID runId) { return AnalysisRunResponse.from(findRun(userId, runId)); }
 
+    @Transactional
+    public void fail(UUID userId, UUID runId, String errorCode, String errorMessage, String failureStage) {
+        findRun(userId, runId).fail(errorCode, errorMessage, failureStage);
+    }
+
     public List<AnalysisRunResponse> list(UUID userId, UUID projectId) {
         projectService.findOwnedProject(userId, projectId);
         return runRepository.findAllByProjectIdAndProjectUserIdOrderByCreatedAtDesc(projectId, userId)
@@ -364,12 +369,14 @@ public class AnalysisService {
     public record AnalysisRunResponse(UUID id, UUID projectId, String runType, String status, String modelVersion,
                                       String summary, String informationNeed, String informationNeedReason,
                                       String noUpdateReason, List<Map<String, Object>> sourceWarnings,
-                                      List<Map<String, Object>> questions, LocalDateTime startedAt,
+                                      List<Map<String, Object>> questions, String errorCode, String errorMessage,
+                                      String failureStage, LocalDateTime startedAt,
                                       LocalDateTime completedAt, LocalDateTime createdAt) {
         static AnalysisRunResponse from(AnalysisRun run) {
             return new AnalysisRunResponse(run.getId(), run.getProject().getId(), run.getRunType(), run.getStatus(),
                     run.getModelVersion(), run.getAiSummary(), run.getInformationNeed(), run.getInformationNeedReason(),
-                    run.getNoUpdateReason(), run.getSourceWarnings(), run.getAiQuestions(), run.getStartedAt(),
+                    run.getNoUpdateReason(), run.getSourceWarnings(), run.getAiQuestions(), run.getErrorCode(),
+                    run.getErrorMessage(), run.getFailureStage(), run.getStartedAt(),
                     run.getCompletedAt(), run.getCreatedAt());
         }
     }
