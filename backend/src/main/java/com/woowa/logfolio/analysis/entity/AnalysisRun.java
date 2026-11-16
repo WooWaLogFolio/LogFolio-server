@@ -33,6 +33,9 @@ public class AnalysisRun {
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "source_warnings", columnDefinition = "jsonb") private List<Map<String, Object>> sourceWarnings;
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "ai_questions", columnDefinition = "jsonb") private List<Map<String, Object>> aiQuestions;
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "ai_usage", columnDefinition = "jsonb") private Map<String, Object> aiUsage;
+    @Column(name = "error_code", length = 80) private String errorCode;
+    @Column(name = "error_message", columnDefinition = "text") private String errorMessage;
+    @Column(name = "failure_stage", length = 80) private String failureStage;
     @Column(name = "started_at") private LocalDateTime startedAt;
     @Column(name = "completed_at") private LocalDateTime completedAt;
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
@@ -67,7 +70,14 @@ public class AnalysisRun {
         this.sourceWarnings = sourceWarnings; this.aiQuestions = aiQuestions; this.aiUsage = aiUsage;
     }
     public void finalizeRun() { status = "FINALIZED"; }
-    public void fail() { status = "FAILED"; completedAt = LocalDateTime.now(); }
+    public void fail() { fail(null, null, null); }
+    public void fail(String errorCode, String errorMessage, String failureStage) {
+        status = "FAILED";
+        completedAt = LocalDateTime.now();
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        this.failureStage = failureStage;
+    }
     public void addInputFile(ProjectFile file) { inputFiles.add(file); }
     public void addInputLog(QuickLog log) { inputLogs.add(log); }
     public UUID getId() { return id; }
@@ -87,6 +97,9 @@ public class AnalysisRun {
     public List<Map<String, Object>> getSourceWarnings() { return sourceWarnings; }
     public List<Map<String, Object>> getAiQuestions() { return aiQuestions; }
     public Map<String, Object> getAiUsage() { return aiUsage; }
+    public String getErrorCode() { return errorCode; }
+    public String getErrorMessage() { return errorMessage; }
+    public String getFailureStage() { return failureStage; }
     public Set<ProjectFile> getInputFiles() { return inputFiles; }
     public Set<QuickLog> getInputLogs() { return inputLogs; }
 }

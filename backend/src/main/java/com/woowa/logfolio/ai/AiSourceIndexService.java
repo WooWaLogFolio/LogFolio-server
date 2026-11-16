@@ -52,7 +52,7 @@ public class AiSourceIndexService {
             AiServerContract.SourceIndexItem item = response.items() == null ? null : response.items().stream()
                     .filter(candidate -> file.getId().equals(candidate.sourceId()))
                     .findFirst().orElse(null);
-            if (item != null && "INDEXED".equals(item.status())) {
+            if (item != null && "INDEXED".equals(item.status()) && item.chunkCount() > 0) {
                 file.indexed();
                 log.info("AI source indexing accepted the project file: fileId={}, projectId={}, response={}",
                         file.getId(), file.getProject().getId(), response);
@@ -64,7 +64,7 @@ public class AiSourceIndexService {
                         file.getId(), item.duplicateOfSourceId());
                 return "INDEXED";
             }
-            log.warn("AI source indexing rejected the project file: fileId={}, projectId={}, response={}",
+            log.warn("AI source indexing rejected the project file or returned no chunks: fileId={}, projectId={}, response={}",
                     file.getId(), file.getProject().getId(), response);
             file.failed();
             return "FAILED";

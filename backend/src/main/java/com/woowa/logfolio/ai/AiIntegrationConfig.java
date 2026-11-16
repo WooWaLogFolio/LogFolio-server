@@ -39,7 +39,9 @@ public class AiIntegrationConfig {
     TaskExecutor aiTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(1);
-        executor.setMaxPoolSize(4);
+        // Upload indexing and analysis may target the same Source. Keep them serialized so
+        // an analysis can never overtake (or run alongside) the upload's indexing task.
+        executor.setMaxPoolSize(1);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("logfolio-ai-");
         executor.initialize();

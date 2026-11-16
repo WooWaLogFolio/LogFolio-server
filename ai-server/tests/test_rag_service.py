@@ -171,6 +171,26 @@ async def test_index_connects_chunking_embedding_and_atomic_source_replace() -> 
 
 
 @pytest.mark.asyncio
+async def test_source_with_no_generated_chunks_is_failed_instead_of_false_indexed(
+    monkeypatch,
+) -> None:
+    embedding = RecordingEmbeddingProvider()
+    store = RecordingVectorStore()
+    service = rag_service(embedding, store)
+    empty_source = source("추출기는 페이지를 반환했지만 Chunk 생성 결과가 없는 자료")
+    monkeypatch.setattr("logfolio_ai.rag.service.chunk_documents", lambda *args, **kwargs: [])
+
+    result = await service.index_sources(uuid4(), [empty_source])
+
+    assert result.indexed_count == 0
+    assert result.failed_count == 1
+    assert result.items[0].status == "FAILED"
+    assert result.items[0].error_code == "SOURCE_TEXT_EMPTY"
+    assert embedding.document_calls == []
+    assert store.replace_calls == []
+
+
+@pytest.mark.asyncio
 async def test_exact_duplicate_source_skips_chunking_and_embedding() -> None:
     embedding = RecordingEmbeddingProvider()
     store = RecordingVectorStore()

@@ -81,6 +81,23 @@ class AnalysisExecutionHandlerTest {
     }
 
     @Test
+    void doesNotAcceptIndexedResponseWithZeroChunks() {
+        AiServerClient client = mock(AiServerClient.class);
+        AnalysisExecutionHandler handler = handler(client, mock(DocumentTextExtractor.class));
+        UUID sourceId = UUID.randomUUID();
+        AiServerContract.SourceIndexResponse response = new AiServerContract.SourceIndexResponse(
+                UUID.randomUUID(), 1, 0, 0,
+                List.of(new AiServerContract.SourceIndexItem(
+                        sourceId, "PROJECT_FILE", "INDEXED", 0, null, null
+                ))
+        );
+
+        boolean indexed = ReflectionTestUtils.invokeMethod(handler, "isIndexed", response, sourceId);
+
+        assertThat(indexed).isFalse();
+    }
+
+    @Test
     void reusesPersistedCanonicalSourceForPreviouslyIndexedDuplicate() {
         AiServerClient client = mock(AiServerClient.class);
         DocumentTextExtractor extractor = mock(DocumentTextExtractor.class);

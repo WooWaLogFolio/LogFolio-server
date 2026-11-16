@@ -73,7 +73,8 @@ public class AnalysisExecutionHandler {
             log.error("AI analysis failed: runId={}", event.analysisRunId(), exception);
             // A failed run must not leave the client polling QUEUED/PROCESSING forever.
             try {
-                analysisService.fail(event.userId(), event.analysisRunId());
+                analysisService.fail(event.userId(), event.analysisRunId(), failureCode(exception),
+                        exception.getMessage(), "SOURCE_INDEX_OR_ANALYSIS");
             } catch (RuntimeException ignored) {
                 // Preserve the original worker failure while keeping the worker thread alive.
             }
@@ -138,7 +139,16 @@ public class AnalysisExecutionHandler {
     private boolean isIndexed(AiServerContract.SourceIndexResponse response, UUID sourceId) {
         return response.items() != null && response.items().stream()
                 .anyMatch(item -> sourceId.equals(item.sourceId())
-                        && "INDEXED".equals(item.status()));
+                        && "INDEXED".equals(item.status())
+                        && item.chunkCount() > 0);
+    }
+
+    private String failureCode(RuntimeException exception) {
+        if (exception instanceof AiServerException) return "AI_SERVER_ERROR";
+        String message = exception.getMessage();
+        if (message != null && message.contains("SOURCE_TEXT_EMPTY")) return "SOURCE_TEXT_EMPTY";
+        if (message != null && message.contains("인덱싱")) return "SOURCE_INDEXING_FAILED";
+        return "ANALYSIS_FAILED";
     }
     private boolean isDuplicate(AiServerContract.SourceIndexResponse response, UUID sourceId) {
         return response.items() != null && response.items().stream()
