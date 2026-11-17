@@ -98,6 +98,21 @@ X-Internal-API-Key: <shared-secret>
 
 Spring은 응답 저장이 모두 성공한 뒤 세션을 사용자 검토 가능 상태로 전환한다. FastAPI 오류나 저장 실패가 발생하면 세션을 실패 상태로 전환하고 빈 `IN_PROGRESS` 세션을 유지하지 않는다.
 
+## Gemini 오류 응답
+
+FastAPI는 Gemini의 원문 오류 메시지나 인증 정보를 노출하지 않고, Spring이 재시도·안내 방식을 결정할 수 있는 안정적인 진단 코드만 반환한다.
+
+| HTTP | `code` | 의미 | 안전한 `details` |
+| --- | --- | --- | --- |
+| `502` | `GEMINI_RATE_LIMITED` | 호출 한도 또는 일시적 과부하 | `providerStatusCode=429` |
+| `502` | `GEMINI_UNAVAILABLE` | Gemini 5xx 장애 | 실제 5xx 상태 코드 |
+| `502` | `GEMINI_NETWORK_ERROR` | DNS·연결·전송 오류 | 예외 클래스명만 제공 |
+| `502` | `GEMINI_REQUEST_ERROR` | 잘못된 인증·모델·요청 등 재시도 불가 4xx | 실제 4xx 상태 코드 |
+| `502` | `LLM_PROVIDER_ERROR` | 위 범주로 확정할 수 없는 공급자 오류 | 안전한 오류 유형 |
+| `504` | `LLM_TIMEOUT` | Gemini 응답 제한 시간 초과 | 없음 |
+
+429, Gemini 5xx, 네트워크 오류는 기존 정책대로 최대 1회 재시도한다. 재시도할 수 없는 4xx는 즉시 실패한다.
+
 ## 역할 경계
 
 ### FastAPI
