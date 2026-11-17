@@ -11,7 +11,8 @@ requires-python = ">=3.11"
 dependencies = [
     "asyncpg>=0.29,<1.0",
     "fastapi>=0.116,<1.0",
-    "google-genai>=1.0,<2.0",
+    # thinking_level support used by Gemini 3.8 latency controls was added in 1.51.
+    "google-genai>=1.51,<2.0",
     "pgvector>=0.4,<1.0",
     "pydantic>=2.10,<3.0",
     "pydantic-settings>=2.8,<3.0",
