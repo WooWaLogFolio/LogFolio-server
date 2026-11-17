@@ -358,7 +358,9 @@ async def test_gemini_provider_does_not_retry_non_transient_4xx() -> None:
     with pytest.raises(AppError) as error:
         await provider.analyze_grounded(grounded_request())
 
-    assert error.value.code == "LLM_REQUEST_ERROR"
+    assert error.value.code == "GEMINI_REQUEST_ERROR"
+    assert error.value.details[0].field == "providerStatusCode"
+    assert error.value.details[0].message == "400"
     assert generate_content.await_count == 1
 
 
@@ -376,9 +378,90 @@ async def test_gemini_provider_does_not_retry_google_client_error_code_4xx() -> 
     with pytest.raises(AppError) as error:
         await provider.analyze_grounded(grounded_request())
 
-    assert error.value.code == "LLM_REQUEST_ERROR"
+    assert error.value.code == "GEMINI_REQUEST_ERROR"
     assert error.value.status_code == 502
     assert generate_content.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_exposes_safe_rate_limit_diagnostic() -> None:
+    class RateLimitError(Exception):
+        status_code = 429
+
+    generate_content = AsyncMock(side_effect=RateLimitError("secret provider body"))
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider(
+        "test-key",
+        "test-model",
+        14,
+        client=client,
+        max_attempts=1,
+    )
+
+    with pytest.raises(AppError) as error:
+        await provider.analyze_grounded(grounded_request())
+
+    assert error.value.code == "GEMINI_RATE_LIMITED"
+    assert error.value.details[0].model_dump() == {
+        "field": "providerStatusCode",
+        "message": "429",
+        "type": "gemini_http_status",
+    }
+    assert "secret provider body" not in str(error.value.details)
+    assert provider.last_call_metrics.error_type == "GEMINI_RATE_LIMITED"
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_exposes_safe_unavailable_diagnostic() -> None:
+    class ServiceUnavailableError(Exception):
+        status_code = 503
+
+    generate_content = AsyncMock(side_effect=ServiceUnavailableError("upstream body"))
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider(
+        "test-key",
+        "test-model",
+        14,
+        client=client,
+        max_attempts=1,
+    )
+
+    with pytest.raises(AppError) as error:
+        await provider.analyze_grounded(grounded_request())
+
+    assert error.value.code == "GEMINI_UNAVAILABLE"
+    assert error.value.details[0].message == "503"
+    assert provider.last_call_metrics.error_type == "GEMINI_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_classifies_network_failure_without_raw_message() -> None:
+    generate_content = AsyncMock(side_effect=ConnectionError("internal host secret"))
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider(
+        "test-key",
+        "test-model",
+        14,
+        client=client,
+        max_attempts=1,
+    )
+
+    with pytest.raises(AppError) as error:
+        await provider.analyze_grounded(grounded_request())
+
+    assert error.value.code == "GEMINI_NETWORK_ERROR"
+    assert error.value.details[0].model_dump() == {
+        "field": "providerErrorType",
+        "message": "ConnectionError",
+        "type": "gemini_client_error",
+    }
+    assert "internal host secret" not in str(error.value.details)
 
 
 def test_gemini_timeout_budget_allows_two_attempts() -> None:

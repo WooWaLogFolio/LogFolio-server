@@ -18,7 +18,7 @@
     {
       "caseId": "NON_TRANSIENT_4XX_NO_RETRY",
       "scenario": "NON_TRANSIENT_4XX",
-      "expectedOutcome": "LLM_REQUEST_ERROR",
+      "expectedOutcome": "GEMINI_REQUEST_ERROR",
       "expectedAttempts": 1,
       "expectedRetryCount": 0
     },

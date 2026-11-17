@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from pydantic import ValidationError
 
-from logfolio_ai.core.errors import AppError
+from logfolio_ai.core.errors import AppError, ErrorItem
 from logfolio_ai.llm.models import GroundedAnalysisInput, LLMCallMetrics
 from logfolio_ai.llm.prompt import SYSTEM_POLICY, build_grounded_analysis_prompt
 from logfolio_ai.models import AnalysisResponse
@@ -15,7 +15,14 @@ from logfolio_ai.privacy import PrivacyRedactor
 
 
 logger = logging.getLogger(__name__)
-_RETRYABLE_CODES = {"LLM_TIMEOUT", "LLM_PROVIDER_ERROR", "LLM_INVALID_RESPONSE"}
+_RETRYABLE_CODES = {
+    "LLM_TIMEOUT",
+    "LLM_PROVIDER_ERROR",
+    "LLM_INVALID_RESPONSE",
+    "GEMINI_RATE_LIMITED",
+    "GEMINI_UNAVAILABLE",
+    "GEMINI_NETWORK_ERROR",
+}
 _RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429}
 
 
@@ -176,20 +183,23 @@ class GeminiLLMProvider:
                 status_code,
                 provider_message,
             )
+            diagnostic = self._provider_diagnostic(exc, status_code)
             if (
                 isinstance(status_code, int)
                 and 400 <= status_code < 500
                 and status_code not in _RETRYABLE_HTTP_STATUSES
             ):
                 raise AppError(
-                    code="LLM_REQUEST_ERROR",
+                    code="GEMINI_REQUEST_ERROR",
                     message="LLM 요청 설정 또는 인증을 확인해야 합니다.",
                     status_code=502,
+                    details=[diagnostic],
                 ) from exc
             raise AppError(
-                code="LLM_PROVIDER_ERROR",
-                message="LLM 공급자 호출에 실패했습니다.",
+                code=self._provider_error_code(exc, status_code),
+                message=self._provider_error_message(status_code),
                 status_code=502,
+                details=[diagnostic],
             ) from exc
 
         try:
@@ -212,3 +222,42 @@ class GeminiLLMProvider:
             }
         )
         return normalized, getattr(response, "usage_metadata", None)
+
+    @staticmethod
+    def _provider_error_code(exc: Exception, status_code: Any) -> str:
+        if status_code == 429:
+            return "GEMINI_RATE_LIMITED"
+        if isinstance(status_code, int) and status_code >= 500:
+            return "GEMINI_UNAVAILABLE"
+        error_name = type(exc).__name__.casefold()
+        if isinstance(exc, (ConnectionError, OSError)) or any(
+            marker in error_name
+            for marker in ("connection", "network", "transport", "dns")
+        ):
+            return "GEMINI_NETWORK_ERROR"
+        return "LLM_PROVIDER_ERROR"
+
+    @staticmethod
+    def _provider_error_message(status_code: Any) -> str:
+        if status_code == 429:
+            return "Gemini 요청 한도 또는 일시적 과부하로 호출에 실패했습니다."
+        if isinstance(status_code, int) and status_code >= 500:
+            return "Gemini 서비스가 일시적으로 응답하지 않습니다."
+        return "Gemini 연결 또는 공급자 호출에 실패했습니다."
+
+    @staticmethod
+    def _provider_diagnostic(exc: Exception, status_code: Any) -> ErrorItem:
+        # Never expose the provider's raw message: it can contain request data or
+        # credentials. A stable category and HTTP status are sufficient for
+        # Spring and operators to decide whether retrying is appropriate.
+        if isinstance(status_code, int):
+            return ErrorItem(
+                field="providerStatusCode",
+                message=str(status_code),
+                type="gemini_http_status",
+            )
+        return ErrorItem(
+            field="providerErrorType",
+            message=type(exc).__name__,
+            type="gemini_client_error",
+        )
