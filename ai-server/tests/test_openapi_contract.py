@@ -14,11 +14,15 @@ def test_openapi_exposes_spring_fastapi_success_contracts() -> None:
     assert set(paths) == {
         "/health",
         "/api/v1/analyses",
+        "/api/v1/experience-refinements",
         "/api/v1/sources/index",
         "/api/v1/projects/{project_id}/sources/{source_id}/index",
     }
     assert schema_ref(paths["/api/v1/analyses"]["post"], "200") == (
         "#/components/schemas/AnalysisResponse"
+    )
+    assert schema_ref(paths["/api/v1/experience-refinements"]["post"], "200") == (
+        "#/components/schemas/ExperienceRefinementResponse"
     )
     assert schema_ref(paths["/api/v1/sources/index"]["post"], "200") == (
         "#/components/schemas/SourceIndexResponse"
@@ -32,6 +36,7 @@ def test_openapi_exposes_shared_error_contract_for_internal_routes() -> None:
     paths = app.openapi()["paths"]
     operations = [
         paths["/api/v1/analyses"]["post"],
+        paths["/api/v1/experience-refinements"]["post"],
         paths["/api/v1/sources/index"]["post"],
         paths["/api/v1/projects/{project_id}/sources/{source_id}/index"]["delete"],
     ]
@@ -64,6 +69,9 @@ def test_openapi_freezes_shared_enum_values_and_limits() -> None:
         "maxItems"
     ] == 3
     assert components["AnalysisResponse"]["properties"]["questions"][
+        "maxItems"
+    ] == 2
+    assert components["ExperienceRefinementResponse"]["properties"]["questions"][
         "maxItems"
     ] == 2
 

@@ -96,8 +96,13 @@ class RecordingRagService:
         *,
         limit: int,
     ) -> List[DocumentChunk]:
-        del project_id, source_ids
-        return self.source_chunks[:limit]
+        del project_id
+        allowed_source_ids = set(source_ids)
+        return [
+            chunk
+            for chunk in self.source_chunks
+            if chunk.source_id in allowed_source_ids
+        ][:limit]
 
 
 class RecordingLLMProvider:
@@ -583,6 +588,54 @@ async def test_empty_semantic_retrieval_uses_new_source_chunks_without_forced_ma
     assert llm.grounded_input.chunks[0].chunk_id == fallback_chunk.chunk_id
     assert llm.grounded_input.chunks[0].retrieval_fallback is True
     assert llm.grounded_input.chunks[0].related_experience_ids == []
+
+
+@pytest.mark.asyncio
+async def test_partial_semantic_retrieval_adds_missing_source_fallback() -> None:
+    analysis_request = request()
+    first_source = analysis_request.documents[0]
+    second_source = DocumentSource(
+        source_id=uuid4(),
+        source_name="independent-project.pdf",
+        pages=[DocumentPage(page_number=1, text="별도 공익 AI 프로젝트를 개발했다.")],
+    )
+    analysis_request.documents.append(second_source)
+    first_result = result_for_source(first_source.source_id, distance=0.1)
+    second_fallback = DocumentChunk(
+        chunk_id=uuid4(),
+        source_id=second_source.source_id,
+        source_name=second_source.source_name,
+        sequence=0,
+        char_start=0,
+        char_end=19,
+        token_count=6,
+        text="별도 공익 AI 프로젝트를 개발했다.",
+    )
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.EXPERIENCE_DISCOVERY,
+                query="경험 발견",
+                chunks=[first_result],
+            )
+        ],
+        source_chunks=[second_fallback],
+    )
+    llm = RecordingLLMProvider(empty_response(analysis_request))
+
+    await AnalysisOrchestrator(rag, llm).analyze(analysis_request)
+
+    assert llm.grounded_input is not None
+    assert {chunk.source_id for chunk in llm.grounded_input.chunks} == {
+        first_source.source_id,
+        second_source.source_id,
+    }
+    fallback = next(
+        chunk
+        for chunk in llm.grounded_input.chunks
+        if chunk.source_id == second_source.source_id
+    )
+    assert fallback.retrieval_fallback is True
 
 
 @pytest.mark.asyncio

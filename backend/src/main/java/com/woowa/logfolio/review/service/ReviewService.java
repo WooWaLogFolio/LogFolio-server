@@ -7,10 +7,13 @@ import com.woowa.logfolio.review.repository.*;
 import com.woowa.logfolio.user.entity.User;
 import com.woowa.logfolio.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,11 +29,14 @@ public class ReviewService {
     private final GapAnswerRepository answerRepository;
     private final ExperienceService experienceService;
     private final UserService userService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SessionResponse startRefinement(UUID userId, UUID experienceId) {
         Experience experience = experienceService.findOwned(userId, experienceId);
-        return sessionResponse(sessionRepository.save(new ReviewSession(experience.getProject(), null)));
+        ReviewSession session = sessionRepository.save(new ReviewSession(experience.getProject(), null));
+        publishAfterCommit(new ReviewRefinementRequestedEvent(userId, session.getId(), experienceId));
+        return sessionResponse(session);
     }
 
     public SessionResponse session(UUID userId, UUID sessionId) {
@@ -84,6 +90,16 @@ public class ReviewService {
                 .stream().map(AnswerResponse::from).toList();
         return new QuestionResponse(question.getId(), question.getTargetSection(), question.getQuestion(),
                 question.getSuggestedAnswers(), question.getDisplayOrder(), answers);
+    }
+
+    private void publishAfterCommit(ReviewRefinementRequestedEvent event) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            eventPublisher.publishEvent(event);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { eventPublisher.publishEvent(event); }
+        });
     }
 
     public record SessionResponse(UUID id, UUID projectId, String status, LocalDateTime startedAt,

@@ -1,5 +1,5 @@
 import asyncio
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +10,7 @@ from logfolio_ai.core.errors import AppError
 from logfolio_ai.main import app, prepare_runtime
 from logfolio_ai.models import (
     AIUsageRecord,
+    AnalysisResponse,
     SourceIndexItem,
     SourceIndexResponse,
 )
@@ -34,6 +35,24 @@ def valid_analysis_payload() -> dict:
                 ],
             }
         ],
+    }
+
+
+def valid_refinement_payload() -> dict:
+    return {
+        "reviewSessionId": str(uuid4()),
+        "projectId": str(uuid4()),
+        "sourceIds": [str(uuid4())],
+        "experience": {
+            "experienceId": str(uuid4()),
+            "title": "기존 경험",
+            "summary": "기존 요약",
+            "claims": [
+                {"sectionType": "ACTION", "content": "기존 행동"},
+            ],
+            "evidenceIds": [],
+            "evidences": [],
+        },
     }
 
 
@@ -122,6 +141,41 @@ def test_fake_analysis_preserves_tracking_ids() -> None:
     assert body["aiUsage"]["taskType"] == "PROJECT_ANALYSIS"
     assert body["aiUsage"]["estimatedCostUsd"] is None
     assert body["aiUsage"]["estimatedCostKrw"] is None
+
+
+def test_experience_refinement_reuses_analysis_pipeline_without_persisting() -> None:
+    payload = valid_refinement_payload()
+
+    class RecordingOrchestrator:
+        request = None
+
+        async def analyze(self, request):
+            self.request = request
+            return AnalysisResponse(
+                analysis_run_id=request.analysis_run_id,
+                project_id=request.project_id,
+                summary="새로운 제안이 없습니다.",
+            )
+
+    orchestrator = RecordingOrchestrator()
+    app.dependency_overrides[get_analysis_orchestrator] = lambda: orchestrator
+    try:
+        response = client.post(
+            "/api/v1/experience-refinements",
+            json=payload,
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["reviewSessionId"] == payload["reviewSessionId"]
+    assert response.json()["experienceId"] == payload["experience"]["experienceId"]
+    assert response.json()["status"] == "NO_UPDATE"
+    assert response.json()["reviewItems"] == []
+    assert orchestrator.request.analysis_run_id == UUID(payload["reviewSessionId"])
+    assert orchestrator.request.existing_experiences[0].experience_id == UUID(
+        payload["experience"]["experienceId"]
+    )
 
 
 def test_validation_error_uses_shared_error_shape() -> None:

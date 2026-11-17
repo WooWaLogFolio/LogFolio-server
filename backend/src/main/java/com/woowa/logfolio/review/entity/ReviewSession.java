@@ -22,6 +22,9 @@ public class ReviewSession {
         id = UUID.randomUUID(); this.project = project; analysisRun = run; status = "IN_PROGRESS"; startedAt = LocalDateTime.now();
     }
     public void complete() { status = "COMPLETED"; completedAt = LocalDateTime.now(); }
+    public void reviewReady() { status = "REVIEW_READY"; }
+    public void finishWithoutReview() { status = "COMPLETED"; completedAt = LocalDateTime.now(); }
+    public void fail() { status = "FAILED"; completedAt = LocalDateTime.now(); }
     public UUID getId() { return id; }
     public Project getProject() { return project; }
     public String getStatus() { return status; }
