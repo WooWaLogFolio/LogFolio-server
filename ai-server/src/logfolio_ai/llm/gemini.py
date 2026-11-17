@@ -32,6 +32,7 @@ class GeminiLLMProvider:
         api_key: str,
         model: str,
         timeout_seconds: float,
+        fallback_model: Optional[str] = None,
         client: Optional[Any] = None,
         max_attempts: int = 3,
         privacy_redactor: Optional[PrivacyRedactor] = None,
@@ -47,6 +48,11 @@ class GeminiLLMProvider:
             client = genai.Client(api_key=api_key)
         self._client = client
         self._model = model
+        self._fallback_model = (
+            fallback_model.strip()
+            if fallback_model is not None and fallback_model.strip() != model
+            else None
+        )
         self._timeout_seconds = timeout_seconds
         self._max_attempts = max_attempts
         self._privacy_redactor = privacy_redactor or PrivacyRedactor()
@@ -79,15 +85,17 @@ class GeminiLLMProvider:
         prompt = build_grounded_analysis_prompt(provider_input)
         started = time.perf_counter()
         for attempt in range(1, self._max_attempts + 1):
+            attempt_model = self._model_for_attempt(attempt)
             try:
                 result, usage = await self._generate(
                     prompt,
                     request.analysis_run_id,
                     request.project_id,
+                    attempt_model,
                 )
                 self._last_call_metrics.set(LLMCallMetrics(
                     provider="gemini",
-                    model=self._model,
+                    model=attempt_model,
                     input_tokens=self._usage_value(usage, "prompt_token_count"),
                     cached_input_tokens=self._usage_value(
                         usage, "cached_content_token_count"
@@ -105,7 +113,7 @@ class GeminiLLMProvider:
                 if exc.code not in _RETRYABLE_CODES or attempt >= attempt_limit:
                     self._last_call_metrics.set(LLMCallMetrics(
                         provider="gemini",
-                        model=self._model,
+                        model=attempt_model,
                         latency_ms=max(
                             0, round((time.perf_counter() - started) * 1000)
                         ),
@@ -116,14 +124,23 @@ class GeminiLLMProvider:
                     raise
                 logger.warning(
                     "Retrying Gemini request after backoff: "
-                    "attempt=%d next_attempt=%d code=%s delay_seconds=%.3f",
+                    "attempt=%d next_attempt=%d code=%s current_model=%s "
+                    "next_model=%s delay_seconds=%.3f",
                     attempt,
                     attempt + 1,
                     exc.code,
+                    attempt_model,
+                    self._model_for_attempt(attempt + 1),
                     delay_seconds := self._retry_delay_seconds(attempt),
                 )
                 await self._sleep(delay_seconds)
         raise RuntimeError("unreachable")
+
+    def _model_for_attempt(self, attempt: int) -> str:
+        """Use the fast fallback after the primary model's first failure."""
+        if attempt > 1 and self._fallback_model is not None:
+            return self._fallback_model
+        return self._model
 
     def _attempt_limit(self, error_code: str) -> int:
         # A 503 means Gemini accepted the request path but is temporarily
@@ -152,13 +169,14 @@ class GeminiLLMProvider:
         prompt: str,
         analysis_run_id: Any,
         project_id: Any,
+        model: str,
     ) -> tuple[AnalysisResponse, Any]:
         from google.genai import types
 
         try:
             response = await asyncio.wait_for(
                 self._client.aio.models.generate_content(
-                    model=self._model,
+                    model=model,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_POLICY.strip(),
