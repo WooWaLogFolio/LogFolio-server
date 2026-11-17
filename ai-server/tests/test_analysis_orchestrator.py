@@ -6,7 +6,7 @@ import pytest
 from logfolio_ai.analysis import AnalysisOrchestrator
 from logfolio_ai.chunking import DocumentChunk
 from logfolio_ai.core.errors import AppError
-from logfolio_ai.llm import GroundedAnalysisInput
+from logfolio_ai.llm import GroundedAnalysisInput, LLMCallMetrics
 from logfolio_ai.models import (
     AnalysisRequest,
     AnalysisResponse,
@@ -106,9 +106,23 @@ class RecordingRagService:
 
 
 class RecordingLLMProvider:
-    def __init__(self, response: AnalysisResponse) -> None:
+    def __init__(
+        self,
+        response: AnalysisResponse,
+        *,
+        model: Optional[str] = None,
+    ) -> None:
         self.response = response
         self.grounded_input: Optional[GroundedAnalysisInput] = None
+        self.last_call_metrics = (
+            LLMCallMetrics(
+                provider="test",
+                model=model,
+                latency_ms=0,
+            )
+            if model is not None
+            else None
+        )
 
     async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
         raise AssertionError("orchestrator must not send the raw request to the LLM")
@@ -534,13 +548,68 @@ async def test_orchestrator_rebuilds_evidence_from_trusted_chunk() -> None:
 
     result = await AnalysisOrchestrator(
         rag,
-        RecordingLLMProvider(response),
+        RecordingLLMProvider(response, model="gemini-3.5-flash-lite"),
     ).analyze(analysis_request)
 
     evidence = result.candidates[0].claims[0].evidences[0]
     assert evidence.chunk_id == retrieved.chunk_id
     assert evidence.source_id == retrieved.source_id
     assert evidence.page_number == retrieved.page_number
+    assert evidence.excerpt == retrieved.text
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_replaces_paraphrased_quote_with_trusted_chunk() -> None:
+    analysis_request = request()
+    retrieved = search_result()
+    provider_claim = Claim(
+        section_type="ACTION",
+        content="JWT 인증 API를 구현했다.",
+        subject_type=SubjectType.TEAM,
+        provenance_type=ProvenanceType.SOURCE_EXTRACTED,
+        verification_status=VerificationStatus.VERIFIED,
+        evidence_type=EvidenceType.DIRECT,
+        evidences=[
+            Evidence(
+                source_id=retrieved.source_id,
+                chunk_id=retrieved.chunk_id,
+                page_number=retrieved.page_number,
+                excerpt="Implemented an authentication endpoint.",
+            )
+        ],
+        requires_user_confirmation=False,
+    )
+    response = AnalysisResponse(
+        analysis_run_id=analysis_request.analysis_run_id,
+        project_id=analysis_request.project_id,
+        summary="근거 기반 분석",
+        candidates=[
+            ExperienceCandidate(
+                candidate_id=uuid4(),
+                title="인증 구현",
+                summary="JWT 인증 구현 경험",
+                claims=[provider_claim],
+            )
+        ],
+    )
+    rag = RecordingRagService(
+        [
+            RetrievalContext(
+                purpose=AnalysisPurpose.USER_CONTRIBUTION,
+                query="기여",
+                chunks=[retrieved],
+            )
+        ]
+    )
+
+    result = await AnalysisOrchestrator(
+        rag,
+        RecordingLLMProvider(response, model="gemini-3.5-flash-lite"),
+    ).analyze(analysis_request)
+
+    assert len(result.candidates) == 1
+    evidence = result.candidates[0].claims[0].evidences[0]
+    assert evidence.chunk_id == retrieved.chunk_id
     assert evidence.excerpt == retrieved.text
 
 
