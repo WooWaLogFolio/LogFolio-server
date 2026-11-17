@@ -183,6 +183,8 @@ class AnalysisOrchestrator:
     def _ground_claim_evidence(
         claim,
         chunks: Dict[UUID, GroundedChunk],
+        *,
+        allow_chunk_quote_repair: bool = False,
     ):
         """Replace provider-authored Evidence metadata with trusted Chunk data.
 
@@ -207,9 +209,20 @@ class AnalysisOrchestrator:
                 return None, repaired_count
             quote_pattern = r"\s+".join(re.escape(part) for part in excerpt_parts)
             quote_match = re.search(quote_pattern, source.text)
-            if quote_match is None:
+            # Smaller fallback models occasionally translate or summarize an
+            # Evidence quote even though they selected a valid retrieved
+            # chunk. The provider is not authoritative for quote text: once a
+            # supplied chunkId is selected, rebuild the quote from the trusted
+            # retrieval payload instead of discarding the whole candidate.
+            # Unknown chunkIds are still rejected above, so a model cannot
+            # attach arbitrary or cross-project evidence.
+            if quote_match is None and not allow_chunk_quote_repair:
                 return None, repaired_count
-            trusted_excerpt = quote_match.group(0)
+            trusted_excerpt = (
+                quote_match.group(0) if quote_match is not None else source.text.strip()
+            )
+            if not trusted_excerpt:
+                return None, repaired_count
             trusted = evidence.model_copy(
                 update={
                     "source_id": source.source_id,
@@ -229,6 +242,8 @@ class AnalysisOrchestrator:
         self,
         response: AnalysisResponse,
         grounded_chunks: List[GroundedChunk],
+        *,
+        allow_chunk_quote_repair: bool = False,
     ) -> AnalysisResponse:
         chunks = {chunk.chunk_id: chunk for chunk in grounded_chunks}
         candidates = []
@@ -241,6 +256,7 @@ class AnalysisOrchestrator:
                 grounded_claim, repaired_count = self._ground_claim_evidence(
                     claim,
                     chunks,
+                    allow_chunk_quote_repair=allow_chunk_quote_repair,
                 )
                 repaired_evidence_count += repaired_count
                 if grounded_claim is not None:
@@ -528,6 +544,10 @@ class AnalysisOrchestrator:
                 exc.ai_usage = self._usage_cost_calculator.build_record(metrics)
             raise
         generated_at = time.perf_counter()
+        metrics = getattr(self._llm_provider, "last_call_metrics", None)
+        used_flash_lite = bool(
+            metrics is not None and "flash-lite" in metrics.model.lower()
+        )
         self._validate_conflict_references(response, provider_input)
         existing_ids = {
             experience.experience_id for experience in request.existing_experiences
@@ -557,13 +577,13 @@ class AnalysisOrchestrator:
         grounded_response = self._filter_invalid_evidence(
             response,
             provider_input.chunks,
+            allow_chunk_quote_repair=used_flash_lite,
         )
         validated = self._policy_validator.validate(
             grounded_response,
             user_answers=request.answers,
             corrections=request.corrections,
         )
-        metrics = getattr(self._llm_provider, "last_call_metrics", None)
         ai_usage = (
             self._usage_cost_calculator.build_record(metrics)
             if metrics is not None
