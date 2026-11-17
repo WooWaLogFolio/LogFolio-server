@@ -347,6 +347,47 @@ async def test_gemini_provider_backs_off_before_retrying_transient_503() -> None
 
 
 @pytest.mark.asyncio
+async def test_gemini_provider_switches_to_fallback_after_primary_timeout() -> None:
+    request = grounded_request()
+    valid_response = json.dumps(
+        {
+            "analysisRunId": str(uuid4()),
+            "projectId": str(uuid4()),
+            "summary": "빠른 모델로 분석 완료",
+            "candidates": [],
+            "questions": [],
+        }
+    )
+    generate_content = AsyncMock(
+        side_effect=[
+            asyncio.TimeoutError,
+            SimpleNamespace(text=valid_response),
+        ]
+    )
+    sleep = AsyncMock()
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider(
+        "test-key",
+        "gemini-3.8-flash",
+        14,
+        fallback_model="gemini-3.5-flash-lite",
+        client=client,
+        sleep=sleep,
+    )
+
+    result = await provider.analyze_grounded(request)
+
+    assert result.summary == "빠른 모델로 분석 완료"
+    assert [
+        call.kwargs["model"] for call in generate_content.await_args_list
+    ] == ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
+    assert provider.last_call_metrics.model == "gemini-3.5-flash-lite"
+    assert provider.last_call_metrics.retry_count == 1
+
+
+@pytest.mark.asyncio
 async def test_gemini_provider_retries_transient_503_up_to_three_attempts() -> None:
     class ServiceUnavailableError(Exception):
         status_code = 503
