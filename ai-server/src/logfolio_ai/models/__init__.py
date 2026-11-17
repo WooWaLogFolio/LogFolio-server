@@ -32,6 +32,12 @@ from logfolio_ai.models.enums import (
     VerificationStatus,
 )
 from logfolio_ai.models.usage import AIUsageRecord, LLMCallMetrics
+from logfolio_ai.models.refinement import (
+    ExperienceRefinementRequest,
+    ExperienceRefinementResponse,
+    RefinementReviewItem,
+    RefinementStatus,
+)
 
 __all__ = [
     "AnalysisRequest",
@@ -65,4 +71,8 @@ __all__ = [
     "UserCorrection",
     "UserAnswer",
     "VerificationStatus",
+    "ExperienceRefinementRequest",
+    "ExperienceRefinementResponse",
+    "RefinementReviewItem",
+    "RefinementStatus",
 ]
