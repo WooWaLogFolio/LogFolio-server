@@ -322,6 +322,42 @@ class AnalysisOrchestrator:
             for chunk in source_chunks
         ]
 
+    def _ensure_source_coverage(
+        self,
+        grounded_chunks: List[GroundedChunk],
+        fallback_chunks: List[GroundedChunk],
+        required_source_ids: List[UUID],
+    ) -> List[GroundedChunk]:
+        """Keep at least one available Chunk per requested Source in LLM context."""
+
+        combined = list(grounded_chunks)
+        known_chunk_ids = {chunk.chunk_id for chunk in combined}
+        combined.extend(
+            chunk for chunk in fallback_chunks if chunk.chunk_id not in known_chunk_ids
+        )
+
+        selected: List[GroundedChunk] = []
+        selected_chunk_ids = set()
+        for source_id in dict.fromkeys(required_source_ids):
+            representative = next(
+                (chunk for chunk in combined if chunk.source_id == source_id),
+                None,
+            )
+            if representative is None:
+                continue
+            selected.append(representative)
+            selected_chunk_ids.add(representative.chunk_id)
+            if len(selected) >= self._max_grounded_chunks:
+                return selected
+
+        for chunk in combined:
+            if chunk.chunk_id in selected_chunk_ids:
+                continue
+            selected.append(chunk)
+            if len(selected) >= self._max_grounded_chunks:
+                break
+        return selected
+
     async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
         started_at = time.perf_counter()
         if request.documents:
@@ -362,31 +398,41 @@ class AnalysisOrchestrator:
         )
         retrieved_at = time.perf_counter()
         grounded_chunks = self._build_grounded_chunks(contexts, source_ids)
-        if not grounded_chunks:
+        covered_source_ids = {chunk.source_id for chunk in grounded_chunks}
+        missing_source_ids = [
+            source_id for source_id in source_ids if source_id not in covered_source_ids
+        ]
+        fallback_chunks: List[GroundedChunk] = []
+        for source_id in missing_source_ids:
             source_chunks = await self._rag_service.retrieve_source_chunks(
                 request.project_id,
-                source_ids,
-                limit=self._max_grounded_chunks,
+                [source_id],
+                limit=min(3, self._max_grounded_chunks),
             )
-            grounded_chunks = self._build_source_fallback_chunks(source_chunks)
-            if not grounded_chunks:
-                logger.info(
-                    "Analysis stopped without retrieval evidence: project_id=%s sources=%d",
-                    request.project_id,
-                    len(source_ids),
-                )
-                return AnalysisResponse(
-                    analysis_run_id=request.analysis_run_id,
-                    project_id=request.project_id,
-                    input_source_ids=source_ids,
-                    referenced_source_ids=[],
-                    summary="검색 가능한 새 Source 근거가 없습니다.",
-                    candidates=[],
-                    questions=[],
-                    no_update_reason=(
-                        "요청한 Source가 아직 인덱싱되지 않았거나 검색 가능한 텍스트가 없습니다."
-                    ),
-                )
+            fallback_chunks.extend(self._build_source_fallback_chunks(source_chunks))
+        grounded_chunks = self._ensure_source_coverage(
+            grounded_chunks,
+            fallback_chunks,
+            source_ids,
+        )
+        if not grounded_chunks:
+            logger.info(
+                "Analysis stopped without retrieval evidence: project_id=%s sources=%d",
+                request.project_id,
+                len(source_ids),
+            )
+            return AnalysisResponse(
+                analysis_run_id=request.analysis_run_id,
+                project_id=request.project_id,
+                input_source_ids=source_ids,
+                referenced_source_ids=[],
+                summary="검색 가능한 새 Source 근거가 없습니다.",
+                candidates=[],
+                questions=[],
+                no_update_reason=(
+                    "요청한 Source가 아직 인덱싱되지 않았거나 검색 가능한 텍스트가 없습니다."
+                ),
+            )
         existing_contexts = await self._rag_service.retrieve_related_experience_context(
             request.project_id,
             source_ids,
