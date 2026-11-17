@@ -89,6 +89,35 @@ public class AiServerClient {
         }
     }
 
+    /** Calls the private FastAPI endpoint that refines one existing Experience. */
+    public JsonNode refineExperience(Map<String, Object> request) {
+        if (!properties.enabled()) {
+            throw new IllegalStateException("AI server integration is disabled");
+        }
+        try {
+            JsonNode response = aiRestClient.post()
+                    .uri("/api/v1/experience-refinements")
+                    .header(INTERNAL_API_KEY_HEADER, requiredApiKey())
+                    .body(request)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (httpRequest, httpResponse) -> {
+                        throw new AiServerException(
+                                "AI 경험 다듬기 요청이 실패했습니다: "
+                                        + httpResponse.getStatusCode() + " - " + errorBody(httpResponse),
+                                httpResponse.getStatusCode().is5xxServerError(), null);
+                    })
+                    .body(JsonNode.class);
+            if (response == null) {
+                throw new AiServerException("AI 경험 다듬기 응답이 비어 있습니다.", true, null);
+            }
+            return response;
+        } catch (AiServerException exception) {
+            throw exception;
+        } catch (RestClientException exception) {
+            throw new AiServerException("AI 서버에 연결하지 못했습니다.", true, exception);
+        }
+    }
+
     public void deleteSourceIndex(UUID projectId, UUID sourceId) {
         if (!properties.enabled()) return;
         try {

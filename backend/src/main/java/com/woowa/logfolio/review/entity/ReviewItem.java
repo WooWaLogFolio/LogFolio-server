@@ -21,6 +21,16 @@ public class ReviewItem {
     @Column(name = "display_order", nullable = false) private int displayOrder;
     @Column(name = "reviewed_at") private LocalDateTime reviewedAt;
     protected ReviewItem() {}
+    public ReviewItem(ReviewSession reviewSession, Experience experience, String itemType,
+                      String proposedContent, int displayOrder) {
+        this.id = UUID.randomUUID();
+        this.reviewSession = reviewSession;
+        this.experience = experience;
+        this.itemType = itemType;
+        this.proposedContent = proposedContent;
+        this.decision = "PENDING";
+        this.displayOrder = displayOrder;
+    }
     public void decide(String decision, String confirmedContent) { this.decision = decision; this.confirmedContent = confirmedContent; reviewedAt = LocalDateTime.now(); }
     public UUID getId() { return id; }
     public ReviewSession getReviewSession() { return reviewSession; }
