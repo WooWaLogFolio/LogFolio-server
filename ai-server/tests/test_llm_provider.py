@@ -388,7 +388,7 @@ async def test_gemini_provider_switches_to_fallback_after_primary_timeout() -> N
 
 
 @pytest.mark.asyncio
-async def test_gemini_provider_retries_transient_503_up_to_three_attempts() -> None:
+async def test_gemini_provider_alternates_models_for_three_503_attempts() -> None:
     class ServiceUnavailableError(Exception):
         status_code = 503
 
@@ -415,8 +415,9 @@ async def test_gemini_provider_retries_transient_503_up_to_three_attempts() -> N
     )
     provider = GeminiLLMProvider(
         "test-key",
-        "test-model",
+        "gemini-3.8-flash",
         14,
+        fallback_model="gemini-3.5-flash-lite",
         client=client,
         retry_base_delay_seconds=2,
         retry_max_delay_seconds=8,
@@ -429,7 +430,15 @@ async def test_gemini_provider_retries_transient_503_up_to_three_attempts() -> N
 
     assert result.summary == "세 번째 요청에서 정상 응답"
     assert generate_content.await_count == 3
+    assert [
+        call.kwargs["model"] for call in generate_content.await_args_list
+    ] == [
+        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.8-flash",
+    ]
     assert [call.args[0] for call in sleep.await_args_list] == [2.5, 4.5]
+    assert provider.last_call_metrics.model == "gemini-3.8-flash"
     assert provider.last_call_metrics.retry_count == 2
 
 

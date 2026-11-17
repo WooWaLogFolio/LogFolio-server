@@ -137,8 +137,8 @@ class GeminiLLMProvider:
         raise RuntimeError("unreachable")
 
     def _model_for_attempt(self, attempt: int) -> str:
-        """Use the fast fallback after the primary model's first failure."""
-        if attempt > 1 and self._fallback_model is not None:
+        """Alternate primary and fallback so a busy fallback is not retried twice."""
+        if attempt % 2 == 0 and self._fallback_model is not None:
             return self._fallback_model
         return self._model
 
