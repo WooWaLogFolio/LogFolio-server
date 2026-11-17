@@ -33,7 +33,7 @@ class GeminiLLMProvider:
         model: str,
         timeout_seconds: float,
         client: Optional[Any] = None,
-        max_attempts: int = 2,
+        max_attempts: int = 3,
         privacy_redactor: Optional[PrivacyRedactor] = None,
         retry_base_delay_seconds: float = 2.0,
         retry_max_delay_seconds: float = 8.0,
@@ -101,7 +101,8 @@ class GeminiLLMProvider:
                 ))
                 return result
             except AppError as exc:
-                if exc.code not in _RETRYABLE_CODES or attempt >= self._max_attempts:
+                attempt_limit = self._attempt_limit(exc.code)
+                if exc.code not in _RETRYABLE_CODES or attempt >= attempt_limit:
                     self._last_call_metrics.set(LLMCallMetrics(
                         provider="gemini",
                         model=self._model,
@@ -123,6 +124,15 @@ class GeminiLLMProvider:
                 )
                 await self._sleep(delay_seconds)
         raise RuntimeError("unreachable")
+
+    def _attempt_limit(self, error_code: str) -> int:
+        # A 503 means Gemini accepted the request path but is temporarily
+        # overloaded. Give that transient condition one additional chance while
+        # keeping timeouts, malformed output, and other failures at the existing
+        # two-attempt policy so they cannot unnecessarily extend the request.
+        if error_code == "GEMINI_UNAVAILABLE":
+            return self._max_attempts
+        return min(self._max_attempts, 2)
 
     def _retry_delay_seconds(self, failed_attempt: int) -> float:
         exponential_delay = min(

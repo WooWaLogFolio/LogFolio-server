@@ -345,6 +345,72 @@ async def test_gemini_provider_backs_off_before_retrying_transient_503() -> None
 
 
 @pytest.mark.asyncio
+async def test_gemini_provider_retries_transient_503_up_to_three_attempts() -> None:
+    class ServiceUnavailableError(Exception):
+        status_code = 503
+
+    request = grounded_request()
+    valid_response = json.dumps(
+        {
+            "analysisRunId": str(uuid4()),
+            "projectId": str(uuid4()),
+            "summary": "세 번째 요청에서 정상 응답",
+            "candidates": [],
+            "questions": [],
+        }
+    )
+    generate_content = AsyncMock(
+        side_effect=[
+            ServiceUnavailableError("high demand"),
+            ServiceUnavailableError("high demand"),
+            SimpleNamespace(text=valid_response),
+        ]
+    )
+    sleep = AsyncMock()
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider(
+        "test-key",
+        "test-model",
+        14,
+        client=client,
+        retry_base_delay_seconds=2,
+        retry_max_delay_seconds=8,
+        retry_jitter_seconds=1,
+        sleep=sleep,
+        random_uniform=lambda _start, _end: 0.5,
+    )
+
+    result = await provider.analyze_grounded(request)
+
+    assert result.summary == "세 번째 요청에서 정상 응답"
+    assert generate_content.await_count == 3
+    assert [call.args[0] for call in sleep.await_args_list] == [2.5, 4.5]
+    assert provider.last_call_metrics.retry_count == 2
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_keeps_timeout_at_two_attempts() -> None:
+    generate_content = AsyncMock(side_effect=asyncio.TimeoutError)
+    sleep = AsyncMock()
+    client = SimpleNamespace(
+        aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    )
+    provider = GeminiLLMProvider(
+        "test-key", "test-model", 14, client=client, sleep=sleep
+    )
+
+    with pytest.raises(AppError) as error:
+        await provider.analyze_grounded(grounded_request())
+
+    assert error.value.code == "LLM_TIMEOUT"
+    assert generate_content.await_count == 2
+    assert sleep.await_count == 1
+    assert provider.last_call_metrics.retry_count == 1
+
+
+@pytest.mark.asyncio
 async def test_gemini_provider_does_not_retry_non_transient_4xx() -> None:
     class InvalidRequestError(Exception):
         status_code = 400
