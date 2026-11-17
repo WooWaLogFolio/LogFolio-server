@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from collections import Counter
 from typing import Dict, List, Optional, Tuple
@@ -179,26 +180,50 @@ class AnalysisOrchestrator:
                 )
 
     @staticmethod
-    def _is_valid_evidence(
+    def _ground_claim_evidence(
         claim,
         chunks: Dict[UUID, GroundedChunk],
-    ) -> bool:
+    ):
+        """Replace provider-authored Evidence metadata with trusted Chunk data.
+
+        The provider is allowed to select a supplied chunk, but it is not the
+        authority for source metadata or whitespace. Rebuilding Evidence from
+        the selected chunk prevents PDF line wrapping from discarding an
+        otherwise exact quote. Semantic changes, translations, and unknown
+        chunkIds are still rejected so unrelated claims cannot borrow a chunk.
+        """
+        if not claim.evidences:
+            return claim, 0
+
+        grounded_evidences = []
+        repaired_count = 0
         for evidence in claim.evidences:
             source = chunks.get(evidence.chunk_id)
-            if (
-                source is None
-                or source.source_id != evidence.source_id
-                or source.source_type != evidence.source_type
-            ):
-                return False
-            if evidence.excerpt not in source.text:
-                return False
-            if (
-                evidence.page_number is not None
-                and evidence.page_number != source.page_number
-            ):
-                return False
-        return True
+            if source is None:
+                return None, repaired_count
+
+            excerpt_parts = evidence.excerpt.split()
+            if not excerpt_parts:
+                return None, repaired_count
+            quote_pattern = r"\s+".join(re.escape(part) for part in excerpt_parts)
+            quote_match = re.search(quote_pattern, source.text)
+            if quote_match is None:
+                return None, repaired_count
+            trusted_excerpt = quote_match.group(0)
+            trusted = evidence.model_copy(
+                update={
+                    "source_id": source.source_id,
+                    "source_type": source.source_type,
+                    "chunk_id": source.chunk_id,
+                    "page_number": source.page_number,
+                    "excerpt": trusted_excerpt,
+                }
+            )
+            if trusted != evidence:
+                repaired_count += 1
+            grounded_evidences.append(trusted)
+
+        return claim.model_copy(update={"evidences": grounded_evidences}), repaired_count
 
     def _filter_invalid_evidence(
         self,
@@ -209,12 +234,17 @@ class AnalysisOrchestrator:
         candidates = []
         removed_candidate_ids = set()
         removed_claim_count = 0
+        repaired_evidence_count = 0
         for candidate in response.candidates:
-            valid_claims = [
-                claim
-                for claim in candidate.claims
-                if self._is_valid_evidence(claim, chunks)
-            ]
+            valid_claims = []
+            for claim in candidate.claims:
+                grounded_claim, repaired_count = self._ground_claim_evidence(
+                    claim,
+                    chunks,
+                )
+                repaired_evidence_count += repaired_count
+                if grounded_claim is not None:
+                    valid_claims.append(grounded_claim)
             removed_claim_count += len(candidate.claims) - len(valid_claims)
             if candidate.claims and not valid_claims:
                 removed_candidate_ids.add(candidate.candidate_id)
@@ -264,6 +294,11 @@ class AnalysisOrchestrator:
                 "Invalid AI evidence filtered: claims=%d candidates=%d",
                 removed_claim_count,
                 len(removed_candidate_ids),
+            )
+        if repaired_evidence_count:
+            logger.info(
+                "AI evidence grounded from trusted chunks: evidences=%d",
+                repaired_evidence_count,
             )
         return filtered
 
