@@ -169,7 +169,13 @@ class GeminiLLMProvider:
                         # ``additionalProperties`` constraints as INVALID_ARGUMENT.
                         # The trusted prompt supplies the JSON Schema instead; the
                         # response is still validated by AnalysisResponse below.
-                        temperature=0.1,
+                        # Gemini 3.8 Flash defaults to medium thinking, which can
+                        # spend most of our request deadline on reasoning. This
+                        # extraction task favors predictable latency over deep
+                        # deliberation, so explicitly use the supported low level.
+                        thinking_config=types.ThinkingConfig(
+                            thinking_level="low"
+                        ),
                     ),
                 ),
                 timeout=self._timeout_seconds,

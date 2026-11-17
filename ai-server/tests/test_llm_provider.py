@@ -130,6 +130,8 @@ async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     assert call["config"].system_instruction == SYSTEM_POLICY.strip()
     assert call["config"].response_schema is None
     assert call["config"].response_json_schema is None
+    assert call["config"].thinking_config.thinking_level.value == "LOW"
+    assert call["config"].temperature is None
     assert "TRUSTED_OUTPUT_JSON_SCHEMA" in call["contents"]
     assert "analysisRunId" in call["contents"]
 
