@@ -70,7 +70,25 @@ jobs:
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            docker image prune -af
+            set -u
+            echo "Disk usage before cleanup:"
+            df -h /
+
+            # Docker/Containerd GC also needs a small amount of free space to
+            # update its metadata. Reclaim OS-managed caches first so GC can
+            # run even when the root filesystem starts completely full.
+            sudo -n journalctl --vacuum-size=50M || true
+            sudo -n apt-get clean || true
+
+            # Preserve running services and every named volume (notably the
+            # PostgreSQL volume). Only stopped containers, build cache, and
+            # images unused by running containers are eligible for deletion.
+            docker container prune -f || true
+            docker builder prune -af || true
+            docker image prune -af || true
+
+            echo "Disk usage after cleanup:"
+            df -h /
 
       # Keep version-controlled runtime files in sync without ever copying .env,
       # which contains production-only secrets on the EC2 instance.
