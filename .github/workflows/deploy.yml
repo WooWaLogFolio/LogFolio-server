@@ -16,6 +16,7 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/woowalogfolio/logfolio-backend
   AI_IMAGE: ghcr.io/woowalogfolio/logfolio-ai
+  GEMINI_MODEL: gemini-3.8-flash
 
 jobs:
   test:
@@ -112,6 +113,9 @@ jobs:
           script: |
             cd /opt/logfolio/deploy
             export IMAGE_TAG=${{ github.sha }}
+            # Keep the production model version-controlled. An exported value
+            # takes precedence over the older GEMINI_MODEL in the EC2 .env.
+            export GEMINI_MODEL=${{ env.GEMINI_MODEL }}
             # Free old, unused image layers before pulling the next release.
             # Running containers and named volumes (including PostgreSQL data)
             # are preserved. Pruning only after deployment is too late when the
