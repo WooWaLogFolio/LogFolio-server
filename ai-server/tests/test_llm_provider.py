@@ -60,6 +60,12 @@ def test_factory_rejects_gemini_without_api_key() -> None:
     assert error.value.code == "LLM_CONFIGURATION_ERROR"
 
 
+def test_system_policy_requires_korean_user_facing_output() -> None:
+    assert "Write every user-facing natural-language value in Korean" in SYSTEM_POLICY
+    assert "Evidence excerpts are exact source quotations" in SYSTEM_POLICY
+    assert "never translate or paraphrase an Evidence excerpt" in SYSTEM_POLICY
+
+
 @pytest.mark.asyncio
 async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     request = grounded_request()
@@ -372,7 +378,7 @@ async def test_gemini_provider_switches_to_fallback_after_primary_timeout() -> N
         "test-key",
         "gemini-3.8-flash",
         14,
-        fallback_model="gemini-3.5-flash-lite",
+        fallback_model="gemini-3.6-flash",
         client=client,
         sleep=sleep,
     )
@@ -382,8 +388,8 @@ async def test_gemini_provider_switches_to_fallback_after_primary_timeout() -> N
     assert result.summary == "빠른 모델로 분석 완료"
     assert [
         call.kwargs["model"] for call in generate_content.await_args_list
-    ] == ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
-    assert provider.last_call_metrics.model == "gemini-3.5-flash-lite"
+    ] == ["gemini-3.8-flash", "gemini-3.6-flash"]
+    assert provider.last_call_metrics.model == "gemini-3.6-flash"
     assert provider.last_call_metrics.retry_count == 1
 
 
@@ -417,7 +423,7 @@ async def test_gemini_provider_alternates_models_for_three_503_attempts() -> Non
         "test-key",
         "gemini-3.8-flash",
         14,
-        fallback_model="gemini-3.5-flash-lite",
+        fallback_model="gemini-3.6-flash",
         client=client,
         retry_base_delay_seconds=2,
         retry_max_delay_seconds=8,
@@ -434,7 +440,7 @@ async def test_gemini_provider_alternates_models_for_three_503_attempts() -> Non
         call.kwargs["model"] for call in generate_content.await_args_list
     ] == [
         "gemini-3.8-flash",
-        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
         "gemini-3.8-flash",
     ]
     assert [call.args[0] for call in sleep.await_args_list] == [2.5, 4.5]

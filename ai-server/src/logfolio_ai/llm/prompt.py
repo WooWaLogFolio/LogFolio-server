@@ -22,6 +22,12 @@ Return only data that satisfies the trusted output JSON schema. Return at most t
 candidates and at most two questions. Quotes must be exact excerpts from the source text.
 Each question must use the related returned candidateId. Use null only when the evidence is
 too weak to create any candidate for that question.
+Write every user-facing natural-language value in Korean, regardless of the language of the
+source documents. This includes the analysis summary, candidate titles and summaries, Claim
+content, questions, suggested answers, information-need reasons, no-update reasons, conflict
+explanations, and policy messages. Keep identifiers, Enum values, code, product names, and proper
+nouns unchanged. Evidence excerpts are exact source quotations and must remain in the original
+source language; never translate or paraphrase an Evidence excerpt.
 Compare new Source chunks with existingExperiences and corrections. Classify each proposed
 candidate as EXISTING_UPDATE or NEW_EXPERIENCE. EXISTING_UPDATE must reference one supplied
 targetExperienceId. Separate two kinds of insufficient information:
