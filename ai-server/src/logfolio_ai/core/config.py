@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, ge=1, le=65535)
     llm_provider: Literal["fake", "gemini"] = "fake"
     gemini_api_key: Optional[SecretStr] = None
-    gemini_model: str = "gemini-3.5-flash"
-    gemini_fallback_model: Optional[str] = "gemini-3.5-flash-lite"
+    gemini_model: str = "gemini-3.8-flash"
+    gemini_fallback_model: Optional[str] = "gemini-3.6-flash"
     # A production Gemini request can take longer than the short local default.
     # The analysis timeout must accommodate the configured two-attempt retry policy.
     llm_timeout_seconds: float = Field(default=45.0, gt=0, le=120)

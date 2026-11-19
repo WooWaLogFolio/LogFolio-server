@@ -409,7 +409,8 @@ Gemini를 사용할 때만 로컬 `.env` 또는 배포 환경의 Secret에 다�
 ```bash
 LOGFOLIO_AI_LLM_PROVIDER=gemini
 LOGFOLIO_AI_GEMINI_API_KEY=your-api-key
-LOGFOLIO_AI_GEMINI_MODEL=gemini-3.5-flash
+LOGFOLIO_AI_GEMINI_MODEL=gemini-3.8-flash
+LOGFOLIO_AI_GEMINI_FALLBACK_MODEL=gemini-3.6-flash
 LOGFOLIO_AI_LLM_TIMEOUT_SECONDS=45
 LOGFOLIO_AI_ANALYSIS_TIMEOUT_SECONDS=110
 LOGFOLIO_AI_LLM_RETRY_BASE_DELAY_SECONDS=2
@@ -492,9 +493,9 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile e5-
 
 ### Gemini free-tier validation
 
-개발 단계에서는 `gemini-3.5-flash` 무료 티어와 비식별 합성 자료만 사용합니다. 무료 티어로 전송한 콘텐츠는 Google 제품 개선에 사용될 수 있으므로 실제 사용자 파일, 개인정보와 회사 비공개 자료를 보내지 않습니다. 운영 환경은 별도의 유료 프로젝트와 Secret으로 분리해야 합니다.
+운영 환경은 유료 Gemini 프로젝트와 전용 Secret을 사용하며, 기본 모델은 `gemini-3.8-flash`, 일시적인 장애 시 대체 모델은 `gemini-3.6-flash`입니다. 개발 환경에서는 비식별 합성 자료만 사용하고 실제 사용자 파일, 개인정보와 회사 비공개 자료를 전송하지 않습니다.
 
-모델은 `GEMINI_MODEL` 환경변수로 교체할 수 있습니다. 예를 들어 `gemini-3.8-flash`가 안정화되면 코드 변경 없이 해당 모델로 전환할 수 있습니다.
+기본 모델과 대체 모델은 각각 `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL` 환경변수로 교체할 수 있습니다.
 
 `deploy/.env`에 Google AI Studio에서 발급한 개발용 키를 직접 입력합니다. 실제 키는 Git, 문서, 메신저 또는 실행 로그에 남기지 않습니다.
 
