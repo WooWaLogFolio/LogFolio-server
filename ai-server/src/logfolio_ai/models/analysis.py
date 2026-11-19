@@ -186,8 +186,21 @@ class ExperienceCandidate(ContractModel):
     conflict: bool = False
     conflicts: List[ConflictDetail] = Field(default_factory=list, max_length=10)
     title: str = Field(min_length=1, max_length=255)
-    summary: str = Field(min_length=1)
-    claims: List[Claim] = Field(default_factory=list)
+    summary: str = Field(
+        min_length=1,
+        description=(
+            "Self-contained Korean experience summary preserving all evidence-supported "
+            "context, action or decision, and result; detail must not shrink when multiple "
+            "Sources or candidates are analyzed."
+        ),
+    )
+    claims: List[Claim] = Field(
+        default_factory=list,
+        description=(
+            "Evidence-grounded draft fields. Include every supported core section and "
+            "combine facts that belong to the same section into one coherent Claim."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_result_mapping(self) -> "ExperienceCandidate":

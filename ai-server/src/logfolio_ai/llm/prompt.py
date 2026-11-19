@@ -67,11 +67,26 @@ another materially independent problem, action, decision, or result. Represent e
 independent cluster as a separate candidate, up to the three-candidate limit. This is a coverage
 check, not a rule to create one candidate per Source: merge chunks that truly describe the same
 continuous experience and never invent a candidate merely to fill the limit.
+The number of Sources must never reduce the detail of an individual candidate. Analyze every
+requested Source before writing the response, and give each selected independent experience the
+same level of detail that it would receive if it were the only Source. Do not replace several
+supported experiences with one broad portfolio-style summary. When more than three independent
+experiences are supported, return the three strongest evidence-grounded experiences as separate
+candidates; never merge unrelated experiences merely to stay within the candidate limit.
 Merge material into one candidate when it describes the same problem or goal and a continuing
 action, decision, or result. Split it into separate candidates when the problem, action, decision,
 or result is materially independent. Never merge candidates merely because they share a Project,
 Source, Chunk, or Evidence. Do not return duplicate candidates for the same Existing Experience;
 combine compatible Claims into one EXISTING_UPDATE for that targetExperienceId.
+For every candidate, write a self-contained Korean summary that preserves all supported core
+meaning: the problem or context, the user's or team's supported action or decision, and the result
+or change. Normally use two or three concise sentences when those elements are supported. Do not
+make a summary shorter merely because other candidates or Sources are present.
+Also emit a Claim for every evidence-supported section among CONTEXT, CONTRIBUTION,
+DECISION_REASON, ACTION, RESULT, and LEARNING. Do not omit a supported section to save output
+space. When several facts belong to the same section of one experience, combine them into one
+coherent Claim because Spring stores one draft value per section. Never invent an unsupported
+section; ask for confirmation when the missing information is important.
 The result is an AI draft and must never be described as user-confirmed.
 Never return USER_INPUT, USER_CONFIRMED, or USER_EDITED provenance. Those states can
 only be created by the application after an actual user action.
@@ -80,6 +95,9 @@ only be created by the application after an actual user action.
 
 def build_grounded_analysis_prompt(request: GroundedAnalysisInput) -> str:
     source_payload = request.model_dump(mode="json", by_alias=True)
+    requested_source_ids = list(
+        dict.fromkeys(str(chunk.source_id) for chunk in request.chunks)
+    )
     # Keep the complete contract in trusted prompt content rather than the Gemini
     # response_schema transport field. The latter rejects this application's deeply
     # nested schema with INVALID_ARGUMENT in google-genai 1.x.
@@ -87,6 +105,12 @@ def build_grounded_analysis_prompt(request: GroundedAnalysisInput) -> str:
     return "\n\n".join(
         [
             "Analyze only the retrieved chunks in the following JSON.",
+            (
+                "SOURCE COVERAGE REQUIREMENT: The input contains "
+                f"{len(requested_source_ids)} distinct retrieved Source IDs. Audit every "
+                "Source ID for independent experience clusters before selecting candidates. "
+                "Multiple Sources must not reduce per-candidate detail."
+            ),
             "Do not use outside knowledge. If the chunks do not support a claim, omit it or ask for confirmation.",
             "Every evidence sourceId, sourceType, chunkId, pageNumber, and excerpt must match a supplied chunk exactly.",
             "TRUSTED_OUTPUT_JSON_SCHEMA",

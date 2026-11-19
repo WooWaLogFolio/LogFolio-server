@@ -66,6 +66,14 @@ def test_system_policy_requires_korean_user_facing_output() -> None:
     assert "never translate or paraphrase an Evidence excerpt" in SYSTEM_POLICY
 
 
+def test_system_policy_preserves_multi_source_candidate_detail() -> None:
+    assert "must never reduce the detail of an individual candidate" in SYSTEM_POLICY
+    assert "one broad portfolio-style summary" in SYSTEM_POLICY
+    assert "three strongest evidence-grounded experiences" in SYSTEM_POLICY
+    assert "Claim for every evidence-supported section" in SYSTEM_POLICY
+    assert "Spring stores one draft value per section" in SYSTEM_POLICY
+
+
 @pytest.mark.asyncio
 async def test_gemini_provider_parses_schema_and_preserves_server_ids() -> None:
     request = grounded_request()
